@@ -1,0 +1,37 @@
+{
+  "$comment": "LightChoice Radar P0: two public RSS sources only. Collection is limited to source-provided titles and summaries.",
+  "sources": [
+    {
+      "id": "rss-home-assistant-community",
+      "name": "Home Assistant 社区 RSS",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://community.home-assistant.io/latest.rss",
+        "_aihot": { "initialBackfillLimit": 15 }
+      },
+      "tier": "T2",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": ["智能家居", "用户社区"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    },
+    {
+      "id": "rss-wyze-community",
+      "name": "Wyze 用户社区 RSS",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://forums.wyze.com/latest.rss",
+        "_aihot": { "initialBackfillLimit": 15 }
+      },
+      "tier": "T2",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": ["智能家居", "用户社区"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false
+    }
+  ]
+}
