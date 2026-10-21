@@ -1,187 +1,311 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.png">
-    <img src="docs/assets/banner-light.png" alt="AIHOT：每个行业，都可以有自己的 AIHOT。很多条信源流进中间的精选，再分给法律、人力资源、金融等各个行业" width="100%">
-  </picture>
-</p>
+# LightChoice Radar 情报中心
 
-<p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-176b75?style=flat-square" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/Node.js-24-176b75?style=flat-square&logo=nodedotjs&logoColor=white" alt="Node.js 24">
-  <img src="https://img.shields.io/badge/PostgreSQL-17-176b75?style=flat-square&logo=postgresql&logoColor=white" alt="PostgreSQL 17">
-  <img src="https://img.shields.io/badge/Docker-Compose-176b75?style=flat-square&logo=docker&logoColor=white" alt="Docker Compose">
-  <a href="https://aihot.news"><img src="https://img.shields.io/badge/%E7%BA%BF%E4%B8%8A%E5%8E%9F%E7%AB%99-aihot.news-202a30?style=flat-square" alt="线上原站 aihot.news"></a>
-</p>
+**面向个人跨境电商商品研究与产品开发决策的公开情报中心。**
 
-<p align="center">
-  <b>一个自己找热点、自己写日报的网站框架。</b><br>
-  把信源换成你的，把精选标准换成你的 KnowHow，它就是你的行业热点站。
-</p>
+本仓库是这套情报中心的长期产品目标、业务主线与路线图的**唯一入口**。工程规则、Agent 协作边界见 [AGENTS.md](AGENTS.md)；技术细节见 [docs/](docs/)。
 
-<p align="center">
-  <b>简体中文</b> · <a href="README.en.md">English</a>
-</p>
+---
 
-<p align="center">
-  <a href="#跑起来">跑起来</a> ·
-  <a href="docs/customize.md">改成你的行业</a> ·
-  <a href="#它是怎么工作的">它是怎么工作的</a> ·
-  <a href="#文档">文档</a> ·
-  <a href="https://github.com/KKKKhazix/AIHOT/discussions">社区交流</a>
-</p>
+## 1. 项目定位
 
-<br>
+**服务对象**：以个人身份做亚马逊美国站（及后续可验证的其它跨境电商市场）选品、产品开发与改进决策的人。
 
-## 这是什么
+**它要做的事**：
 
-[AIHOT](https://aihot.news) 是我做的一个 AI 热点网站。它每天从一批信源里收资料，用大模型先筛一遍、再独立打两次分，挑出真正值得看的，写成中文标题和摘要；把不同来源说的同一件事聚成一个事件，按有多少人在说排出热点；每天早上出一份日报。
+- 收集**公开**信息（官方公告、行业媒体、公开社区、公开评论等），保留来源、时间与可核查证据。
+- 把信息整理成**需求线索**：用户抱怨、功能缺失、替代需求、新品提及、竞争变化。
+- 为"要不要做某个产品/改进某个产品"提供可回查的判断材料，而不是替人拍板。
 
-这个仓库是它的引擎和框架：网站、后台、精选流程、聚簇和热度算法，**所有提示词的原文和入选门槛**，都在这里。
+**它明确不做的事**：
 
-## 为什么开源
-
-这半年，很多做法律、做 HR、做金融、做贵金属的朋友问我，能不能也给他们的行业做一个。
-
-我做不了。我不懂你们的行业，不知道哪些信源有用，也不知道什么样的消息，对你们来说才叫热点。
-
-但你们懂。
-
-既然我没办法满足所有人，那就把火种交到大家自己手上。
-
-## 说在前面
-
-- **我不是专业的开发者。** 我是设计师出身，半年前还看不太懂代码。这套代码是我和 AI 一起重写的，比以前干净了很多，但一定还有写得不好的地方。发现问题欢迎提 Issue，我不一定能很快回复，先说声抱歉。
-- **这是 AIHOT 的引擎。** 它和 AIHOT 线上跑的是同一份引擎代码，同步时直接从线上导出，不是精心打磨的通用框架。以后 AIHOT 的更新，我会尽量同步过来，但没法保证每一次都同步。模型榜、Codex 重置监控、主题页的大事记这些只对 AI 行业有意义的功能，以及 AIHOT 自己的运营工具，只留在 AIHOT 上。
-- **里面没有 AIHOT 的信源名单和运营数据。** 仓库带了 18 个公开的海外 AI 资讯源做示范，够你跑起来看效果；真正的信源，要换成你自己行业的。
-- **请不要用 AIHOT 的名字和 Logo。** 换上你自己的名字，它就是你的站。
-
-## 它是怎么工作的
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/how-dark.png">
-  <img src="docs/assets/how-light.png" alt="六步：采集、预筛、两次评分、写作、聚簇、热点与成刊" width="100%">
-</picture>
-
-一条资料从信源进来，先判重，再预筛；可能重要的独立打两次分，写好中文标题和摘要，和别的报道聚成事件，算进热度。X 帖子没有正文或只有链接时，保留原帖的链接和图片，不调用写作或翻译模型。分数过了门槛、又不是精选里已有新闻的重复，才进精选；日报按规则编出当天要闻，周报、月报再从日报里汇编。每一步的提示词都在 [`industry/prompts/`](industry/prompts/)，改标准不用改代码。详见 [精选与校准](docs/selection.md)。
-
-### 聚簇与热点
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/cluster-dark.png">
-  <img src="docs/assets/cluster-light.png" alt="五个来源的报道聚成一个事件，事件进入当前热点榜" width="100%">
-</picture>
-
-同一件事，官网发一篇、媒体转十篇、X 上吵一天，读者只需要看到一次。AIHOT 把它们聚成一个**事件**：先用标题摘要的向量（没配向量服务时比文字重合度）在最近两周里找候选，再让模型判断是同一件事、后续进展，还是两件事；拿不准的合并，写入前再让模型复核一遍（复核可以单独换一家模型，设 `GROUP_REVIEW_MODEL`）。
-
-**热度**按事件算，不按文章算：48 小时内，每个独立来源只算一次，24 小时减半。重复抓取不会多算，一家媒体发十篇也只算一次，所以排在前面的，是真正有很多人在说的事。
-
-### 速度
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/perf-dark.png">
-  <img src="docs/assets/perf-light.png" alt="AIHOT 线上实测：页面中位数 10 毫秒，95% 在 50 毫秒内；接口中位数 6 毫秒，95% 在 12 毫秒内；文章页 95% 在 14 毫秒内" width="100%">
-</picture>
-
-## 你会得到什么
-
-| | |
+| 不做 | 原因 |
 |---|---|
-| **六种信源** | RSS、网页列表、JSON 接口、X 账号、微信公众号，以及你自己脚本推送进来的内容。信源分三级（官方一手、官方账号与准官方、媒体与个人），各级入选门槛不同；抓取频率按产出自动调整 |
-| **精选** | 预筛，同一份评分标准独立打两次分，再按信源分级的门槛决定入选；同一条新闻只占一条，换个说法的重复不进。提示词和门槛全部公开，全部可以改；用你自己标注的样本在 SelectBench 里校准 |
-| **写作** | 中文标题、答案先行的摘要、推荐理由，外文全文翻译；分类、标签和新闻事实单独抽取；防止模型把原文没提到的公司写进标题 |
-| **聚簇** | 不同来源报道的同一件事聚成一个事件，后续进展挂在同一个事件下，事件页有综述；进展和报道时间线可一起切换“最新在前”或“最早在前”；人工改过的归属不会被覆盖 |
-| **热点** | 按事件算热度：独立来源越多越靠前，X 上的讨论也算进来；和 6 小时前比，涨得快的标上升，新出现的标“新” |
-| **日报、周报、月报** | 每天出日报（默认 08:00），按规则编出当天要闻：一件事一条，报过的事只在有新进展时跟进，不调模型。每周一出周报、每月 1 日出月报（默认 10:00、10:30），从日报里汇编，模型只写总述和栏目导读。几点出刊在 `site/site.ts` 的 `EDITION_TIMES` 里改 |
-| **主题与搜索** | 公司、方向、内容形态三类主题页；标题摘要搜索和全文相关搜索 |
-| **阅读设置** | 深浅色外观、网站默认字体或浏览器默认字体；收藏和阅读设置只保存在本机，可以导出、导入备份 |
-| **给 Agent 用** | RSS（精选、全部、全文、日报、周报、月报）、公开 API、MCP、Agent Markdown、`llms.txt`，同一份内容给人看也给 Agent 用 |
-| **后台** | 信源管理与试抓、内容诊断与人工评分更正、精选评测、每一步单独换模型、付费服务的预算熔断、运行记录与告警 |
+| 亚马逊全站爬虫、全量评论抓取 | 这是情报线索系统，不是数据抓取农场；也避免违反平台条款 |
+| 把关键词命中直接当成市场结论 | 关键词出现次数不等于需求规模、竞争格局或可做性 |
+| 销量推算、BSR 预测、自动选品 | 缺少可验证的公开数据支撑，属于过度承诺 |
+| 绕过平台限制的采集（代理池、验证码绕过、登录态爬取） | 合规红线，见 [§8](#8-边界与合规) |
+| 用付费模型/付费数据服务替代规则 | 零新增付费是硬约束，见 [AGENTS.md](AGENTS.md) |
 
-## 看一眼
+**与 DSH 的关系**：DeepSeek Harness（DSH）是日常操作与多 Agent 接力的主入口；Radar 本身保持独立、可单独运行的情报引擎，不因"集成"而被改写。当前集成方式见 [§6.4](#64-在-dsh-里查询情报)。
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/shots-dark.png">
-  <img src="docs/assets/shots-light.png" alt="首页的每日精选，关于页的信源河" width="100%">
-</picture>
+---
 
-<p align="center"><sub>截图来自用示范信源跑起来的本地站，站名是默认的 MyHOT。</sub></p>
+## 2. 四条核心业务主线（严格按顺序推进）
 
-## 跑起来
+业务主线是**产品能力的推进顺序**，不是功能清单。**必须按 1 → 2 → 3 → 4 的顺序推进**：前一条达到"可用、可验证"的验收标准后，才进入下一条。
 
-想创建自己的独立站点，可以先点 [Use this template](https://github.com/KKKKhazix/AIHOT/generate)，再克隆你生成的仓库。想持续合并上游更新或贡献代码，建议先 Fork。下面的命令适合直接试用。
+- 后续主线**可以提前做调研**（读官方文档、找公开信源、验证可行性），但**不得因此打乱当前开发顺序**，也不得提前接入采集、写页面或改数据结构。
+- 任何"顺手把后面主线一起做了"的改动，视为范围扩大，需要先回到顺序本身确认。
 
-需要 [Docker](https://docs.docker.com/get-started/get-docker/)、[Node.js 24](https://nodejs.org/en/download)（运行 `init-env` 生成配置要用），和一个 OpenAI 兼容的模型 API Key（DeepSeek、千问、智谱都可以）。
+### 主线 1：平台政策（当前优先）
 
-`init-env` 默认按 DeepSeek 配置。用千问、智谱等别家，照 `.env.example` 里的例子改 `.env` 的 `LLM_BASE_URL`、`LLM_MODEL` 和 `LLM_EXTRA_JSON`；用推理模型（先想再答）时，还要设 `LLM_REASONING_TOKENS` 给推理留出输出额度。
+**目标**：跟踪亚马逊官方公告、费用变更、合规要求、分仓/物流政策、账号与招商政策，及时提示对个人卖家的实际影响。
+
+**验收标准**（达到才算可用）：
+
+1. 至少 1 个**官方公开**来源（官方公告页/官方博客/官方帮助中心）稳定入库，不依赖登录态。
+2. 每条记录保留：原文标题、官方原文链接、官方发布时间、本地收录时间；缺失值如实留空，不猜。
+3. 可按政策类型（费用 / 合规 / 物流分仓 / 账号 / 其它）筛选或打标。
+4. 抽检 10 条，标题、时间、链接与官方原文一致率 100%；不允许把自媒体转述当成官方政策。
+5. 来源失效、页面改版、连续抓取失败时**能被发现**（来源状态可见，不静默失败）。
+
+**当前状态：未开始。** 现有信源中没有亚马逊官方来源；`site_fulltext` 全关，正文抓取在规则模式下不启用。
+
+### 主线 2：行业动态
+
+**目标**：收集跨境电商行业新闻、市场变化与可信行业信息，形成"这个市场最近在发生什么"的背景面。
+
+**验收标准**：
+
+1. 至少 2 个**免费公开**行业信源（RSS 优先），互不重复；付费墙、需登录、需购买的数据源不接。
+2. 判重有效：同一新闻转载不重复占位；来源与原文链接可回溯。
+3. 时间口径正确：按信源时区解析，展示统一为北京时间；无可信发布时间的记录不冒充新消息。
+4. 能区分"新闻事件 / 观点评论 / 厂商软文"，抽检 10 条判断与人工一致。
+5. 单源失败不影响其它源，失败可见。
+
+**当前状态：未开始。** 现有 2 个信源属智能家居/消费产品社区，不是行业媒体。
+
+### 主线 3：消费者原声
+
+**目标**：收集公开商品评论、问答、Reddit、YouTube 等买家反馈，提炼真实痛点与需求。
+
+**验收标准**：
+
+1. 来源合规：只读取**公开可匿名访问**的内容，不绕验证码、不使用代理池、不冒用登录态。
+2. 每条保留：原文链接、采集时间、可得的发布时间、来源与所属商品/品类（能判定时）。
+3. 抽检 10 条，至少 5 条确实是产品体验、故障、推荐或替代需求；泛技术讨论不算数。
+4. 不把同一用户重复发帖计成多个买家；不把转述当一手反馈。
+5. 明确标注"这是线索，不是该商品买家事实"，需回原文核对。
+
+**当前状态：部分具备（未达验收）。** 已接入 Home Assistant 社区与 Wyze 用户社区的公开 RSS，属**社区讨论**，不等于亚马逊评论；Amazon 评论、Reddit、YouTube 均未接入。规则线索识别已可用（见 [§3.1](#31-已实现并验证)）。
+
+### 主线 4：市场信号
+
+**目标**：围绕关键词需求、价格、排名、新品与竞争格局，形成可验证的市场判断材料。
+
+**验收标准**：
+
+1. 至少 1 个**可验证、可复查**的免费数据入口；数据口径（采样范围、时间窗、单位）写清楚。
+2. 每个结论都能追到原始记录，并与其它主线信息交叉验证。
+3. 明确声明局限：关键词热度 ≠ 销量，排名 ≠ 利润，样本 ≠ 全市场。
+4. 不购买商业数据服务、不使用付费代理、不调用付费 API。
+
+**当前状态：未开始。** 目前只有"关键词监控 + 规则线索标签"（本地查询能力），**不是**市场数据。价格、排名、销量、竞争格局数据均无来源。
+
+### 主线状态总表
+
+| # | 主线 | 状态 | 下一步（仅当前主线可执行） |
+|---|---|---|---|
+| 1 | 平台政策 | **未开始（当前优先）** | 找 1 个官方公开来源 → 验证抓取与时间 → 入库与筛选 → 抽检 10 条 |
+| 2 | 行业动态 | 未开始 | 等主线 1 验收通过 |
+| 3 | 消费者原声 | 部分具备（社区 RSS 已通，评论/Reddit/YouTube 未接） | 等主线 1、2 通过后补齐来源 |
+| 4 | 市场信号 | 未开始 | 等主线 1–3 通过后设计数据口径 |
+
+---
+
+## 3. 当前阶段与已实现能力
+
+> 本节的"已实现"只指**代码存在且实际跑通过**的能力；"计划"不得当成已完成。
+
+### 3.1 已实现并验证
+
+| 能力 | 说明 | 证据 |
+|---|---|---|
+| 规则模式（无模型） | `packages/backend/src/config.ts` 按站名强制 `ruleOnlyMode`；只采 RSS、不抓正文、不做模型评分与事件归并 | `tests/radar-core.standalone.test.ts` 断言 `config.ruleOnlyMode === true` |
+| 零付费硬拦截 | 规则模式下所有付费请求在发网络前抛错 | 同上测试断言 `paidRequest` 被拒；`providers/receipts.ts` |
+| RSS 采集 + 判重 + 内容材料哈希 | pg-boss 队列、按来源间隔调度、`A→B→A` 视为新修订而非重复 | `apps/worker/src/schedules.ts`、`tests/radar-core.standalone.test.ts` |
+| 规则线索识别 | 四个规则（产品问题 / 新品提及 / 替代需求 / 产品相关行业动态）带字段偏移与命中原文 | `packages/backend/src/editorial/radar-rules.ts`（`radar-rules-v1`） |
+| 页面：全部动态 / 今日新增 / 搜索 / 详情 / 主题 / 热门 / 关于 | `/all`、`/today`（按北京时间与 `discovered_at` 倒序）、搜索、条目详情与原文跳转 | `apps/web/app/routes/` |
+| 关键词监控（后台） | 保存监控词、按词查询线索 | `packages/backend/src/admin/radar-monitors.ts`、后台 `/admin/radar` |
+| 线索导出（Markdown） | 导出保留来源、收录时间与规则证据 | `packages/backend/src/publication/radar.ts` |
+| 公开出口 | 网页、RSS、`/api/v1/`、`/api/v1/agent`（Markdown）、`/api/mcp`、`/llms.txt` | `apps/api/src/routes/` |
+| DSH 只读查询 | `lightchoice_latest` / `lightchoice_search` 两个工具，查真实记录 | 2026-10-21 实测：最新 5 条、搜索 `Wyze` 命中 5 条、无匹配返回空状态（详见 §6.4） |
+
+### 3.2 存在但本轮未逐一验证
+
+- MCP 工具集合：`/api/mcp` 与 `scripts/mcp-check.ts` 存在，本轮未逐个工具实跑。
+- 后台全部页面（信源、内容诊断、运行记录）：本轮未逐个打开验证。
+- Docker 部署路径：`docker-compose.yml` 存在，本机实验环境未走 Docker。
+- 采集定时任务：本轮只验证了 API 读取，未验证 worker 连续运行稳定性。
+
+### 3.3 计划中（未实现）
+
+- 四条主线中的来源接入与页面（见 [§2](#2-四条核心业务主线严格按顺序推进)）。
+- 机器翻译：`content.translate` 在规则模式下**关闭**，英文原文按英文展示，不伪称已翻译。
+- 事件归并（新内容）、模型综述与日报周报月报的定时任务：规则模式下**已停用**，不要重新打开当作可用功能；热度统计仍在按事件运行。
+- 商品维度聚合（ASIN/品类）、价格与排名时间序列。
+
+### 3.4 尚未验证的数据来源
+
+- 亚马逊官方公告/帮助中心（结构未知，需先验证可公开抓取与时间字段）。
+- Amazon 评论、Q&A（公开性、robots、条款均未核实）。
+- Reddit / YouTube 公开内容（API 限额与条款未核实）。
+- 任何价格、排名、销量类数据（无合法免费来源结论）。
+
+---
+
+## 4. 技术架构
+
+### 4.1 三个进程
+
+| 进程 | 位置 | 职责 |
+|---|---|---|
+| api | `apps/api/` | Fastify：站点接口 `/api/site/`、公开 API `/api/v1/`、RSS、MCP、后台、图片代理、分享图 |
+| worker | `apps/worker/` | pg-boss 队列与定时任务：抓信源、处理内容、热度、清理、告警 |
+| web | `apps/web/` | React Router 服务端渲染页面，只通过 HTTP 读 api，不碰数据库 |
+
+业务代码在 `packages/backend/`；跨端类型在 `packages/contracts/`；本站文案与品牌在 `site/`；行业分类、信源、提示词在 `industry/`；本站专属功能放 `modules/`。
+
+### 4.2 要守住的架构规则
+
+- **一个公开读取层**：所有对外出口都从 `packages/backend/src/publication/` 读，新增出口同样。
+- **页面不调模型**：读者打开页面只读已有数据；模型只在 worker 任务里调用（当前规则模式下整体关闭）。
+- **付费请求有回执与预算熔断**：`providers/receipts.ts`；规则模式直接拒绝付费请求。
+- **安全阀默认关**：`COLLECT_ENABLED`、`MODEL_CALLS_ENABLED`、`FEISHU_*_ENABLED`、`INDEXNOW_SUBMIT_ENABLED` 只有设成 `true` 才打开。
+- **来源可追溯**：每条记录链接原文；`site_fulltext` 默认关，只展示来源提供的标题与摘要。
+- **公开内容匿名**：管理员与访客看到的一样；后台只允许管理员。
+- **数据迁移只增不改**：`database/migrations/` 按完整文件名排序执行，已发布的迁移不改写。
+
+### 4.3 目录速览
+
+| 位置 | 内容 |
+|---|---|
+| `apps/api`、`apps/worker`、`apps/web` | 三个进程 |
+| `packages/backend/src/sources/` | 信源读取与抓取调度 |
+| `packages/backend/src/content/` | 入库、判重、正文清洗 |
+| `packages/backend/src/editorial/` | 判断与写作（当前为规则实现 `radar-rules.ts`） |
+| `packages/backend/src/publication/` | 公开读取层（含 `radar.ts` 导出） |
+| `packages/backend/src/admin/` | 后台接口（含 `radar-monitors.ts`） |
+| `database/migrations/` | 数据库迁移 |
+| `site/`、`industry/`、`modules/` | 本站配置、行业知识、本站专属功能 |
+| `scripts/` | 初始化、迁移、种子、评测、检查 |
+| `tests/` | 后端测试（库名须以 `_test` / `_ci` 结尾） |
+
+---
+
+## 5. 跑起来
+
+### 5.1 前置
+
+- Node.js 24（直接运行 TypeScript，后端无构建步骤）
+- PostgreSQL 17（本机实验环境使用便携版，未注册 Windows 服务）
+- 生成配置：`node scripts/init-env.ts`（生成 `.env`）。**本项目不把任何密钥写进文档或提交进仓库。**
+
+### 5.2 本机开发（实测路径）
+
+实验环境实测：数据库在 `127.0.0.1:5544`，api 在 `127.0.0.1:3001`，web 在 `127.0.0.1:3000`。数据库地址由 `.env` 的 `DATABASE_URL` 决定，本文不记录凭据。
 
 ```bash
-git clone https://github.com/KKKKhazix/AIHOT.git myhot
-cd myhot
-node scripts/init-env.ts --llm-key <你的模型 API Key>
+# 首次或迁移后（脚本自带 --env-file-if-exists=.env）
+npm run db:migrate
+
+# 三个进程分别启动（各开一个终端）
+npm run dev:api      # http://127.0.0.1:3001
+npm run dev:worker   # 队列与定时任务
+npm run dev:web      # http://127.0.0.1:3000
+```
+
+采集与否由 `COLLECT_ENABLED` 决定（默认关）。只做读取与页面验证时，可以只启动 api + web。
+
+### 5.3 Docker 方式
+
+```bash
 docker compose up -d --build
 ```
 
-打开 <http://localhost:3000>。后台在 `/admin`，管理员密码在 `.env` 的 `ADMIN_PASSWORD` 里。一两分钟后开始有内容，第一次导入的资料大约半小时处理完。
+打开 <http://localhost:3000>，后台在 `/admin`。域名、HTTPS、中国大陆网络、备份与更新见 [部署](docs/deploy.md)。
 
-机器上没有 Node、服务器在中国大陆、要配域名和 HTTPS，或者不用 Docker、直接在 Linux、macOS 上跑（Windows 用 WSL2），见 [部署](docs/deploy.md)。
+### 5.4 常用检查命令
 
-站点跑起来后，打开 `/agent` 可以复制 MCP、RSS 或 API 的接入方式；只能读网页的 Agent 从 `/api/v1/agent` 开始；接口说明在 `/openapi-v1.json`。
-
-## 把它改成你的行业
-
-最省事的办法：打开你的 Agent（Claude Code、Codex 都可以），把这个仓库交给它，然后说：
-
-```text
-请读 AGENTS.md 和 docs/customize.md，把这个站改成「XX 行业」的热点站。
-我关心的是：……（写你想盯的信源、你觉得什么消息重要、什么不重要，越具体越好）。
-改完帮我跑 npm run typecheck、npm test 和 node scripts/smoke.ts，并告诉我还需要我自己决定哪些事。
+```bash
+npm run typecheck                                                  # 类型检查
+DATABASE_URL=postgres://127.0.0.1:5544/<名字>_test npm test         # 后端测试（库名须以 _test / _ci 结尾，账号要能建库）
+npm run build -w @aihot/web && node --test apps/web/tests/*.test.ts # 前端构建 + 页面测试
+node scripts/smoke.ts --base http://localhost:3000                 # 站点冒烟（需先跑起来）
+node scripts/mcp-check.ts                                          # MCP 工具集合检查
 ```
 
-要改的东西几乎都在 [`site/`](site/) 和 [`industry/`](industry/) 这两个文件夹里，代码基本不用动：
+测试不访问任何外部服务；规则模式下模型与付费接口一律不调用。
 
-| 文件 | 改什么 |
+### 5.5 怎么确认"真的有数据"
+
+1. 打开 `/today`：条目按**北京时间收录日**倒序，点开能看到来源与原文链接。
+2. 打开 `/all` 与 `/all?q=Wyze`，确认命中、排序与空状态都正确。
+3. `curl http://127.0.0.1:3001/api/v1/agent/latest?limit=5&mode=all&window=7d` 应返回带来源与北京时间的中文 Markdown。
+4. 页面能看到内容，只证明展示；**记录是否真实入库**还要回数据库核对来源链接与时间。
+
+---
+
+## 6. 使用说明
+
+### 6.1 页面入口
+
+| 地址 | 内容 |
 |---|---|
-| `site/site.ts` | 站名、行业词、出刊时间、首页文案、关于页、条目与日报周报月报上的说法、公开接口的分类 |
-| `industry/taxonomy.ts`、`industry/topics.json` | 分类、标签、主题 |
-| `industry/sources.json` | 首次启动时导入的信源 |
-| `industry/prompts/` | 精选标准和写作要求。**你的行业 KnowHow，就写在这里** |
-| `industry/selection.ts` | 入选门槛 |
-| `site/models.ts` | 每一步默认用哪个模型（不改也行：都用 `.env` 里配的那一个） |
-| `site/brand/`、`site/pages/`、`site/public/`、`site/changelog.json` | 图标与 Logo，使用规则和隐私说明，`robots.txt` 这类发布在网站根目录的文件，更新日志 |
-| `modules/` | 框架里没有、只有你的站要的功能，做成模块放在这里，见 [架构](docs/architecture.md#模块) 的“模块” |
+| `/` | 首页（当前规则模式下以最新线索为主，不生成 AI 精选） |
+| `/today` | 今日新增：按收录时间倒序，判断"今天有什么新线索" |
+| `/all` | 全部动态：按时间浏览、进入详情与原文 |
+| `/all?q=<关键词>` | 关键词搜索：可切换按时间或相关度排序；搜索繁忙时进入 `/all/search-busy` 提示页 |
+| `/topics` `/hot` | 主题与热门：热门来自事件热度统计；规则模式下不做模型归并与综述，事件覆盖可能不全 |
+| `/admin` | 后台：信源、内容诊断、关键词监控、运行记录 |
 
-最值得花时间的是评分标准（`industry/prompts/selection-score.md`）和门槛：拿一两百条你自己标注过的资料，用 `scripts/eval-selection.ts` 跑一遍，看它选得准不准，再回去改。怎么做写在 [精选与校准](docs/selection.md) 里。
+### 6.2 公开出口（给程序与 Agent）
 
-## 文档
+| 地址 | 用途 |
+|---|---|
+| `/api/v1/` | 公开 JSON API，文档 `/openapi-v1.json` |
+| `/api/v1/agent` | 给 Agent 读的 Markdown，`/api/v1/agent/latest`、`/api/v1/agent/search` 等 |
+| `/api/mcp` | MCP 服务（工具名前缀 `lightchoice_radar`） |
+| `/feed.xml` 等 | RSS：精选、全部、分类等 |
+| `/llms.txt`、`/sitemap.xml` | 给大模型与搜索引擎的说明 |
+
+### 6.3 关键词监控与线索导出
+
+后台 `/admin/radar` 可保存监控词（名称 + 查询词，空白会被规整、空值被拒绝）；线索导出为 Markdown 时保留来源、收录时间与规则命中的原文片段，便于复核。
+
+### 6.4 在 DSH 里查询情报
+
+插件位于仓库之外：`D:\Workspace\轻选情报中心\lightchoice-radar-plugin`（Cordis bundle，通过 `plugin_manager` 安装到 DSH profile）。提供两个**只读**工具：
+
+| 工具 | 作用 | 实际接口 |
+|---|---|---|
+| `lightchoice_latest` | 查看最新情报（默认最近 7 天全部公开动态、5 条） | `GET /api/v1/agent/latest` |
+| `lightchoice_search` | 按关键词搜索，返回命中内容与原文链接 | `GET /api/v1/agent/search` |
+
+用法：在 DSH 里直接说「查看最新 5 条情报」「搜索关键词 Wyze」。插件只访问 `127.0.0.1:3001` 的这两个固定路径，参数中没有 URL 字段，不写数据库、不调用模型；API 未启动时返回中文错误，不伪造数据。
+
+---
+
+## 7. 文档
 
 | 文档 | 内容 |
 |---|---|
-| [把它改成你的行业](docs/customize.md) | 站名、分类、主题、信源、提示词、门槛、模型、品牌，一步一步来 |
-| [信源](docs/sources.md) | 六种信源怎么配，分级和全文，抓取频率，旧文和存档，固定起点 `publishedAfter`，外部推送接口 |
-| [精选与校准](docs/selection.md) | 一条资料怎么变成精选、怎么编进日报周报月报，怎么用自己的样本校准 |
-| [事件归组与关系评测](docs/grouping.md) | 事件关系怎么判断，怎么用自己标注的成对样本评测 |
-| [综述评测](docs/story-digest-evaluation.md) | 改事件综述提示词前，怎么在同一批事件上并排比较 |
-| [部署](docs/deploy.md) | Docker、域名和 HTTPS、中国大陆、更新、备份、花多少钱，不用 Docker 时在 Linux、macOS（Windows 用 WSL2）上怎么跑 |
-| [架构](docs/architecture.md) | 三个进程、几条不变的规则、目录、模块、数据库迁移、对外出口、测试 |
+| [AGENTS.md](AGENTS.md) | 工程规则、零付费与合规边界、多 Agent 接力约定 |
+| [架构](docs/architecture.md) | 三个进程、公开读取层、模块、迁移、对外出口、测试 |
+| [信源](docs/sources.md) | 信源类型、分级、抓取频率、全文与外部推送 |
+| [部署](docs/deploy.md) | Docker、域名与 HTTPS、中国大陆、更新、备份、成本 |
+| [精选与校准](docs/selection.md) | 精选流程与用自己的样本校准（规则模式下不启用模型精选） |
+| [把它改成你的行业](docs/customize.md) | 站点配置与行业知识的修改入口 |
+| [事件归组与关系评测](docs/grouping.md) | 事件关系判断与评测（规则模式下归组关闭） |
+| [综述评测](docs/story-digest-evaluation.md) | 改综述提示词前的并排比较方法 |
 
-技术栈：Node.js 24 · TypeScript · React Router（服务端渲染）· Fastify · PostgreSQL · pg-boss · Tailwind CSS · Docker Compose。
+---
 
-## 交流与贡献
+## 8. 边界与合规
 
-部署和使用问题到 [问答区](https://github.com/KKKKhazix/AIHOT/discussions/categories/q-a)，新想法到 [想法交流区](https://github.com/KKKKhazix/AIHOT/discussions/categories/ideas)，欢迎在 [作品展示区](https://github.com/KKKKhazix/AIHOT/discussions/categories/show-and-tell) 分享你做出的行业热点站。
+- **零新增付费**：不调用付费模型 API、不产生付费 Token、不订阅商业数据服务、不购买代理。只用合法公开信源、免费 RSS、官方公开公告与免费工具。这条是硬约束，不接受"临时先付费验证"。
+- **不绕过平台限制**：不使用代理池、验证码绕过、登录态爬取、伪造请求头等手段获取数据。
+- **只收公开信息**：不采集非公开、需授权或明确禁止抓取的内容；robots 与来源条款优先。
+- **来源可追溯**：任何进入系统的记录都必须能回到原文链接与时间；无法回溯的数据不入库。
+- **不冒充**：不把社区讨论当买家事实，不把关键词命中当市场规模，不把规划写成已完成，不把英文原文说成已翻译。
+- **不写真实数据**：开发与验证期间不修改真实库记录、不执行迁移、不触发采集或推送，除非任务明确授权。
 
-发现 Bug 或有明确的功能建议，可以 [提交 Issue](https://github.com/KKKKhazix/AIHOT/issues/new/choose)。准备改代码前，先看 [贡献说明](CONTRIBUTING.md)；安全漏洞请走 [私密报告入口](SECURITY.md)。
+---
 
-## 最后
+## 9. 许可与来源
 
-AIHOT 曾经只是我无数个深夜里，一个很小、很小的念头。
+本仓库基于开源项目 [AIHOT](https://github.com/KKKKhazix/AIHOT) 的固定快照 `5633b648b9ca6453caec5bcf70a76785a794286f` 改造为 LightChoice Radar；本地 Git 基线为 `f44ad57bef555f33f7bd1733d6360699f2e5b319`。代码使用 [MIT 许可证](LICENSE)。
 
-我不知道它会被改成什么样子，会走到多远的地方。但这可能就是开源最浪漫的地方。
-
-剩下的路，就交给你们了。
-
-<p align="right">—— 数字生命卡兹克</p>
-
-## 许可
-
-代码使用 [MIT 许可证](LICENSE)。AIHOT 的名字和 Logo 不在许可范围内。字体有自己的许可，见 [NOTICE](NOTICE)。
+- AIHOT 的名字与 Logo 不在许可范围内；本站使用 LightChoice Radar 自己的名称与品牌，不沿用其标识。
+- 字体许可见 [NOTICE](NOTICE)。
+- 第三方信源内容版权归原发布者，本站只保存标题、摘要与原文链接，遵守各来源的使用条款。
