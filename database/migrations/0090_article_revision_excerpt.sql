@@ -1,3 +1,4 @@
+-- atomic
 -- Keep the source excerpt attached to each exact material version for history and provenance.
 ALTER TABLE article_revisions ADD COLUMN excerpt text;
 

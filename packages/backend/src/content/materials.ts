@@ -86,7 +86,7 @@ const UNKNOWN_TIME = "unknown-publication-time";
 const STALE = "stale-on-discovery";
 
 /** The one timeline rule shared by every entrance. */
-export function decideTimeline(claimed: Date | null | undefined, discoveredAt: Date, explicitBackfill?: string | null, aheadMs = FUTURE_TOLERANCE_MS): TimelineDecision {
+export function decideTimeline(claimed: Date | null | undefined, discoveredAt: Date, explicitBackfill?: string | null, aheadMs = FUTURE_TOLERANCE_MS, sourceUpdatedAt?: Date | null): TimelineDecision {
   let publishedAt: Date | null = claimed && Number.isFinite(claimed.getTime()) ? claimed : null;
   if (publishedAt && publishedAt.getTime() > discoveredAt.getTime() + aheadMs) publishedAt = null;
   let backfillReason: string | null = null;
@@ -94,7 +94,9 @@ export function decideTimeline(claimed: Date | null | undefined, discoveredAt: D
   else if (!publishedAt) backfillReason = UNKNOWN_TIME;
   else if (publishedAt && discoveredAt.getTime() - publishedAt.getTime() > STALE_ON_DISCOVERY_MS) backfillReason = STALE;
   const backfill = backfillReason !== null;
-  const timelineAt = backfill && publishedAt ? publishedAt : discoveredAt;
+  // Without a publication date the timeline may use the source's own update date: a policy document
+  // updated in July is not today's news, and the crawl day must never stand in for its date.
+  const timelineAt = backfill && publishedAt ? publishedAt : publishedAt ? discoveredAt : sourceUpdatedAt ?? discoveredAt;
   return { publishedAt, timelineAt, backfill, backfillReason };
 }
 
@@ -182,8 +184,10 @@ async function insertRevision(db: Db, revision: { articleId: string; revision: n
     await db`INSERT INTO article_revisions (article_id, revision, content_hash, title, excerpt, body_text)
       VALUES (${revision.articleId}, ${revision.revision}, ${revision.hash}, ${revision.title}, ${revision.excerpt}, ${revision.bodyText})`;
   } else {
-    // Before the additive excerpt migration, retain the best available text snapshot in the existing column.
-    const legacySnapshot = revision.bodyText || revision.excerpt;
+    // Before the additive excerpt migration the excerpt column does not exist, so only a real body
+    // can be stored here. The excerpt stays on the article itself: writing it into body_text would
+    // make a short metadata description look like a stored article body.
+    const legacySnapshot = revision.bodyText;
     await db`INSERT INTO article_revisions (article_id, revision, content_hash, title, body_text)
       VALUES (${revision.articleId}, ${revision.revision}, ${revision.hash}, ${revision.title}, ${legacySnapshot})`;
   }
@@ -236,6 +240,37 @@ export async function reuseExternalMaterialIdentities<C extends Pick<MaterialInp
   });
 }
 
+/** The later of two readings of a source's own update date; null means the source said nothing. */
+function laterDate(stored: Date | null, claimed: Date | null | undefined): Date | null {
+  if (!claimed) return stored;
+  return stored && stored.getTime() >= claimed.getTime() ? stored : claimed;
+}
+
+/**
+ * A source can restate the date it last updated a document without changing a word of it. An article
+ * with a trusted publication date keeps that date for both its timeline and its card; an undated one
+ * takes the source's own date as its timeline, so a policy updated in July is not dated by the crawl.
+ * A reading older than the stored one says nothing new and moves nothing back. The caller holds the
+ * material lock; the body, its hash and its analysis are untouched, so this is not a revision.
+ */
+async function refreshSourceUpdatedAt(
+  db: Db, articleId: string, claimed: Date | null | undefined, stored: { published_at: Date | null; source_updated_at: Date | null },
+): Promise<boolean> {
+  if (!claimed) return false;
+  if (stored.source_updated_at && claimed.getTime() <= stored.source_updated_at.getTime()) return false;
+  if (stored.published_at !== null) {
+    await db`UPDATE articles SET source_updated_at = ${claimed}, updated_at = now() WHERE id = ${articleId}`;
+    return true;
+  }
+  await db`UPDATE articles SET source_updated_at = ${claimed}, timeline_at = ${claimed}, updated_at = now() WHERE id = ${articleId}`;
+  // The pool keeps its own copy of the timeline, derived by the one publication projection.
+  if ((await db`SELECT 1 FROM publications WHERE article_id = ${articleId}`).length) {
+    const published = await publishArticleTx(db as Tx, articleId);
+    await emit("articleChanged", { id: articleId, kind: "content", reduced: published?.reduced, reason: "source update date" }, db);
+  }
+  return true;
+}
+
 /**
  * Stores material. Existing identities get a discovery record, and a new revision only when the
  * stored content really changes. Concurrent reports of the same material are serialised on the row,
@@ -247,8 +282,8 @@ export async function upsertMaterial(m: MaterialInput, db: Db = sql): Promise<Ma
 }
 
 async function lockMaterial(db: Db, identityKey: string) {
-  const [existing] = await db<{ id: string; source_id: string; revision: number; content_hash: string | null; backfill: boolean; published_at: Date | null; publication_time: string | null; title: string; body_text: string | null; excerpt: string | null; participation_mode: string }[]>`
-    SELECT a.id, a.source_id, a.revision, a.content_hash, a.backfill, a.published_at, a.publication_time, a.title, a.body_text, a.excerpt, s.participation_mode
+  const [existing] = await db<{ id: string; source_id: string; revision: number; content_hash: string | null; backfill: boolean; published_at: Date | null; source_updated_at: Date | null; publication_time: string | null; title: string; body_text: string | null; excerpt: string | null; participation_mode: string }[]>`
+    SELECT a.id, a.source_id, a.revision, a.content_hash, a.backfill, a.published_at, a.source_updated_at, a.publication_time, a.title, a.body_text, a.excerpt, s.participation_mode
     FROM articles a JOIN sources s ON s.id = a.source_id WHERE a.identity_key = ${identityKey} FOR UPDATE OF a`;
   return existing;
 }
@@ -262,7 +297,7 @@ async function upsertIn(db: Db, m: MaterialInput): Promise<MaterialResult> {
   const discoveredAt = m.discoveredAt ?? new Date();
   const title = collapseWhitespace(m.title).slice(0, 1000) || m.url;
 
-  const t = decideTimeline(m.publishedAt, discoveredAt, m.backfill);
+  const t = decideTimeline(m.publishedAt, discoveredAt, m.backfill, FUTURE_TOLERANCE_MS, m.sourceUpdatedAt ?? null);
   // Most listing entries are already stored. Lock and reuse those rows without attempting an
   // insert of their body and raw payload on every collection. The unique key still arbitrates
   // concurrent first discoveries; after losing that insert, read and lock its winner.
@@ -323,6 +358,7 @@ async function upsertIn(db: Db, m: MaterialInput): Promise<MaterialResult> {
   const next = contentHash({ title, bodyText, excerpt });
   if (!time && isCurrentMaterialHash(existing!.content_hash, next)) {
     await updatePresentation(db, existing!.id, { html: m.bodyHtml, media: m.media });
+    await refreshSourceUpdatedAt(db, existing!.id, m.sourceUpdatedAt, existing!);
     return unchanged;
   }
   if (!time && existing!.content_hash === null) {
@@ -338,9 +374,14 @@ async function upsertIn(db: Db, m: MaterialInput): Promise<MaterialResult> {
   if (!time && sameBarringLoss(existing!.title, title) && sameBarringLoss(existing!.body_text, bodyText) && sameBarringLoss(existing!.excerpt, excerpt)) return unchanged;
 
   const media = m.media ? sql.json(m.media as never) : null;
+  // A new revision carries the same date rule as the first store: the source's own update date only
+  // ever moves forward, and it is a timeline only for material without a trusted publication date.
+  const sourceUpdatedAt = laterDate(existing!.source_updated_at, m.sourceUpdatedAt);
+  const timelineAt = (time?.publishedAt ?? existing!.published_at) === null ? sourceUpdatedAt : null;
   await reviseMaterial(db, existing!.id, {
     set: sql`title = ${title}, author = coalesce(${m.author ?? null}, author), language = coalesce(${m.language ?? null}, language),
-      source_updated_at = ${m.sourceUpdatedAt ?? null}, excerpt = coalesce(${m.excerpt ?? null}, excerpt),
+      source_updated_at = ${sourceUpdatedAt}, ${timelineAt ? sql`timeline_at = ${timelineAt},` : sql``}
+      excerpt = coalesce(${m.excerpt ?? null}, excerpt),
       body_text = coalesce(${m.bodyText ?? null}, body_text), body_html = coalesce(${m.bodyHtml ?? null}, body_html),
       body_status = CASE WHEN ${m.bodyText ?? null}::text IS NULL THEN body_status ELSE ${m.bodyStatus ?? "ok"} END,
       media = CASE WHEN ${media}::jsonb IS NULL THEN media ELSE ${media}::jsonb END,

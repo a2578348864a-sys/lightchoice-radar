@@ -6,6 +6,7 @@ import type { AdminSource, AdminSourceCreated, AdminSourceDetail, AdminSourcePre
 import { REPLACEABLE_SOURCE_KINDS } from "@aihot/contracts/admin";
 import { audit, auditHistory, Conflict } from "../audit.ts";
 import { groupingReset } from "../content/provenance.ts";
+import { config } from "../config.ts";
 import { sql, type Db } from "../db.ts";
 import { enqueue, QUEUES } from "../jobs/queue.ts";
 import { republishKey, requestRepublish } from "../jobs/publication.ts";
@@ -16,6 +17,7 @@ import { fetchRss } from "../sources/rss.ts";
 import { assertSupportedConfig, UnsupportedConfig } from "../sources/config-keys.ts";
 import { enrichDetails, listingEntries, storedDetails } from "../sources/collect.ts";
 import { filterPublicationWindow } from "../sources/filters.ts";
+import { isApprovedRadarPolicyWebList } from "../sources/radar-policy-source.ts";
 import { FetchError, type Candidate, type SourceRow } from "../sources/types.ts";
 import { fetchWebList } from "../sources/web-list.ts";
 import { fetchXSearch } from "../sources/x.ts";
@@ -86,6 +88,9 @@ export async function previewStoredSource(id: string): Promise<BeforeJson<AdminS
 export async function previewSource(draft: Pick<SourceRow, "id" | "kind" | "config"> & Partial<SourceRow>): Promise<BeforeJson<AdminSourcePreview>> {
   const source = { name: draft.id, enabled: true, cursor: null, tier: "T2", participation_mode: "editorial", ...draft } as SourceRow;
   assertSupportedConfig(source.kind, source.config);
+  if (config.ruleOnlyMode && source.kind !== "rss" && !isApprovedRadarPolicyWebList(source)) {
+    throw new FetchError("LightChoice Radar blocks unapproved non-RSS sources");
+  }
   const started = performance.now();
   let found;
   if (source.kind === "rss") found = (await fetchRss(source, { force: true })).candidates;

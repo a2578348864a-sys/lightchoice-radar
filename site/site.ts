@@ -27,9 +27,9 @@ export const SITE = {
    */
   subject: "跨境市场",
   /** 首页的完整标题（浏览器标签、搜索结果）。 */
-  homeTitle: "LightChoice Radar — 跨境市场情报",
+  homeTitle: "LightChoice Radar — Amazon 美国站平台政策情报",
   /** 主题目录页（/topics）的标题。 */
-  topicsTitle: "跨境市场主题与产品动态",
+  topicsTitle: "Amazon 美国站政策主题",
   /** 反馈表单输入框里的示例。 */
   feedbackExample: "例如：我在搜索某个关键词时遇到……我原本想……",
   /** 反馈页标题下面的一句话。 */
@@ -37,13 +37,13 @@ export const SITE = {
   /** 反馈表单邮箱框里的提示。 */
   feedbackEmailHint: "留下邮箱，我们可以回信联系你",
   /** 一句话介绍：搜索引擎、分享卡片、RSS、llms.txt 会用。 */
-  description: "收集公开产品社区的新品、故障、价格和用户需求线索，保留来源链接与采集时间。",
+  description: "为 Amazon 美国站选品提供平台政策与产品安全核查线索，保留原文、来源和发布时间；未确认信息明确标注。",
   /** llms.txt 里一句话介绍下面的一段详细介绍（选填）。 */
   llmsIntro: null as string | null,
   /** 一行小字：分享图、海报下方。 */
-  tagline: "新品线索与用户声音",
+  tagline: "平台政策与产品安全线索",
   /** 搜索引擎读到的关键词（首页结构化数据）。 */
-  keywords: ["跨境电商市场情报", "Amazon 美国站", "新品线索", "用户反馈"] as string[],
+  keywords: ["Amazon 美国站政策", "FBA 入库与费用", "类目合规", "CPSC 产品召回"] as string[],
   /** 网站开始收录的年份（结构化数据的时间范围，选填）。 */
   since: null as string | null,
   /** 界面语言（HTML lang、og:locale）。 */
@@ -121,7 +121,7 @@ export const NAV = {
    * 不放进导航的引擎入口，目前只支持热点榜（"/hot"）和主题（"/topics"）。页面照样能打开；原来回到它的返回按钮和链接改回精选，
    * 写 "/hot" 时首页也不放当前热点。
    */
-  hidden: [] as Array<"/hot" | "/topics">,
+  hidden: ["/hot", "/topics"] as Array<"/hot" | "/topics">,
 };
 
 /** 条目卡片和详情页上的几处说法和显示。 */
@@ -147,16 +147,16 @@ export const ABOUT = {
   /** 页面描述（搜索结果、分享卡片）。 */
   description: `关于 ${SITE.name}：${SITE.description}`,
   /** 大标题：第一行正常颜色，第二行强调色。 */
-  headline: ["先从公开用户讨论里，", "找产品需求和问题线索。"] as [string, string],
+  headline: ["先查平台规则与产品安全，", "原文和来源留给你核对。"] as [string, string],
   /** 标题下面的一段话。{sources} 会换成实时的信源数（两边自动加空格，所以 {sources} 两边不写空格）；统计没取到时换成 sourcesFallback。 */
-  lead: `${SITE.name} 自动读取公开 RSS，保存原文标题、来源链接和采集时间。`,
-  sourcesFallback: "2 个",
+  lead: `${SITE.name} 收录公开政策与产品安全信息，并保留原文、来源与时间。`,
+  sourcesFallback: "1 个",
   /** 信源河动画下面的四个环节。 */
   steps: {
-    collect: "本轮只读取 Home Assistant 与 Wyze 两个公开用户社区 RSS。",
-    store: "保存订阅提供的标题、摘要、原文链接和采集时间，并按原文链接去重。",
-    select: "本轮不调用模型，不翻译或判断相关性；页面展示的是来源原文线索。",
-    publish: "每条记录都可打开来源核查；是否属于真实买家需求，需要人工判断。",
+    collect: "当前信源配置为 CPSC 官方产品召回 RSS。Amazon 登录后可见的内容不采集；未通过访问验证的来源不列为可用信源。",
+    store: "保留 RSS 提供的标题、摘要、原文链接与发布时间，并记录首次收录时间和内容修订。",
+    select: "本地规则只标注原文关键词，不调用模型或自动翻译，也不代表政策事实和适用范围已核实。",
+    publish: "找不到明确生效日期时显示未确认；选品影响需结合目标类目、商品属性和原文人工核对。",
   },
   /**
    * 作者块（选填），null 就不显示。
@@ -189,7 +189,7 @@ export const ADMIN = {
 /** Agent 接入页的示例。 */
 export const AGENT = {
   /** MCP 工具表里“搜索”一行：能搜什么、可以怎么问。 */
-  search: { scope: "按公司、产品、人物或话题搜最近 7 天", ask: "这家公司最近发了什么？" },
+  search: { scope: "按平台政策、费用、FBA 入库、类目合规或产品召回搜最近 7 天", ask: "最近有哪些可能影响 Amazon 美国站选品的规则变化？" },
 };
 
 /** 日报、周报、月报版面上的说法。 */
@@ -245,7 +245,7 @@ export const COMMUNITY_FEEDS: { dev: string[]; hn: string[] } = {
 /** 各页分享图（/og/pages/*.png）上的文字。主题目录页的那张按主题数自动生成。 */
 export const CARDS: Record<string, { kicker: string; title: string; subtitle: string; accent?: "hot" | "amber" }> = {
   site: { kicker: subjectAfter("每日", "精选"), title: SITE.tagline, subtitle: SITE.description },
-  all: { kicker: subjectAfter("全部", "动态"), title: "所有信源的最新动态，一站看完", subtitle: "按时间汇总各信源的最新动态，可按类别与标签筛选。" },
+  all: { kicker: subjectAfter("全部", "动态"), title: "公开平台政策与产品安全信息", subtitle: "按原文关键词分类，核对来源、发布时间和生效日期；分类不等于政策事实已核实。" },
   hot: { kicker: "热点榜", title: "过去 48 小时，大家在讨论什么", subtitle: "热度指数、趋势与组成热度的公开来源。", accent: "hot" },
   daily: { kicker: withSubject("日报"), title: subjectAfter(`每天 ${spokenTime(EDITION_TIMES.daily)}，一份读得完的`, "日报"), subtitle: `${subjectAfter("前一天值得关注的", "动态")}。` },
   weekly: { kicker: withSubject("周报"), title: `一周${REPORTS.entry.noun}，一次看清`, subtitle: "本周的主线、重要发布与值得回看的讨论。" },

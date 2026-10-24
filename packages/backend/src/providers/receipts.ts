@@ -10,7 +10,7 @@
 import { sql, type Db } from "../db.ts";
 import { sha256, stableJson } from "../lib/ids.ts";
 import { shutdownSignal } from "../lib/shutdown.ts";
-import { config } from "../config.ts";
+import { config, translationPurposeAllowed } from "../config.ts";
 
 /** The text of a spent budget's error; with `%` for both parts it is the LIKE pattern that finds every saved one. */
 export const budgetMessage = (service: string, window: string) => `Budget for ${service} exhausted (${window})`;
@@ -254,7 +254,9 @@ async function checkBudget(tx: Db, service: string, model?: string | null): Prom
  */
 export async function paidRequest(req: ReceiptRequest, call: () => Promise<CallOutcome>, beforeRequest?: (tx: Db) => Promise<void>): Promise<ReceiptResult> {
   // Hard stop before reuse, reservation or network I/O, including accidental scheduled calls.
-  if (config.ruleOnlyMode) throw new Error("Paid provider requests are disabled in LightChoice Radar mode");
+  // The only exception is a translation purpose while the dedicated translation switch is on
+  // (config.translationPurposeAllowed); every other purpose still stops here.
+  if (config.ruleOnlyMode && !translationPurposeAllowed(req.purpose)) throw new Error("Paid provider requests are disabled in LightChoice Radar mode");
   const logicalKey = logicalKeyFor(req);
 
   const claimed = await sql.begin(async (tx) => {

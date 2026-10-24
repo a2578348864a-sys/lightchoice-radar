@@ -5,6 +5,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { PUBLIC_API_CATEGORY_KEYS, type PublicApiCategoryKey } from "@aihot/contracts/taxonomy";
 import { isValidDate } from "@aihot/contracts/time";
 import { agentGuide, dailyAnswer, hotAnswer, latestAnswer, periodAnswer, searchAnswer, searchItems, storyAnswer } from "@aihot/backend/publication/agent";
+import { parseHistoricalSearchRange } from "@aihot/backend/publication/search-range";
 import { v1Items } from "@aihot/backend/publication/v1";
 import { resolveStory, v1HotTopics, v1Story } from "@aihot/backend/publication/stories";
 import { dailyWithNotes, isPeriodKey, v1Period } from "@aihot/backend/publication/reports";
@@ -42,12 +43,15 @@ export function registerAgent(app: FastifyInstance) {
   }));
 
   app.get("/api/v1/agent/search", publicHandler(async (req, reply) => {
-    const q = strictQuery(req, ["q", "window", "category", "limit"]);
+    const q = strictQuery(req, ["q", "window", "category", "limit", "from", "to"]);
     const text = (q.q ?? "").trim();
     if ([...text].length < 2 || [...text].length > 200) throw new QueryError("q must contain 2 to 200 characters.");
     const p = { ...listParams(q), window: enumParam(q.window, "window", ["24h", "7d"] as const, "7d") };
-    const found = await searchItems(text, p.window, p.category, p.limit);
-    return markdown(req, reply, searchAnswer(found, { q: text, window: p.window, category: p.category }), "agent-search", V1_OPERATIONS.items.cacheControl);
+    const parsedRange = parseHistoricalSearchRange(q.from, q.to);
+    if ("error" in parsedRange) throw new QueryError(parsedRange.error);
+    const publishedRange = parsedRange.range;
+    const found = await searchItems(text, p.window, p.category, p.limit, undefined, publishedRange);
+    return markdown(req, reply, searchAnswer(found, { q: text, window: p.window, category: p.category, publishedRange }), "agent-search", V1_OPERATIONS.items.cacheControl);
   }));
 
   app.get("/api/v1/agent/hot", publicHandler(async (req, reply) => {

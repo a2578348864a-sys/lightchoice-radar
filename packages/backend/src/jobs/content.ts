@@ -199,8 +199,20 @@ async function afterFailure(articleId: string, revision: number, error: unknown)
   return { state: "retrying", retryAt };
 }
 
-export async function registerContentJobs(boss: PgBoss) {
-  await work(boss, QUEUES.analyze, { localConcurrency: 6, pollingIntervalSeconds: 2 }, ({ articleId, attemptTag }) => processArticle(articleId, { attemptTag }));
+export async function registerContentJobs(boss: PgBoss, opts: { scope?: SweepScope } = {}) {
+  const scope = opts.scope?.sources?.length || opts.scope?.since ? opts.scope : null;
+  await work(boss, QUEUES.analyze, { localConcurrency: scope ? 1 : 6, pollingIntervalSeconds: 2 }, async ({ articleId, attemptTag }) => {
+    // A scoped worker (a bounded first-lane trial) refuses work that predates its start or belongs to
+    // another lane: the job finishes without touching the article or its publication.
+    if (scope) {
+      const [row] = await sql<{ created_at: Date; source_id: string }[]>`
+        SELECT created_at, source_id FROM articles WHERE id = ${articleId}`;
+      if (!row) return { skipped: "missing" };
+      if (scope.since && row.created_at < new Date(scope.since)) return { skipped: "before-baseline" };
+      if (scope.sources?.length && !scope.sources.includes(row.source_id)) return { skipped: "out-of-scope-source" };
+    }
+    return processArticle(articleId, { attemptTag });
+  });
 }
 
 /**
@@ -244,19 +256,30 @@ export async function registerExtractionJobs(boss: PgBoss) {
  * job was never created (a crash between write and enqueue), or whose job has waited half an hour
  * (pg-boss refuses the duplicate while it still exists). Returns the jobs actually created.
  */
-export async function sweepUnprocessed(): Promise<{ enqueued: number }> {
+export interface SweepScope {
+  /** Only these sources are picked up (the first lane's official/regulatory set). */
+  sources?: readonly string[];
+  /** Only material created at or after this instant is picked up (a trial's start). */
+  since?: string;
+}
+
+export async function sweepUnprocessed(scope: SweepScope = {}): Promise<{ enqueued: number }> {
+  const scoped = !!(scope.sources?.length || scope.since);
   const rows = await sql<{ id: string }[]>`
     SELECT id FROM articles
     WHERE processing_state = 'new' AND created_at < now() - interval '3 minutes'
       AND (processing_retry_at IS NULL OR processing_retry_at <= now())
       AND (processing_queued_at IS NULL OR processing_queued_at < now() - ${QUEUED_STALE}::interval)
+      ${scope.since ? sql`AND created_at >= ${scope.since}::timestamptz` : sql``}
+      ${scope.sources?.length ? sql`AND source_id = ANY(${scope.sources as string[]})` : sql``}
     ORDER BY discovered_at DESC LIMIT 500`;
   let enqueued = 0;
   for (const r of rows) if (await queueProcessing(r.id)) enqueued += 1;
 
   // Existing AIHOT content must also receive Radar tags. Re-evaluate current editorial material
   // with deterministic rules in bounded batches; this path never calls a model or paid provider.
-  if (config.ruleOnlyMode) {
+  // A scoped run (a bounded trial) never re-judges stored material: it follows new arrivals only.
+  if (config.ruleOnlyMode && !scoped) {
     const staleRules = await sql<{ id: string }[]>`
       WITH stale AS (
         SELECT a.id FROM articles a

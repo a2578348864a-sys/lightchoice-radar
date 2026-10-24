@@ -5,8 +5,9 @@
 import type { z } from "zod";
 import type { ModelPreset } from "@aihot/contracts/site-config";
 import { PRESETS } from "@aihot/site/models";
-import { config, credential } from "../config.ts";
+import { config, credential, translationPurposeAllowed } from "../config.ts";
 import { sha256 } from "../lib/ids.ts";
+import { reserveTranslationCall, settleTranslationCall } from "../editorial/translate-budget.ts";
 import {
   assertAccepted, failureKind, logicalKeyFor, ModelOutputError, ModelUnavailableError, paidRequest, ProviderRejectedError, receiptState, rejectReceivedResponse,
   type ReceiptRequest,
@@ -65,6 +66,8 @@ export interface ChatJsonOptions<S extends z.ZodType> {
   /** false: the model answers in its own text format (no JSON mode); `parse` turns it into the schema's input. */
   json?: boolean;
   parse?: (content: string) => unknown;
+  /** The article a translation purpose belongs to, for the translation budget's distinct-article cap. */
+  articleId?: string;
 }
 
 export interface ChatJsonResult<T> {
@@ -163,7 +166,10 @@ export async function chatJson<S extends z.ZodType>(opts: ChatJsonOptions<S>): P
 async function chatOnce<S extends z.ZodType>(opts: ChatJsonOptions<S>, circuit = false, fallbackFor?: string): Promise<ChatJsonResult<z.infer<S>>> {
   const spec = MODELS[opts.model];
   if (!spec) throw new Error(`Unknown model ${opts.model}`);
-  if (!config.modelCallsEnabled) throw new ModelUnavailableError("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
+  // Translation is the deployment's only paid capability: it passes the switch meant for every other
+  // step only while the dedicated translation gate names this purpose. Nothing else gets through.
+  const translation = translationPurposeAllowed(opts.purpose);
+  if (!config.modelCallsEnabled && !translation) throw new ModelUnavailableError("Model calls are disabled (MODEL_CALLS_ENABLED=false)");
   const baseUrl = credential("models", spec.baseUrlEnv);
   const apiKey = credential("models", spec.apiKeyEnv);
   if (!baseUrl || !apiKey || !spec.model) throw new ModelUnavailableError(`Model ${opts.model} is not configured (${spec.baseUrlEnv}, ${spec.apiKeyEnv}${spec.key === "default" ? ", LLM_MODEL" : ""})`);
@@ -222,10 +228,17 @@ async function chatOnce<S extends z.ZodType>(opts: ChatJsonOptions<S>, circuit =
         cost: null,
       };
     },
-    circuit ? async tx => { permit = await enterModelCircuit(tx, spec.service, timeoutMs); } : undefined,
+    async tx => {
+      // Booked inside the receipt transaction: a refused reservation writes neither a receipt nor a spend.
+      // The purpose rides along so the window's own purpose allowlist (if any) is checked before the send.
+      if (translation) await reserveTranslationCall(tx, { articleId: opts.articleId ?? "", inputChars: userText.length + opts.system.length, maxTokens, purpose: opts.purpose });
+      if (circuit) permit = await enterModelCircuit(tx, spec.service, timeoutMs);
+    },
   );
 
   const response = receipt.response as { choices?: Array<{ message?: { content?: string }; finish_reason?: string }>; usage?: Record<string, unknown> };
+  // Usage is the only record of what this request actually cost.
+  if (translation) await settleTranslationCall(response.usage, { articleId: opts.articleId ?? "", inputChars: userText.length + opts.system.length, maxTokens });
   const content = response.choices?.[0]?.message?.content ?? "";
   let parsed: z.infer<S>;
   try {

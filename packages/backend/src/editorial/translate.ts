@@ -194,7 +194,7 @@ export async function translateArticle(articleId: string): Promise<TranslateResu
     const translated = await translateAll(articleId, row.revision, [text], SYSTEM_POST);
     const [t] = translated.translations;
     if (!t) return unusable(translated.receiptIds, "translation did not line up");
-    await store(articleId, row.revision, row.title, textToHtml(t), t, true, translated.receiptIds);
+    await storeTranslation(articleId, row.revision, row.title, textToHtml(t), t, true, translated.receiptIds);
     return result({ status: "translated", segments: 1 });
   }
 
@@ -236,11 +236,16 @@ export async function translateArticle(articleId: string): Promise<TranslateResu
   if (!done) return unusable(receiptIds, "no batch translated");
   const complete = done === blocks.length;
   const html = sanitizeBody($.html());
-  await store(articleId, row.revision, row.title, html, cheerio.load(html, null, false).root().text().trim(), complete, receiptIds, row.body_html);
+  await storeTranslation(articleId, row.revision, row.title, html, cheerio.load(html, null, false).root().text().trim(), complete, receiptIds, row.body_html);
   return result({ status: complete ? "translated" : "partial", segments: done });
 }
 
-async function store(articleId: string, revision: number, title: string, html: string, text: string, complete: boolean, receiptIds: number[], sourceHtml?: string) {
+/**
+ * Commits one translation answer. Exported for the same-version regression test: in this repository a
+ * model call can never reach it (rule mode blocks paid requests before the network), so the test drives
+ * the storage rule itself instead of pretending a model answered.
+ */
+export async function storeTranslation(articleId: string, revision: number, title: string, html: string, text: string, complete: boolean, receiptIds: number[], sourceHtml?: string) {
   // Never over a translation of a later revision (a slow run finishing after a newer one).
   await sql.begin(async (tx) => {
     // A layout refresh can finish while the model is answering the same semantic revision.
@@ -252,9 +257,18 @@ async function store(articleId: string, revision: number, title: string, html: s
     const changed = await tx`
       INSERT INTO translations (article_id, lang, revision, title, body_html, body_text, complete, origin)
       VALUES (${articleId}, 'zh', ${revision}, ${title}, ${html}, ${text}, ${complete}, 'model')
-      ON CONFLICT (article_id, lang) DO UPDATE SET revision = EXCLUDED.revision, title = EXCLUDED.title, body_html = EXCLUDED.body_html,
+      ON CONFLICT (article_id, lang) DO UPDATE SET revision = EXCLUDED.revision,
+        -- A Chinese title made for this same revision (editorial/translate-text.ts) is kept: the body
+        -- translation carries the source title, not a better one.
+        title = CASE WHEN translations.revision = EXCLUDED.revision AND coalesce(translations.title, '') <> ''
+                          AND translations.title <> EXCLUDED.title
+                     THEN translations.title ELSE EXCLUDED.title END,
+        body_html = EXCLUDED.body_html,
         body_text = EXCLUDED.body_text, complete = EXCLUDED.complete, origin = 'model', created_at = now()
-      WHERE translations.origin <> 'source' AND translations.revision <= EXCLUDED.revision
+      WHERE translations.origin <> 'source' AND (translations.revision < EXCLUDED.revision
+          -- Same version: a complete translation is only ever replaced by another complete one, so a
+          -- late partial answer can never downgrade a translation that already covers the whole text.
+          OR (translations.revision = EXCLUDED.revision AND (NOT translations.complete OR EXCLUDED.complete)))
         AND (translations.revision, translations.title, translations.body_html, translations.body_text, translations.complete, translations.origin)
           IS DISTINCT FROM (EXCLUDED.revision, EXCLUDED.title, EXCLUDED.body_html, EXCLUDED.body_text, EXCLUDED.complete, EXCLUDED.origin)
       RETURNING article_id`;

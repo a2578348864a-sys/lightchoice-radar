@@ -24,6 +24,13 @@ export function listedCondition(now: Date) {
   return sql`p.visibility = 'public' AND p.eligible AND ${releasedCondition(now)}`;
 }
 
+/** Explicit historical search may read public, relevant editorial archives without changing list eligibility. */
+export function historicalSearchCondition(now: Date) {
+  return sql`p.visibility = 'public' AND s.participation_mode = 'editorial'
+    AND EXISTS (SELECT 1 FROM analyses historical_analysis WHERE historical_analysis.id = p.analysis_id AND historical_analysis.relevance = 'pass')
+    AND ${releasedCondition(now)}`;
+}
+
 /** Story reports include older editorial material outside the pool, but never withdrawn or not yet released content. */
 export function storyReportCondition(now: Date) {
   return sql`p.visibility = 'public' AND s.participation_mode = 'editorial' AND ${releasedCondition(now)}`;

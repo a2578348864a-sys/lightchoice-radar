@@ -19,6 +19,10 @@ export interface JobData {
   "events.group": { articleId: string; signalOnly?: boolean };
   "events.digest": { storyId: number };
   "sources.fetch": { sourceId: string; force?: boolean };
+  "sources.fetch-amazon-announcements": { sourceId: string; force?: boolean };
+  "sources.fetch-amazon-fee-updates": { sourceId: string; force?: boolean };
+  "sources.fetch-regulatory": { sourceId: string; force?: boolean };
+  "sources.fetch-amz123-leads": { sourceId: string; force?: boolean };
   "sources.fetch-x": { key: string; sourceIds: string[] };
   "sources.mp": { sourceId: string; reason?: "schedule" | "manual" };
   "notify.selected": { articleId: string; attempt?: number };
@@ -33,6 +37,10 @@ export const QUEUES = {
   group: "events.group",
   digest: "events.digest",
   fetchSource: "sources.fetch",
+  fetchAmazonAnnouncements: "sources.fetch-amazon-announcements",
+  fetchAmazonFeeUpdates: "sources.fetch-amazon-fee-updates",
+  fetchRegulatory: "sources.fetch-regulatory",
+  fetchAmz123Leads: "sources.fetch-amz123-leads",
   fetchXShard: "sources.fetch-x",
   mpCheck: "sources.mp",
   notifySelected: "notify.selected",
@@ -49,6 +57,10 @@ const QUEUE_OPTIONS: Record<QueueName, QueueOptions> = {
   [QUEUES.group]: { policy: "short", retryLimit: 4, retryDelay: 20, retryBackoff: true, expireInSeconds: 600 },
   [QUEUES.digest]: { policy: "short", retryLimit: 3, retryDelay: 60, retryBackoff: true, expireInSeconds: 900 },
   [QUEUES.fetchSource]: { policy: "short", retryLimit: 0, expireInSeconds: 600 },
+  [QUEUES.fetchAmazonAnnouncements]: { policy: "short", retryLimit: 0, expireInSeconds: 600 },
+  [QUEUES.fetchAmazonFeeUpdates]: { policy: "short", retryLimit: 0, expireInSeconds: 600 },
+  [QUEUES.fetchRegulatory]: { policy: "short", retryLimit: 0, expireInSeconds: 600 },
+  [QUEUES.fetchAmz123Leads]: { policy: "short", retryLimit: 0, expireInSeconds: 900 },
   [QUEUES.fetchXShard]: { policy: "short", retryLimit: 0, expireInSeconds: 900 },
   [QUEUES.mpCheck]: { policy: "short", retryLimit: 3, retryDelay: 60, retryBackoff: true, expireInSeconds: 600 },
   [QUEUES.notifySelected]: { policy: "short", retryLimit: 0, expireInSeconds: 300 },

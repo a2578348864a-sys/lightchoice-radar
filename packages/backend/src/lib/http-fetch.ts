@@ -127,7 +127,13 @@ export async function guardedFetch(input: string, opts: GuardedFetchOptions = {}
   let url = await check(input);
   const maxRedirects = opts.maxRedirects ?? 5;
   const maxBytes = opts.maxBytes ?? 8 * 1024 * 1024;
-  const headers = new Headers({ "user-agent": DEFAULT_UA, "accept-language": "zh-CN,zh;q=0.9,en;q=0.8" });
+  // Pin compression negotiation to the formats supported by Node's native fetch as well as Undici.
+  // Undici versions that advertise zstd can receive incomplete HTML shells from some Amazon public pages.
+  const headers = new Headers({
+    "user-agent": DEFAULT_UA,
+    "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
+    "accept-encoding": "br, gzip, deflate",
+  });
   // Header names are case-insensitive: a caller's "User-Agent" replaces the default instead of joining it.
   for (const [name, value] of Object.entries(opts.headers ?? {})) headers.set(name, value);
   const publicHeaders = new Set(["accept", "accept-language", "accept-encoding", "user-agent", "cache-control", "if-modified-since", "if-none-match", "range", "if-range"]);

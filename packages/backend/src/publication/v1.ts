@@ -4,10 +4,11 @@ import { sql, type Db } from "../db.ts";
 import { decodeCursor, encodeCursor, InvalidCursorError, queryBinding } from "../lib/cursor.ts";
 import { newShortId } from "../lib/ids.ts";
 import { publicCategoryCondition, API_ITEM_COLUMNS, API_ITEM_FROM, type ApiItemRow } from "./items.ts";
-import { listedCondition, seatedCondition } from "./scope.ts";
+import { historicalSearchCondition, listedCondition, seatedCondition } from "./scope.ts";
 import { publicMatchCondition, searchTerms, withSearchCapacity } from "./pool.ts";
 import { sharedSearch } from "../lib/cache.ts";
 import { v1Payload, type V1ItemPayload } from "./publish.ts";
+import type { HistoricalSearchRange } from "./search-range.ts";
 
 export interface V1ItemsQuery {
   mode: "selected" | "all";
@@ -17,11 +18,12 @@ export interface V1ItemsQuery {
   q: string | null;
   limit: number;
   cursor: string | null;
+  publishedRange?: HistoricalSearchRange;
 }
 
 export interface V1ItemsResult {
   schemaVersion: 1;
-  query: { mode: string; category: string | null; window: string; q: string | null; by: string; ordering: string };
+  query: { mode: string; category: string | null; window: string; q: string | null; by: string; ordering: string; publishedRange?: { from: string; to: string } };
   items: V1ItemPayload[];
   page: { count: number; hasMore: boolean; nextCursor: string | null };
 }
@@ -29,39 +31,44 @@ export interface V1ItemsResult {
 export function rowToV1(row: ApiItemRow): V1ItemPayload {
   return v1Payload({
     articleId: row.id, title: row.title, originalTitle: row.original_title, summary: row.summary, sourceName: row.source_name,
-    url: row.url, publishedAt: row.published_at, discoveredAt: row.discovered_at, category: row.category,
+    url: row.url, publishedAt: row.published_at, publicationTime: row.publication_time, discoveredAt: row.discovered_at, category: row.category,
     score: row.score === null ? null : Number(row.score), selected: row.selected, reason: row.reason,
   });
 }
 
 /** Search callers across HTTP and tools share one read. */
 export const v1Items = sharedSearch(
-  (q: V1ItemsQuery) => JSON.stringify([q.mode, q.window, q.by, q.category, q.q, q.limit, q.cursor]),
+  (q: V1ItemsQuery) => JSON.stringify([q.mode, q.window, q.by, q.category, q.q, q.limit, q.cursor, q.publishedRange?.from, q.publishedRange?.to]),
   queryItems, (q) => !!q.q?.trim(),
 );
 
 async function queryItems(query: V1ItemsQuery, now: Date): Promise<V1ItemsResult> {
   const windowMs = query.window === "24h" ? 86400000 : 7 * 86400000;
   const windowStart = new Date(now.getTime() - windowMs);
-  const binding = queryBinding({ m: query.mode, w: query.window, b: query.by, c: query.category, q: query.q });
+  const binding = queryBinding({ m: query.mode, w: query.window, b: query.by, c: query.category, q: query.q, from: query.publishedRange?.from, to: query.publishedRange?.to });
   // by=timeline is the site's own order: a selected item at its reading-group anchor, anything else at its timeline time.
-  const sortCol = query.by === "published" ? sql`coalesce(p.published_at, p.discovered_at)` : query.mode === "selected" ? sql`p.sort_at` : sql`p.timeline_at`;
+  const sortCol = query.publishedRange ? sql`p.published_at` : query.by === "published" ? sql`coalesce(p.published_at, p.discovered_at)` : query.mode === "selected" ? sql`p.sort_at` : sql`p.timeline_at`;
   let after: { a: number; i: string } | null = null;
   if (query.cursor) {
     const c = decodeCursor<{ a: number; i: string; c: string }>("it3", query.cursor);
     if (c.c !== binding || !Number.isSafeInteger(c.a) || !Number.isFinite(new Date(c.a).getTime())
       || typeof c.i !== "string" || !/^[a-zA-Z0-9_-]{1,80}$/.test(c.i)) throw new InvalidCursorError("cursor does not belong to this query");
     // The rolling window slid past the anchor: tell the client instead of returning an empty page.
-    if (c.a < windowStart.getTime()) throw new InvalidCursorError("the rolling window moved past this cursor");
+    if (!query.publishedRange && c.a < windowStart.getTime()) throw new InvalidCursorError("the rolling window moved past this cursor");
     after = { a: c.a, i: c.i };
   }
-  const scope = query.mode === "selected" ? seatedCondition(now) : listedCondition(now);
+  const scope = query.mode === "selected"
+    ? seatedCondition(now)
+    : query.publishedRange ? historicalSearchCondition(now) : listedCondition(now);
   const terms = query.q ? searchTerms(query.q) : [];
+  const timeCondition = query.publishedRange
+    ? sql`p.published_at >= ${query.publishedRange.start} AND p.published_at < ${query.publishedRange.endExclusive} AND p.published_at <= ${now}`
+    : sql`${sortCol} >= ${windowStart} AND ${sortCol} <= ${now}`;
 
   const run = (db: Db) => db<(ApiItemRow & { sort_at: Date })[]>`
     SELECT ${API_ITEM_COLUMNS}, ${sortCol} AS sort_at ${API_ITEM_FROM}
     WHERE ${scope} ${publicCategoryCondition(query.category)} ${publicMatchCondition(terms)}
-      AND ${sortCol} >= ${windowStart} AND ${sortCol} <= ${now}
+      AND ${timeCondition}
       ${after ? sql`AND (${sortCol}, p.article_id) < (${new Date(after.a)}, ${after.i})` : sql``}
     ORDER BY ${sortCol} DESC, p.article_id DESC
     LIMIT ${query.limit + 1}`;
@@ -75,6 +82,7 @@ async function queryItems(query: V1ItemsQuery, now: Date): Promise<V1ItemsResult
     query: {
       mode: query.mode, category: query.category, window: query.window, q: query.q, by: query.by,
       ordering: query.by === "published" ? "publishedAtDesc" : "timelineDesc",
+      ...(query.publishedRange ? { publishedRange: { from: query.publishedRange.from, to: query.publishedRange.to } } : {}),
     },
     items: page.map(rowToV1),
     page: {

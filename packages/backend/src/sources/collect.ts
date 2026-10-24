@@ -11,12 +11,37 @@ import { enqueue, QUEUES, shutdownSignal } from "../jobs/queue.ts";
 import { queueProcessing } from "../jobs/content.ts";
 import { BudgetExceededError, completeReceipt } from "../providers/receipts.ts";
 import { fetchRss } from "./rss.ts";
-import { fetchDetail, fetchWebList, isCallToActionTitle, needsTitle, type DetailNeed } from "./web-list.ts";
+import { fetchDetail, fetchWebList, isCallToActionTitle, needsTitle, sitemapLastmodAdvanced, type DetailNeed } from "./web-list.ts";
 import { unsupportedConfig } from "./config-keys.ts";
 import { admitListing, filterPublicationWindow } from "./filters.ts";
 import { fetchJsonList } from "./json-list.ts";
+import { AMAZON_US_ANNOUNCEMENTS_SOURCE_ID, RADAR_POLICY_SOURCE_ID, archiveWindowFloor, isApprovedRadarLeadSource, isApprovedRadarLeadSourceId, isApprovedRadarPolicyWebList, isApprovedRadarRegulatorySource, isQualifyingAmazonPolicyAnnouncement, nextPolicyGateMemory, policyGateRejections, RADAR_LEAD_SOURCE_IDS, RADAR_POLICY_SOURCE_IDS, type PolicyGateMemory, type RadarLeadSourceId, type RadarRegulatorySourceId } from "./radar-policy-source.ts";
+import { fetchAdsPolicyPages, isApprovedAdsPolicySource } from "./ads-policy.ts";
+import { fetchAmz123Leads } from "./amz123.ts";
 import { fetchXSearch, planXShards, readXSearch, shardHandle, shardQuery, selfThreadHandle, SHARDABLE_SQL, tweetToCandidate, type XBacklog } from "./x.ts";
 import { FetchError, type Candidate, type SourceRow } from "./types.ts";
+import { BrowserUnavailableError } from "./browser-render.ts";
+
+/**
+ * Why a run failed, in the terms an operator acts on: a missing browser and a changed page need
+ * different fixes, and neither is the same as the site being down for a minute.
+ */
+export type CollectFailureClass = "browser-unavailable" | "blocked-address" | "budget" | "page" | "source-http" | "network" | "unknown";
+
+export function classifyCollectFailure(error: unknown): CollectFailureClass {
+  if (error instanceof BrowserUnavailableError) return "browser-unavailable";
+  if (error instanceof BudgetExceededError) return "budget";
+  if (error instanceof FetchError) return "page";
+  if (error instanceof HttpStatusError) return "source-http";
+  const code = String((error as { code?: string; cause?: { code?: string } })?.code ?? (error as { cause?: { code?: string } })?.cause?.code ?? "");
+  const message = String((error as Error)?.message ?? error);
+  // The fetcher refuses loopback, private and link-local addresses: a source pointed at one is a
+  // configuration decision, not a network hiccup, and retrying it will never succeed.
+  if (code === "EBLOCKED" || /blocked private address/i.test(message)) return "blocked-address";
+  if (/^(ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|UND_ERR_[A-Z_]+)$/.test(code)
+      || /fetch failed|network|socket hang up|timed? ?out/i.test(message)) return "network";
+  return "unknown";
+}
 
 export interface CollectResult {
   sourceId: string;
@@ -25,6 +50,8 @@ export interface CollectResult {
   created: number;
   revised: number;
   error?: string;
+  /** Present on a failed run: the class the logs and fetch_runs.detail carry. */
+  failureClass?: CollectFailureClass;
 }
 
 export async function loadSource(id: string): Promise<SourceRow | null> {
@@ -39,6 +66,7 @@ export interface StoredDetail {
   source_id: string;
   title: string;
   published_at: Date | null;
+  source_updated_at: Date | null;
   publication_time?: string | null;
   excerpt: string | null;
   body_status: string;
@@ -49,7 +77,7 @@ export interface StoredDetail {
 export async function storedDetails(identities: string[]): Promise<Map<string, StoredDetail>> {
   if (identities.length === 0) return new Map();
   // One array parameter: a long listing would exceed the query's parameter limit.
-  const rows = await sql<StoredDetail[]>`SELECT identity_key, source_id, title, published_at, publication_time, excerpt, body_status,
+  const rows = await sql<StoredDetail[]>`SELECT identity_key, source_id, title, published_at, source_updated_at, publication_time, excerpt, body_status,
     raw->'collectionDetail'->>'rules' AS rules
     FROM articles WHERE identity_key = ANY(${identities}::text[])`;
   return new Map(rows.map((r) => [r.identity_key, r]));
@@ -93,9 +121,18 @@ export async function listingEntries(source: SourceRow, found: Candidate[]): Pro
  * and passes an undated entry; `admits` judges again after detail pages may have dated it.
  */
 function admission(source: SourceRow, known: Map<string, StoredDetail>, firstImport: boolean) {
-  const months = Number(source.config._aihot?.initialBackfillMonths ?? 12);
-  const floor = firstImport ? Date.now() - months * 30 * DAY_MS
-    : source.kind === "x_search" ? null : Date.parse(String(source.cursor!.initializedAt)) - STALE_ON_DISCOVERY_MS;
+  // A body-gated index keeps its archive window on every run: the gate decides from the article body,
+  // so an entry whose page was never read has to be re-admitted while it is still listed. Rejected
+  // bodies are remembered (cursor.detailGate), so this does not re-read them every run.
+  const floor = archiveWindowFloor({
+    sourceId: source.id,
+    kind: source.kind,
+    firstImport,
+    months: Number(source.config._aihot?.initialBackfillMonths ?? 12),
+    initializedAt: source.cursor?.initializedAt ? String(source.cursor.initializedAt) : null,
+    now: Date.now(),
+    staleMs: STALE_ON_DISCOVERY_MS,
+  });
   const byListing = (c: Candidate) => floor === null || !firstImport && known.has(c.identityKey!) || !(c.publishedAt && c.publishedAt.getTime() < floor);
   return { byListing, admits: (c: Candidate) => byListing(c) && filterPublicationWindow([c], source.config.publishedAfter).length > 0 };
 }
@@ -134,11 +171,12 @@ function fromStored(c: CollectionCandidate, stored: StoredDetail, source: Source
 function detailNeed(c: CollectionCandidate, stored: StoredDetail | undefined, source: SourceRow, listingTitle: string): DetailNeed | null {
   const d = source.config.detail!;
   const storedHeadline = !!stored && isCallToActionTitle(listingTitle) && !isCallToActionTitle(stored.title);
+  const updated = sitemapLastmodAdvanced(c.sourceUpdatedAt, stored?.source_updated_at);
   const need: DetailNeed = {
-    date: d.publishedAtAuthoritative === true || !(stored?.published_at || c.publishedAt) || d.upgradeDatePrecision === true,
-    title: !!(d.titleSelector || d.titleRegex) && (d.titleAuthoritative === true || (!storedHeadline && needsTitle(c.title))),
-    summary: !!d.summarySelector && !(stored?.excerpt || c.excerpt),
-    body: source.participation_mode === "editorial" && stored?.body_status !== "ok" && !c.bodyText && (!c.bodyStatus || c.bodyStatus === "pending"),
+    date: updated || d.publishedAtAuthoritative === true || !(stored?.published_at || c.publishedAt) || d.upgradeDatePrecision === true,
+    title: !!(d.titleSelector || d.titleRegex) && (updated || d.titleAuthoritative === true || (!storedHeadline && needsTitle(c.title))),
+    summary: !!d.summarySelector && (updated || !(stored?.excerpt || c.excerpt)),
+    body: source.participation_mode === "editorial" && (updated || stored?.body_status !== "ok" && !c.bodyText && (!c.bodyStatus || c.bodyStatus === "pending")),
   };
   return need.date || need.title || need.summary ? need : null;
 }
@@ -184,7 +222,8 @@ export async function enrichDetails(candidates: CollectionCandidate[], source: S
     const stored = known.get(c.identityKey!);
     if (stored && stored.source_id !== source.id) continue;
     const listingTitle = c.title;
-    if (stored && fromStored(c, stored, source, rules)) continue;
+    const currentDetails = stored ? fromStored(c, stored, source, rules) : false;
+    if (stored && currentDetails && !sitemapLastmodAdvanced(c.sourceUpdatedAt, stored.source_updated_at)) continue;
     const need = rules === null ? null : detailNeed(c, stored, source, listingTitle);
     if (!need) continue;
     const listed = c.publishedAt?.toISOString() ?? null;
@@ -254,7 +293,7 @@ async function store(sourceId: string, runId: number, candidates: CollectionCand
  * one interval later. A failure counts toward "failing" (5 in a row) and waits longer after each one,
  * up to six hours; a full budget is not the source's failure: it waits 15 minutes and counts nothing.
  */
-async function recordFetch(db: Db, sourceId: string, runId: number, run: { found: number; created: number; detail: object | null } & ({ cursor: Record<string, unknown> } | { error: string; budget: boolean })): Promise<void> {
+export async function recordFetch(db: Db, sourceId: string, runId: number, run: { found: number; created: number; detail: object | null } & ({ cursor: Record<string, unknown> } | { error: string; budget: boolean })): Promise<void> {
   const detail = run.detail ? db.json(run.detail as never) : null;
   if ("cursor" in run) {
     await db`
@@ -279,11 +318,13 @@ async function recordFetch(db: Db, sourceId: string, runId: number, run: { found
 }
 
 /** `xSince` reads an X account again from that post, without moving its watermark back. */
-export async function collectSource(sourceId: string, opts: { force?: boolean; xSince?: string } = {}): Promise<CollectResult> {
+export async function collectSource(sourceId: string, opts: { force?: boolean; xSince?: string; onlyUrl?: string } = {}): Promise<CollectResult> {
   const source = await loadSource(sourceId);
   if (!source) return { sourceId, status: "skipped", found: 0, created: 0, revised: 0, error: "missing" };
   if (!source.enabled && !opts.force) return { sourceId, status: "skipped", found: 0, created: 0, revised: 0, error: "paused" };
-  if (config.ruleOnlyMode && source.kind !== "rss") return { sourceId, status: "skipped", found: 0, created: 0, revised: 0, error: "LightChoice Radar only collects RSS sources" };
+  if (config.ruleOnlyMode && source.kind !== "rss" && !isApprovedRadarPolicyWebList(source) && !isApprovedAdsPolicySource(source) && !isApprovedRadarLeadSource(source)) {
+    return { sourceId, status: "skipped", found: 0, created: 0, revised: 0, error: "LightChoice Radar blocks unapproved non-RSS sources" };
+  }
   if (source.kind === "mp_account" || source.kind === "external") {
     // WeChat accounts are reconciled by the mp job; external sources only receive reports.
     return { sourceId, status: "skipped", found: 0, created: 0, revised: 0 };
@@ -314,6 +355,15 @@ export async function collectSource(sourceId: string, opts: { force?: boolean; x
       else delete nextCursor.rss;
       if (rss.notModified) detail = { notModified: true, httpStatus: 304 };
     }
+    // Ads policy pages exist only after JavaScript runs: same web_list pipeline, different reader.
+    else if (source.kind === "web_list" && source.config.adapter === "browser_help") candidates = await fetchAdsPolicyPages(source);
+    // The third-party lead source: its own robots gate, its own discovery, and metadata only.
+    else if (source.kind === "web_list" && source.config.adapter === "amz123_leads") {
+      const round = await fetchAmz123Leads(source, opts.onlyUrl === undefined ? {} : { onlyUrl: opts.onlyUrl });
+      candidates = round.candidates;
+      nextCursor = round.cursor;
+      detail = { ...(detail ?? {}), amz123: round.diagnostics };
+    }
     else if (source.kind === "web_list") candidates = await fetchWebList(source);
     else if (source.kind === "json_list") candidates = await fetchJsonList(source);
     else {
@@ -336,11 +386,26 @@ export async function collectSource(sourceId: string, opts: { force?: boolean; x
     candidates = candidates.filter(byListing);
     // First import of a new source: bounded, and archived by source time (never "today", never pushed).
     if (firstImport) candidates = candidates.slice(0, Number(source.config._aihot?.initialBackfillLimit ?? 30));
+    // A body this gate already read and rejected is not read again under the same gate version.
+    const gateRejected = policyGateRejections(source.cursor?.detailGate as PolicyGateMemory | undefined);
+    if (gateRejected.size) candidates = candidates.filter((c) => !gateRejected.has(c.identityKey!));
     const reads = await enrichDetails(candidates, source, known, {
       budget: Number(d?.maxFetches ?? 0), admits,
       after: source.cursor?.detailRules === rules ? source.cursor?.detailAfter : undefined,
       datedOut: source.cursor?.detailRules === rules ? source.cursor?.detailDatedOut ?? {} : {},
     });
+    // The Amazon index mixes announcements, features, events and training. Only save entries whose
+    // fetched original body contains explicit seller-rule evidence; a title or teaser is insufficient.
+    if (source.id === AMAZON_US_ANNOUNCEMENTS_SOURCE_ID) {
+      const rejectedNow: string[] = [];
+      candidates = candidates.filter((candidate) => {
+        if (isQualifyingAmazonPolicyAnnouncement(candidate.bodyText)) return true;
+        if (candidate.bodyText) rejectedNow.push(candidate.identityKey!);
+        return false;
+      });
+      // Only a body that was actually read is remembered: an unread page must be retried next run.
+      if (found) nextCursor.detailGate = nextPolicyGateMemory(source.cursor?.detailGate as PolicyGateMemory | undefined, rejectedNow);
+    }
     if (d) {
       detail = { ...detail, detailAttempts: reads.attempts, detailFailures: reads.failures.length, detailPending: reads.pending, detailErrors: reads.failures };
       nextCursor.detailRules = rules;
@@ -375,8 +440,9 @@ export async function collectSource(sourceId: string, opts: { force?: boolean; x
   } catch (error) {
     if (shutdownSignal.signal.aborted) throw error;
     const message = String(error instanceof Error ? error.message : error).slice(0, 1000);
-    await recordFetch(sql, sourceId, run!.id, { found, created, detail: null, error: message, budget: error instanceof BudgetExceededError });
-    return { sourceId, status: "failed", found, created, revised, error: message };
+    const failureClass = classifyCollectFailure(error);
+    await recordFetch(sql, sourceId, run!.id, { found, created, detail: { failureClass }, error: message, budget: error instanceof BudgetExceededError });
+    return { sourceId, status: "failed", found, created, revised, error: message, failureClass };
   }
 }
 
@@ -481,19 +547,49 @@ async function scheduleXShards(): Promise<number> {
   return enqueued;
 }
 
-/** Every minute: enqueue due sources (enabled, not WeChat/external), oldest due first; X accounts by shard. */
-export async function scheduleDueSources(): Promise<{ enqueued: number; shards: number }> {
-  const rows = await sql<{ id: string }[]>`
-    SELECT id FROM sources
-    WHERE enabled AND ${config.ruleOnlyMode ? sql`kind = 'rss'` : sql`kind IN ('rss', 'web_list', 'json_list', 'x_search')`}
+/**
+ * Every minute: enqueue due sources (enabled, not WeChat/external), oldest due first; X accounts by shard.
+ * An explicit Radar policy source scope is available for safe one-source operations and never schedules
+ * a different source or an X shard. The normal worker calls this with no argument and keeps its existing behavior.
+ */
+export async function scheduleDueSources(onlyPolicySourceId?: (typeof RADAR_POLICY_SOURCE_IDS)[number] | RadarRegulatorySourceId | RadarLeadSourceId): Promise<{ enqueued: number; shards: number }> {
+  if (onlyPolicySourceId && !(RADAR_POLICY_SOURCE_IDS as readonly string[]).includes(onlyPolicySourceId) && !isApprovedRadarRegulatorySource(onlyPolicySourceId) && !isApprovedRadarLeadSourceId(onlyPolicySourceId)) {
+    throw new Error(`Source is not in a Radar schedule allowlist: ${onlyPolicySourceId}`);
+  }
+  const radarPolicySourceIds: string[] = [...RADAR_POLICY_SOURCE_IDS];
+  // The lead source is a Radar source of its own: it is scheduled by the isolated worker, never by
+  // the general worker, so it keeps its own queue and its own cadence.
+  const radarWebListIds: string[] = [...radarPolicySourceIds, ...RADAR_LEAD_SOURCE_IDS];
+  const rows = await sql<Pick<SourceRow, "id" | "kind" | "config">[]>`
+    SELECT id, kind, config FROM sources
+    WHERE enabled AND ${config.ruleOnlyMode
+      ? sql`(kind = 'rss' OR (kind = 'web_list' AND id = ANY(${radarWebListIds}::text[])))`
+      : sql`kind IN ('rss', 'web_list', 'json_list', 'x_search') AND id <> ALL(${RADAR_LEAD_SOURCE_IDS}::text[])`}
+      AND ${onlyPolicySourceId ? sql`id = ${onlyPolicySourceId}` : sql`true`}
       AND (next_fetch_at IS NULL OR next_fetch_at <= now()) AND NOT (${sharded()})
     ORDER BY next_fetch_at NULLS FIRST LIMIT 40`;
   let enqueued = 0;
-  for (const r of rows) {
-    if (await enqueue(QUEUES.fetchSource, { sourceId: r.id }, { singletonKey: r.id })) enqueued += 1;
+  const eligible = config.ruleOnlyMode
+    ? rows.filter((r) => r.kind === "rss" || isApprovedRadarPolicyWebList(r) || isApprovedRadarLeadSource(r))
+    : rows;
+  for (const r of eligible) {
+    // Each private source family keeps its own queue so the isolated worker never reads `sources.fetch`
+    // and therefore never takes a job that belongs to another source. The fee-updates routing only
+    // applies when its own isolated schedule calls with that id; the general schedule (no argument)
+    // keeps the historic `sources.fetch` routing unchanged.
+    const queue = onlyPolicySourceId === AMAZON_US_ANNOUNCEMENTS_SOURCE_ID
+      ? QUEUES.fetchAmazonAnnouncements
+      : onlyPolicySourceId === RADAR_POLICY_SOURCE_ID
+        ? QUEUES.fetchAmazonFeeUpdates
+        : isApprovedRadarRegulatorySource(r.id)
+          ? QUEUES.fetchRegulatory
+          : isApprovedRadarLeadSourceId(r.id)
+            ? QUEUES.fetchAmz123Leads
+            : QUEUES.fetchSource;
+    if (await enqueue(queue, { sourceId: r.id }, { singletonKey: r.id })) enqueued += 1;
     await sql`UPDATE sources SET next_fetch_at = now() + interval '10 minutes' WHERE id = ${r.id}`;
   }
-  return { enqueued, shards: config.ruleOnlyMode ? 0 : await scheduleXShards() };
+  return { enqueued, shards: config.ruleOnlyMode || onlyPolicySourceId ? 0 : await scheduleXShards() };
 }
 
 /** Minutes between reads of a shard: editorial accounts every half hour, hot-signal accounts hourly. */
@@ -505,12 +601,19 @@ const shardMinutes = (mode: string) => X_SHARD_MINUTES[mode] ?? 60;
  * hot_signal sources are allowed to be slower.
  */
 export async function adaptIntervals(): Promise<{ updated: number }> {
+  const radarPolicySourceIds: string[] = [...RADAR_POLICY_SOURCE_IDS];
   const rows = await sql<Array<Pick<SourceRow, "id" | "participation_mode" | "kind" | "config" | "cursor"> & { paid_listing: boolean; per_day: number }>>`
     SELECT s.id, s.participation_mode, s.kind, s.config, s.cursor, coalesce(s.config->>'url', '') LIKE 'https://r.jina.ai/%' AS paid_listing,
       (SELECT count(*) FROM articles a WHERE a.source_id = s.id AND a.discovered_at > now() - interval '7 days' AND NOT a.backfill) / 7.0 AS per_day
-    FROM sources s WHERE s.enabled AND ${config.ruleOnlyMode ? sql`s.kind = 'rss'` : sql`s.kind IN ('rss', 'web_list', 'json_list', 'x_search')`}`;
+    FROM sources s WHERE s.enabled AND ${config.ruleOnlyMode
+      ? sql`(s.kind = 'rss' OR (s.kind = 'web_list' AND s.id = ANY(${radarPolicySourceIds}::text[])))`
+      : sql`s.kind IN ('rss', 'web_list', 'json_list', 'x_search') AND s.id <> ALL(${RADAR_LEAD_SOURCE_IDS}::text[])`}`;
   let updated = 0;
-  for (const r of rows) {
+  // A lead source keeps the cadence it was given: its own interval is the schedule, not a guess.
+  const eligible = config.ruleOnlyMode
+    ? rows.filter((r) => r.kind === "rss" || isApprovedRadarPolicyWebList(r))
+    : rows.filter((r) => !isApprovedRadarLeadSourceId(r.id));
+  for (const r of eligible) {
     const perDay = Number(r.per_day);
     // Editorial sites and feeds are looked at hourly at least (they cost nothing);
     // editorial X and listings read through Jina stop at two hours (paid per call, within their budgets);

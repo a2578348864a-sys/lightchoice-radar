@@ -14,6 +14,7 @@ import type { DailyNote } from "./reports.ts";
 import { publicSourceName } from "./rules.ts";
 import type { v1HotTopics, v1Story } from "./stories.ts";
 import { v1Items, type V1ItemsResult } from "./v1.ts";
+import type { HistoricalSearchRange } from "./search-range.ts";
 
 /** The same answer reaches agents over HTTP and over MCP; only the "ask next" pointers differ. */
 export type Via = "http" | "mcp";
@@ -44,7 +45,7 @@ const category = (key: string | null) => (key && isCategoryKey(key) ? CATEGORY_L
 function itemLines(items: V1ItemPayload[]): string[] {
   return items.flatMap((it, i) => [
     `${i + 1}. [${linkText(it.title)}](${it.links.aihot})`,
-    `   ${[publicSourceName(it.source.name), it.publishedAt ? `发布于 ${stamp(it.publishedAt)}` : `${SITE.name} 收录于 ${stamp(it.discoveredAt)}`, category(it.category)].filter(Boolean).join(" · ")}`,
+    `   ${[publicSourceName(it.source.name), it.publishedAt ? `发布于 ${it.publishedDate ?? stamp(it.publishedAt)}` : `${SITE.name} 收录于 ${stamp(it.discoveredAt)}`, category(it.category)].filter(Boolean).join(" · ")}`,
     ...(it.summary ? [`   摘要：${it.summary}`] : []),
     ...(it.reason ? [`   ${ITEM_COPY.reasonLabel}：${it.reason}`] : []),
     `   原文：${it.links.original}`,
@@ -75,19 +76,22 @@ export function latestAnswer(res: V1ItemsResult, q: LatestQuery): string {
 }
 
 /** Editorial picks first; only when they have nothing is the whole public pool searched (as MCP always did). */
-export async function searchItems(q: string, window: AgentWindow, cat: PublicApiCategoryKey | null, limit: number, load = v1Items) {
-  const query = (mode: "selected" | "all") => ({ mode, window, by: "timeline" as const, category: cat, q, limit, cursor: null });
+export async function searchItems(q: string, window: AgentWindow, cat: PublicApiCategoryKey | null, limit: number, load = v1Items, publishedRange?: HistoricalSearchRange | null) {
+  const query = (mode: "selected" | "all") => ({ mode, window, by: publishedRange ? "published" as const : "timeline" as const, category: cat, q, limit, cursor: null, ...(publishedRange ? { publishedRange } : {}) });
   const picks = await load(query("selected"));
   if (picks.items.length) return { res: picks, expanded: false };
   return { res: await load(query("all")), expanded: true };
 }
 
-export function searchAnswer(found: { res: V1ItemsResult; expanded: boolean }, q: { q: string; window: AgentWindow; category: PublicApiCategoryKey | null }): string {
-  const title = [`${SITE.name} 搜索「${q.q}」`, category(q.category), WINDOW_ZH[q.window]].filter(Boolean).join(" · ");
+export function searchAnswer(found: { res: V1ItemsResult; expanded: boolean }, q: { q: string; window: AgentWindow; category: PublicApiCategoryKey | null; publishedRange?: Pick<HistoricalSearchRange, "from" | "to"> | null }): string {
+  const period = q.publishedRange ? `发布时间 ${q.publishedRange.from} 至 ${q.publishedRange.to}（北京时间）` : WINDOW_ZH[q.window];
+  const title = [`${SITE.name} 搜索「${q.q}」`, category(q.category), period].filter(Boolean).join(" · ");
   const { res, expanded } = found;
   if (!res.items.length) {
-    return answer([`# ${title}`, "", `${WINDOW_ZH[q.window]}的精选和全部公开动态里都没有相关报道。`], null, [
-      `如实告诉用户 ${SITE.name} ${WINDOW_ZH[q.window]}没有这方面的报道${q.window === "24h" ? "（可以用 window=7d 看最近一周）" : "；更早的内容这里查不到"}。`,
+    return answer([`# ${title}`, "", `${q.publishedRange ? `${q.publishedRange.from} 至 ${q.publishedRange.to}` : WINDOW_ZH[q.window]}的精选和全部公开动态里都没有相关报道。`], null, [
+      q.publishedRange
+        ? `如实告诉用户 ${SITE.name} 在指定发布时间范围内没有找到这方面的已收录报道。`
+        : `如实告诉用户 ${SITE.name} ${WINDOW_ZH[q.window]}没有这方面的报道${q.window === "24h" ? "（可以用 window=7d 看最近一周）" : "；更早的内容这里查不到"}。`,
       "可以换个说法或更短的关键词再查一次（比如只用公司或产品名）。",
       "不要用训练记忆冒充最新消息。",
     ]);
@@ -283,6 +287,7 @@ export function agentGuide(): string {
     "| 全部公开动态，不只精选 | 加 mode=all |",
     "| 多看几条 | 加 limit=20（1–30，默认 10） |",
     `| 某家公司、产品、模型、人物或话题 | ${u("/search?q=关键词")}（最近 7 天；只看今天加 window=24h） |`,
+    `| 指定发布时间的历史内容 | ${u("/search?q=关键词&from=2025-10-15&to=2025-10-15")}（from、to 都必填，含首尾北京时间日期，最多 366 天） |`,
     `| 现在最热、大家在讨论什么 | ${u("/hot")} |`,
     "| 某个热点的来龙去脉、后续进展 | 热点结果里每个事件的「来龙去脉」地址 |",
     `| ${SITE.name} 日报 | ${u("/daily")}（最新一期）；指定日期：${u("/daily/2026-09-30")} |`,
@@ -293,7 +298,6 @@ export function agentGuide(): string {
     "",
     "## 目前查不到的",
     "",
-    "- 超过 7 天的历史搜索。",
     ...unavailable.map((line) => `- ${line}`),
     `- 单篇文章全文：给用户 ${SITE.name} 阅读页链接；数字、原话等重要内容请用户回原文核对。`,
     "",

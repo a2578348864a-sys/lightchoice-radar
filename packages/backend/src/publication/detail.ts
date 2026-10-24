@@ -1,5 +1,5 @@
 // Item detail and Markdown export, both behind the same visibility and licence rules.
-import type { OutlineEntry, RuleEvidence, SiteItemDetail, StoryRef } from "@aihot/contracts/site";
+import type { OutlineEntry, PolicyExplanation, PolicyKeyFact, RuleEvidence, SiteItemDetail, StoryRef } from "@aihot/contracts/site";
 import { ITEM_COPY, SITE } from "@aihot/site";
 import { bodyToMarkdown } from "../content/markdown.ts";
 import { sql } from "../db.ts";
@@ -7,6 +7,7 @@ import { stripTagMarkup } from "../lib/text.ts";
 import { proxyBodyImages } from "../media/imgproxy.ts";
 import { textToHtml } from "../content/sanitize.ts";
 import { exportTranslation, isChineseBody, ITEM_COLUMNS, ITEM_FROM, seatHolders, showsPost, toItemSummary, xView, type ItemRow } from "./items.ts";
+import { keyFactsFromMaterial } from "../editorial/key-facts.ts";
 import { evidenceCondition, listedCondition } from "./scope.ts";
 import { itemUrl, siteUrl } from "./links.ts";
 import { hasItemPage, publicSourceName } from "./rules.ts";
@@ -49,9 +50,9 @@ async function loadRow(id: string): Promise<DetailRow | null> {
   return row ?? null;
 }
 
-async function loadRadarHistory(id: string, revision: number): Promise<Pick<SiteItemDetail, "ruleVersion" | "ruleEvidence" | "revisionHistory">> {
+async function loadRadarHistory(id: string, revision: number): Promise<Pick<SiteItemDetail, "ruleVersion" | "ruleEvidence" | "revisionHistory" | "explanation">> {
   if (SITE.name !== "LightChoice Radar") return {};
-  const [analysis] = await sql<{ output: { ruleVersion?: string; ruleEvidence?: RuleEvidence[] } }[]>`
+  const [analysis] = await sql<{ output: { ruleVersion?: string; ruleEvidence?: RuleEvidence[]; explanation?: PolicyExplanation | null } }[]>`
     SELECT an.output FROM analyses an JOIN articles a ON a.id = an.article_id AND a.revision = an.input_revision
     WHERE an.article_id = ${id} AND an.origin = 'rule' ORDER BY an.id DESC LIMIT 1`;
   let revisions: Array<{ revision: number; title: string; excerpt: string | null; created_at: Date }> = [];
@@ -77,6 +78,9 @@ async function loadRadarHistory(id: string, revision: number): Promise<Pick<Site
   return {
     ...(analysis?.output?.ruleVersion ? { ruleVersion: analysis.output.ruleVersion } : {}),
     ...(Array.isArray(evidence) ? { ruleEvidence: evidence } : {}),
+    // Only an explanation of this exact material version is returned; an older one stays invisible
+    // (identity.explanation reports it as stale instead of showing it as current).
+    explanation: analysis?.output?.explanation ?? null,
     revisionHistory: revisions.map((row) => ({ revision: row.revision, title: row.title, excerpt: row.excerpt, capturedAt: row.created_at.toISOString() })),
   };
 }
@@ -115,6 +119,14 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
 
   const summary = toItemSummary(row);
   const radarHistory = await loadRadarHistory(id, row.material_revision);
+  // 关键信息：同一套确定性规则（editorial/key-facts.ts）在读取时计算——纯字符串、零模型、零写入、
+  // 零第二事实库。它读的是当前版本的原文、摘要、正文与中文译名，因此原文或译文一变，下一次读取就
+  // 跟着变，不会沿用过期派生结果；材料不支持时不产生字段，页面就不渲染这个区块。随规则解释存库的
+  // keyFacts 保留为分析记录（与审计轨迹在一起），页面展示的始终是当前版本的计算结果。
+  const keyFacts: PolicyKeyFact[] = keyFactsFromMaterial({
+    title: row.title, excerpt: row.summary, bodyText: row.body_text,
+    sourceName: row.source_name, chineseTitle: row.tr_title,
+  });
   if (row.visibility === "summary-only") {
     const item: SiteItemDetail = {
       ...summary,
@@ -136,6 +148,7 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
       group: null,
       hasTranslation: false,
       bodyLanguage: "original",
+      keyFacts,
     };
     return { kind: "found", item, row };
   }
@@ -197,6 +210,7 @@ export async function loadItemDetail(id: string, language: "zh" | "original" = "
     group,
     hasTranslation: reading.hasTranslation,
     bodyLanguage: reading.bodyLanguage,
+    keyFacts,
     ...radarHistory,
   };
   return { kind: "found", item, row };

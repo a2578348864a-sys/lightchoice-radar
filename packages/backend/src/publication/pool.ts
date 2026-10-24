@@ -1,5 +1,5 @@
 // Public pool (/all) with numeric pages, and search in its two orderings.
-import type { PoolResponse, TimelineFilters } from "@aihot/contracts/site";
+import type { PoolResponse, PoolSourceOption, TimelineFilters } from "@aihot/contracts/site";
 import { addDays, beijingDate, beijingMidnight } from "@aihot/contracts/time";
 import { one, sql, withCustomPlans, type Db } from "../db.ts";
 import { cachedByKey, sharedSearch } from "../lib/cache.ts";
@@ -123,20 +123,47 @@ function discoveredRangeCondition(from?: string | null, to?: string | null) {
     ${to ? sql`AND p.discovered_at < ${beijingMidnight(addDays(to, 1))}` : sql``}`;
 }
 
-async function listedCount(f: TimelineFilters, now: Date, discoveredToday = false, from?: string | null, to?: string | null): Promise<number> {
+function publishedRangeCondition(from?: string | null, to?: string | null) {
+  return sql`${from ? sql`AND p.published_at >= ${beijingMidnight(from)}` : sql``}
+    ${to ? sql`AND p.published_at < ${beijingMidnight(addDays(to, 1))}` : sql``}`;
+}
+
+function dateRangeCondition(from: string | null | undefined, to: string | null | undefined, basis: "collected" | "published" = "collected") {
+  return basis === "published" ? publishedRangeCondition(from, to) : discoveredRangeCondition(from, to);
+}
+
+function sourceCondition(sourceId?: string | null) {
+  return sourceId ? sql`AND p.source_id = ${sourceId}` : sql``;
+}
+
+export async function loadPoolSources(now = new Date()): Promise<PoolSourceOption[]> {
+  return sql<PoolSourceOption[]>`
+    SELECT DISTINCT s.id, s.name FROM publications p JOIN sources s ON s.id = p.source_id
+    WHERE ${listedCondition(now)} ORDER BY s.name, s.id`;
+}
+
+async function listedCount(
+  f: TimelineFilters,
+  now: Date,
+  discoveredToday = false,
+  from?: string | null,
+  to?: string | null,
+  sourceId?: string | null,
+  dateBasis: "collected" | "published" = "collected",
+): Promise<number> {
   return Number(one(await sql<{ n: number }[]>`
     SELECT count(*) AS n FROM (SELECT 1 FROM publications p WHERE ${listedCondition(now)}
-      ${discoveredTodayCondition(now, discoveredToday)} ${discoveredRangeCondition(from, to)}
+      ${discoveredTodayCondition(now, discoveredToday)} ${dateRangeCondition(from, to, dateBasis)} ${sourceCondition(sourceId)}
       ${channelCondition(f.channel)} ${categoryCondition(f.category)} ${tagCondition(f.tag)} LIMIT ${POOL_MAX_PAGES * POOL_PAGE_SIZE}) t`).n);
 }
 
 /** Without a search the total only sets the page count: it is reused for 30 seconds per filter. */
 const poolTotal = cachedByKey(
-  (key: { filters: TimelineFilters; discoveredToday: boolean; from?: string | null; to?: string | null }) => JSON.stringify([
-    key.filters.channel, key.filters.category, key.filters.tag, key.discoveredToday, key.from ?? null, key.to ?? null,
+  (key: { filters: TimelineFilters; discoveredToday: boolean; from?: string | null; to?: string | null; sourceId?: string | null; dateBasis?: "collected" | "published" }) => JSON.stringify([
+    key.filters.channel, key.filters.category, key.filters.tag, key.discoveredToday, key.from ?? null, key.to ?? null, key.sourceId ?? null, key.dateBasis ?? "collected",
     key.discoveredToday ? beijingDate(new Date()) : null,
   ]),
-  (key) => listedCount(key.filters, new Date(), key.discoveredToday, key.from, key.to),
+  (key) => listedCount(key.filters, new Date(), key.discoveredToday, key.from, key.to, key.sourceId, key.dateBasis),
   { freshMs: 30_000, maxStaleMs: 30_000, maxKeys: 200 },
 );
 
@@ -148,12 +175,16 @@ export interface PoolQuery extends TimelineFilters {
   /** Beijing calendar dates on which the item was first collected, inclusive. */
   discoveredFrom?: string | null;
   discoveredTo?: string | null;
+  /** Filter by the original publication date instead of the local collection date. */
+  dateBasis?: "collected" | "published";
+  /** Exact public source identity. */
+  sourceId?: string | null;
   now?: Date;
 }
 
 // Identical searches share their read before taking search capacity.
 const searchPool = sharedSearch(
-  (q: PoolQuery) => JSON.stringify([q.channel, q.category, q.tag, q.q, q.tab, q.page, q.discoveredToday, q.discoveredFrom ?? null, q.discoveredTo ?? null]),
+  (q: PoolQuery) => JSON.stringify([q.channel, q.category, q.tag, q.q, q.tab, q.page, q.discoveredToday, q.discoveredFrom ?? null, q.discoveredTo ?? null, q.dateBasis ?? "collected", q.sourceId ?? null]),
   queryPool, (q) => !!q.q?.trim(),
 );
 
@@ -165,11 +196,16 @@ async function queryPool(query: PoolQuery, now: Date): Promise<PoolResponse> {
   const page = Math.min(Math.max(query.page ?? 1, 1), POOL_MAX_PAGES);
   const q = query.q?.trim() || null;
   const tab = q && query.tab === "relevance" ? "relevance" : "time";
+  const dateBasis = query.dateBasis ?? "collected";
   const terms = q ? searchTerms(q) : [];
   const entityTag = q ? queryEntityTag(q) : null;
-  const filters = sql`${discoveredTodayCondition(now, !!query.discoveredToday)} ${discoveredRangeCondition(query.discoveredFrom, query.discoveredTo)}
-    ${channelCondition(query.channel)} ${categoryCondition(query.category)} ${tagCondition(query.tag)}`;
-  const orderAt = query.discoveredToday || query.discoveredFrom || query.discoveredTo ? sql`p.discovered_at` : sql`p.timeline_at`;
+  const filters = sql`${discoveredTodayCondition(now, !!query.discoveredToday)} ${dateRangeCondition(query.discoveredFrom, query.discoveredTo, dateBasis)}
+    ${sourceCondition(query.sourceId)} ${channelCondition(query.channel)} ${categoryCondition(query.category)} ${tagCondition(query.tag)}`;
+  const orderAt = query.discoveredToday
+    ? sql`p.discovered_at`
+    : query.discoveredFrom || query.discoveredTo
+      ? dateBasis === "published" ? sql`p.published_at` : sql`p.discovered_at`
+      : sql`p.timeline_at`;
   const offset = (page - 1) * POOL_PAGE_SIZE;
   const cap = POOL_MAX_PAGES * POOL_PAGE_SIZE;
 
@@ -190,8 +226,8 @@ async function queryPool(query: PoolQuery, now: Date): Promise<PoolResponse> {
       return {
         rows,
         total: query.now
-          ? await listedCount(query, now, !!query.discoveredToday, query.discoveredFrom, query.discoveredTo)
-          : await poolTotal({ filters: query, discoveredToday: !!query.discoveredToday, from: query.discoveredFrom, to: query.discoveredTo }),
+          ? await listedCount(query, now, !!query.discoveredToday, query.discoveredFrom, query.discoveredTo, query.sourceId, dateBasis)
+          : await poolTotal({ filters: query, discoveredToday: !!query.discoveredToday, from: query.discoveredFrom, to: query.discoveredTo, sourceId: query.sourceId, dateBasis }),
       };
     }
     if (tab === "relevance") {
@@ -263,7 +299,7 @@ async function queryPool(query: PoolQuery, now: Date): Promise<PoolResponse> {
 
   const holders = await seatHolders(rows, now);
   return {
-    filters: { channel: query.channel, category: query.category, tag: query.tag, q, tab },
+    filters: { channel: query.channel, category: query.category, tag: query.tag, q, tab, sourceId: query.sourceId ?? null, dateBasis },
     items: rows.map((r) => (holders.has(r.id) ? { ...toFeedItemSummary(r), reason: null, sameEvent: holders.get(r.id)! } : toFeedItemSummary(r))),
     page,
     pageCount: Math.min(POOL_MAX_PAGES, Math.max(1, Math.ceil(total / POOL_PAGE_SIZE))),

@@ -37,16 +37,91 @@ export interface StoryRef {
   title: string;
 }
 
+/**
+ * Where the Chinese reading material of one item comes from and what this site may show of it.
+ * Every value describes a stored fact (a field, a configuration, a version), never a quality judgement.
+ */
+export interface ContentIdentity {
+  /**
+   * The title as written: the source's own text in its own language, a Chinese copy made here, or a
+   * machine translation of the current revision (machine-zh, never presented as the source's words).
+   */
+  titleKind: "original" | "source-zh" | "rule-zh" | "machine-zh";
+  /** The summary: the source's own words, a Chinese summary organised from the body by local rules, or a machine translation. */
+  summaryKind: "source" | "rule-zh" | "machine-zh" | "none";
+  /** The material this site holds, before any display policy: full body, feed excerpt, or title only. */
+  material: "body" | "excerpt" | "title-only";
+  /** Whether the page shows the stored body (source_fulltext and body status decide, see body_mode). */
+  bodyShown: boolean;
+  /** A translation of the current material version; `stale` means an older revision's translation exists. */
+  translation: "none" | "complete" | "partial" | "stale";
+  /** The Chinese policy explanation of the current material version; `stale` means an older one exists. */
+  explanation: "none" | "current" | "stale";
+}
+
+/**
+ * One scannable fact about the piece, lifted out of the stored material by local rules — never
+ * paraphrased, never inferred. `value` may keep the source's own words (a model number, an amount, a
+ * product name); `evidence` says which stored field it came from, so a reader can check it.
+ */
+export interface PolicyKeyFact {
+  label: string;
+  value: string;
+  evidence: string;
+}
+
+/**
+ * A Chinese policy explanation assembled by local rules from stored fields and rule evidence
+ * (backend editorial/policy-explain.ts). It is a structural reading aid, never a model translation
+ * or an official statement: `notice` says so on the page.
+ */
+export interface PolicyExplanation {
+  method: "rule";
+  ruleVersion: string;
+  /** The material version this explanation was built from. */
+  inputRevision: number;
+  generatedAt: string;
+  /** Coverage: a title alone cannot support the same fields a body can. */
+  complete: boolean;
+  material: "body" | "excerpt" | "title-only";
+  oneLiner: string;
+  /** What the stored material currently states, as structure: source identity, file status, themes. */
+  current: string[];
+  /** A change only when the official text itself says so; null means no change claim was found. */
+  change: { statement: string; evidence: string } | null;
+  appliesTo: string | null;
+  /** Each date labelled by what it is: a publication date is never a discovery date. */
+  keyDates: Array<{ label: string; display: string; kind: "published" | "source-updated" | "discovered" | "effective-claim" }>;
+  pending: string[];
+  /** Exact stored-field positions the explanation leans on. */
+  evidence: Array<{ label: string; field: "title" | "excerpt" | "body"; matchedText: string }>;
+  /** Scannable facts lifted verbatim from the stored material; empty when the material supports none. */
+  keyFacts: PolicyKeyFact[];
+  /** Deterministic checks that ran before the explanation was stored (names, not verdicts). */
+  checks: string[];
+  notice: string;
+}
+
 /** What every site answer about an article carries; a card and a page each add the X post in their own form. */
 export interface ItemSummary {
   id: string;
+  /** Chinese when a current machine translation exists, else the source's own title. */
   title: string;
   originalTitle: string | null;
   summary: string | null;
+  /** The source summary as the source wrote it, kept beside a machine translation of it. */
+  originalSummary?: string | null;
   reason: string | null;
   source: SourceRef;
   links: { original: string };
   publishedAt: string | null;
+  /** Exact source date when the source supplied a calendar date but no time. */
+  publishedDate?: string;
+  /**
+   * The source's own date for the document, when it states one ("Updated on Jul 22, 2026"). It is not
+   * a publication date: an undated policy page is dated by it, and a card has to say so.
+   */
+  sourceUpdatedAt?: string | null;
   discoveredAt: string;
   timelineAt: string;
   category: CategoryKey | null;
@@ -55,10 +130,14 @@ export interface ItemSummary {
   selected: boolean;
   channel: "news" | "x";
   story: StoryRef | null;
+  /** Present when the site records where the Chinese material comes from (LightChoice Radar). */
+  identity?: ContentIdentity;
 }
 
 /** The fields rendered by a site feed card; full original text lives in the item detail. */
-export interface FeedItemSummary extends Pick<ItemSummary, "id" | "title" | "summary" | "reason" | "source" | "publishedAt" | "discoveredAt" | "timelineAt" | "category" | "tags" | "score" | "selected" | "channel"> {
+export interface FeedItemSummary extends Pick<ItemSummary, "id" | "title" | "summary" | "reason" | "source" | "publishedAt" | "publishedDate" | "sourceUpdatedAt" | "discoveredAt" | "timelineAt" | "category" | "tags" | "score" | "selected" | "channel" | "identity"> {
+  /** The source title, shown beside a machine-translated one (dropped when it is the same string). */
+  originalTitle?: string | null;
   x: (Pick<XPostView, "authorName" | "handle" | "avatarUrl" | "avatarSrcSet" | "media"> & {
     quoted: Omit<NonNullable<XPostView["quoted"]>, "url"> | null;
   }) | null;
@@ -115,13 +194,24 @@ export interface TimelineResponse {
 }
 
 export interface PoolResponse {
-  filters: TimelineFilters & { q: string | null; tab: "time" | "relevance" };
+  filters: TimelineFilters & {
+    q: string | null;
+    tab: "time" | "relevance";
+    sourceId?: string | null;
+    dateBasis?: "collected" | "published";
+  };
   items: FeedItemSummary[];
   page: number;
   pageCount: number;
   total: number;
   todayCount: number;
   freshness: string;
+}
+
+/** Only sources that currently have public, listable items are offered as a website filter. */
+export interface PoolSourceOption {
+  id: string;
+  name: string;
 }
 
 /** A deterministic rule match points back to the exact stored source field and character offsets. */
@@ -166,6 +256,13 @@ export interface SiteItemDetail extends ItemSummary {
   /** Present in LightChoice Radar when this material was classified by local rules. */
   ruleVersion?: string;
   ruleEvidence?: RuleEvidence[];
+  /** Present in LightChoice Radar: the Chinese policy explanation of this material version. */
+  explanation?: PolicyExplanation | null;
+  /**
+   * Scannable facts lifted from this material version (editorial/key-facts.ts): stored with the rule
+   * explanation when one exists, otherwise computed on read. Same rules, same evidence, no second store.
+   */
+  keyFacts?: PolicyKeyFact[];
   /** Exact excerpts recorded at each material revision; null means that revision predates excerpt history. */
   revisionHistory?: Array<{ revision: number; title: string; excerpt: string | null; capturedAt: string }>;
 }
@@ -493,4 +590,129 @@ export interface TopicPage {
   page: number;
   pageCount: number;
   pageSize: number;
+}
+
+/**
+ * Third-party policy leads: candidates a third-party site reported, not a policy Amazon confirmed.
+ * The list and detail carry metadata only — never an article body — and stay outside the public pool,
+ * the search index and the fact tables.
+ */
+export interface LeadListItem {
+  id: string;
+  title: string;
+  /** The report's own page on the third-party site. */
+  url: string;
+  author: string | null;
+  sourceId: string;
+  sourceName: string;
+  /** The report's publication date. */
+  publishedAt: string | null;
+  /** When the third-party site last changed the report, when it says so. */
+  sourceUpdatedAt: string | null;
+  /** When this project first saw the report. */
+  discoveredAt: string;
+  /** The site's own short description, capped. Never a passage of the body. */
+  excerpt: string | null;
+  /** The pipeline state of the stored record (new / processing / processed / skipped). */
+  processingState: string;
+  /** True when a reviewer excluded the report; such rows never mix with the candidates. */
+  excluded: boolean;
+  exclusionReason: string | null;
+  /** The official evidence state: third-party-only unless an official record actually matched. */
+  officialStatus: string;
+  officialNote: string | null;
+  officialUrl: string | null;
+  /** Which agency publishes the matched official record (CBP / 联邦公报 …) — never "Amazon". */
+  officialSource: string | null;
+  /** A precise label for `effectiveDate`, e.g. "CBP Form 5106 信息核查加强执法开始日期". */
+  effectiveDateLabel: string | null;
+  /** Per-claim verification written by bounded official research (R30); null when never verified. */
+  officialClaims: LeadClaim[] | null;
+  /** When that verification record was written. Never a policy date. */
+  officialVerifiedAt: string | null;
+  /**
+   * A policy effective date: only a date the official record itself states, and only when official
+   * evidence matched. A matched official page that states no date leaves this null.
+   */
+  effectiveDate: string | null;
+  /** The date the third-party report itself states. Never presented as a verified policy date. */
+  reportedEffectiveDate: string | null;
+  /** True when `effectiveDate` is a date the official record states, not the report's claim. */
+  effectiveDateVerified: boolean;
+  /** The lead tags the admission gate attached (第三方线索｜…). */
+  leadTags: string[];
+  /** The lead source's own rule ids, never the shared radar rule ids. */
+  ruleIds: string[];
+  /** The subject the shared radar rules gave the report (类目合规线索 …); empty when none matched. */
+  radarTags: string[];
+  /** The shared radar rule ids, kept apart from the lead source's own rules. */
+  radarRuleIds: string[];
+  section: string | null;
+  column: string | null;
+  /** The dedupe state of the event the lead describes (new / pending-determination / merged). */
+  eventState: string | null;
+}
+
+/** One third-party claim and what bounded official research found for it. */
+export interface LeadClaim {
+  /** The claim in the report's own terms. */
+  claim: string;
+  /** supported: an official record's own text states it. unverified: no public official text found. */
+  verdict: "supported" | "unverified";
+  /** The official wording that backs a supported claim, with its document. */
+  evidence: string | null;
+  /** Why an unverified claim stays unverified (no public source yet / login-only channel). */
+  note: string | null;
+}
+
+export interface LeadDetail extends LeadListItem {
+  /** The third-party site's own tags on the report. */
+  siteTags: string[];
+  market: string | null;
+  marketEvidence: string | null;
+  gateVersion: string | null;
+  discoveredVia: string | null;
+  eventKey: string | null;
+  officialTitle: string | null;
+  officialPublishedAt: string | null;
+  reviewedAt: string | null;
+}
+
+export interface LeadCounts {
+  /** Stored leads that are still candidates (not excluded). */
+  active: number;
+  /** Reports a reviewer excluded from the candidates. */
+  excluded: number;
+  all: number;
+}
+
+export interface LeadsResponse {
+  items: LeadListItem[];
+  counts: LeadCounts;
+  filters: { state: LeadState; verification: string | null; processing: string | null };
+  source: { id: string; name: string; enabled: boolean; intervalMinutes: number };
+  /** Why these records are candidates and not confirmed policy: shown as-is on the page. */
+  limitations: string[];
+}
+
+export type LeadState = "active" | "excluded" | "all";
+
+/** What the source row says, whether a worker holds the role, and what the last round did. */
+export interface LeadSourceStatus {
+  source: {
+    id: string;
+    name: string;
+    enabled: boolean;
+    health: string;
+    failCount: number;
+    intervalMinutes: number;
+    lastError: string | null;
+    nextFetchAt: string | null;
+    lastOkAt: string | null;
+  };
+  /** The dedicated worker holds its advisory lock right now. */
+  worker: { running: boolean; signal: "advisory-lock" };
+  lastRun: { id: number; status: string; found: number; created: number; startedAt: string; error: string | null } | null;
+  /** next_fetch_at is a plan, not a promise: nothing runs while the worker is down. */
+  nextFetchIsPlanOnly: boolean;
 }

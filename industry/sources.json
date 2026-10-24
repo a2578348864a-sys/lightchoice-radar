@@ -1,37 +1,211 @@
 {
-  "$comment": "LightChoice Radar P0: two public RSS sources only. Collection is limited to source-provided titles and summaries.",
+  "$comment": "LightChoice Radar Phase 1. platform_policy sources: Amazon U.S. fee updates, Amazon Sell on Amazon announcements (full-text seller-rule gate). amazon-us-accelerate-updates is disabled: its only record is an Accelerate 2026 conference recap (marketing), so it is excluded from platform-policy statistics and keeps its historical record. external_regulation sources: CPSC recall RSS and Federal Register CPSC/FTC rulemaking RSS, scheduled only by the isolated worker's regulatory allowlist. Seller Central login-only pages are excluded. ads-policy-pages is a closed set of two Amazon Ads policy documents that only render with JavaScript; it stays disabled until a controlled run is asked for. amz123-policy-leads is a third-party lead source (not a policy source): it is isolated, stores metadata only, reads only the two approved AMZ123 columns under a robots gate, and runs every 360 minutes on the isolated worker.",
   "sources": [
     {
-      "id": "rss-home-assistant-community",
-      "name": "Home Assistant 社区 RSS",
-      "kind": "rss",
+      "id": "amazon-us-fee-updates",
+      "name": "亚马逊官方｜美国站销售与 FBA 年度费用更新",
+      "kind": "web_list",
       "config": {
-        "feedUrl": "https://community.home-assistant.io/latest.rss",
-        "_aihot": { "initialBackfillLimit": 15 }
+        "url": "https://sellingpartners.aboutamazon.com/data-insights",
+        "parseMode": "html",
+        "itemSelector": ".PageList-items-item",
+        "linkSelector": ".PagePromo-title a.Link",
+        "titleSelector": ".PagePromo-title",
+        "publishedAtSelector": ".PagePromo-date",
+        "publishedAtUtcOffset": "+00:00",
+        "allowUrlPrefixes": ["https://sellingpartners.aboutamazon.com/update-to-u-s-referral-and-fulfillment-by-amazon-fees-for-"],
+        "publisherRole": "organization",
+        "publisherUrlPrefixes": ["https://sellingpartners.aboutamazon.com/update-to-u-s-referral-and-fulfillment-by-amazon-fees-for-"],
+        "publisherRequiresDiscovery": true,
+        "acceptLanguage": "en-US,en;q=0.9",
+        "_aihot": { "initialBackfillLimit": 10, "initialBackfillMonths": 13 }
       },
-      "tier": "T2",
+      "tier": "T1",
       "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 60,
-      "tags": ["智能家居", "用户社区"],
+      "tags": ["platform_policy", "亚马逊官方", "美国站", "销售费用", "FBA"],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
     {
-      "id": "rss-wyze-community",
-      "name": "Wyze 用户社区 RSS",
+      "id": "rss-cpsc-recalls",
+      "name": "美国监管｜CPSC 官方产品召回 RSS",
       "kind": "rss",
       "config": {
-        "feedUrl": "https://forums.wyze.com/latest.rss",
+        "feedUrl": "https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-RSS",
+        "acceptLanguage": "en-US,en;q=0.9",
         "_aihot": { "initialBackfillLimit": 15 }
       },
-      "tier": "T2",
+      "tier": "T1",
       "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 60,
-      "tags": ["智能家居", "用户社区"],
+      "tags": ["external_regulation", "美国监管机构", "消费品安全", "产品召回"],
       "site_fulltext": false,
       "syndicate_fulltext": false
+    },
+    {
+      "id": "amazon-us-accelerate-updates",
+      "name": "亚马逊官方｜卖家大会与功能宣传（已停采，历史记录保留）",
+      "kind": "web_list",
+      "config": {
+        "url": "https://sellingpartners.aboutamazon.com/",
+        "parseMode": "html",
+        "itemSelector": ".PageList-items-item",
+        "linkSelector": ".PagePromo-title a.Link",
+        "titleSelector": ".PagePromo-title",
+        "publishedAtSelector": ".PagePromo-date",
+        "publishedAtUtcOffset": "+00:00",
+        "allowUrlPrefixes": ["https://sellingpartners.aboutamazon.com/accelerate-"],
+        "publisherRole": "organization",
+        "publisherUrlPrefixes": ["https://sellingpartners.aboutamazon.com/accelerate-"],
+        "publisherRequiresDiscovery": true,
+        "acceptLanguage": "en-US,en;q=0.9",
+        "detail": {
+          "maxFetches": 1,
+          "publishedAtRegex": "\"datePublished\"\\s*:\\s*\"(\\d{4}-\\d{2}-\\d{2})T",
+          "publishedAtUtcOffset": "+00:00",
+          "publishedAtAuthoritative": true,
+          "titleSelector": "h1",
+          "summarySelector": "meta[property=\"og:description\"]"
+        },
+        "_aihot": { "initialBackfillLimit": 10, "initialBackfillMonths": 13 }
+      },
+      "tier": "T1",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 60,
+      "tags": ["亚马逊官方", "卖家活动与功能宣传"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "amazon-us-announcements",
+      "name": "亚马逊官方｜美国站公告列表（正文政策证据筛选）",
+      "kind": "web_list",
+      "config": {
+        "url": "https://sell.amazon.com/blog/announcements?p=1&mons_sel_locale=en_US",
+        "parseMode": "html",
+        "itemSelector": ".PagePromoC",
+        "linkSelector": ".PagePromo-title a.Link",
+        "titleSelector": ".PagePromo-title",
+        "publishedAtSelector": ".PagePromo-date",
+        "publishedAtUtcOffset": "+00:00",
+        "allowUrlPrefixes": ["https://sell.amazon.com/blog/announcements/"],
+        "publisherRole": "organization",
+        "publisherUrlPrefixes": ["https://sell.amazon.com/blog/announcements/"],
+        "publisherRequiresDiscovery": true,
+        "acceptLanguage": "en-US,en;q=0.9",
+        "detail": {
+          "maxFetches": 15,
+          "publishedAtRegex": "datePublished\">([^<]+)</div>",
+          "publishedAtUtcOffset": "+00:00",
+          "publishedAtAuthoritative": false,
+          "titleSelector": "h1",
+          "summarySelector": "meta[property=\"og:description\"]"
+        },
+        "_aihot": { "initialBackfillLimit": 15, "initialBackfillMonths": 13 }
+      },
+      "tier": "T1",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "tags": ["platform_policy", "亚马逊官方", "美国站", "卖家公告", "正文规则筛选"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "us-federal-register-cpsc",
+      "name": "美国监管｜联邦公报 CPSC 规则与拟议规则 RSS",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.federalregister.gov/api/v1/documents.rss?conditions%5Bagencies%5D%5B%5D=consumer-product-safety-commission&conditions%5Btype%5D%5B%5D=RULE&conditions%5Btype%5D%5B%5D=PRORULE&conditions%5Bpublication_date%5D%5Bgte%5D=2026-01-01&per_page=50",
+        "acceptLanguage": "en-US,en;q=0.9",
+        "ingestNoiseFilter": {
+          "dropMarkers": ["sunshine act", "information collection", "advisory committee", "petition for rulemaking", "meeting"]
+        },
+        "_aihot": { "initialBackfillLimit": 20 }
+      },
+      "tier": "T1",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": ["美国监管机构", "external_regulation", "消费品安全", "联邦公报"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "us-federal-register-ftc",
+      "name": "美国监管｜联邦公报 FTC 规则与拟议规则 RSS",
+      "kind": "rss",
+      "config": {
+        "feedUrl": "https://www.federalregister.gov/api/v1/documents.rss?conditions%5Bagencies%5D%5B%5D=federal-trade-commission&conditions%5Btype%5D%5B%5D=RULE&conditions%5Btype%5D%5B%5D=PRORULE&conditions%5Bpublication_date%5D%5Bgte%5D=2026-01-01&per_page=50",
+        "acceptLanguage": "en-US,en;q=0.9",
+        "ingestNoiseFilter": {
+          "dropMarkers": ["sunshine act", "information collection", "advisory committee", "petition for rulemaking", "meeting"]
+        },
+        "_aihot": { "initialBackfillLimit": 20 }
+      },
+      "tier": "T1",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 120,
+      "tags": ["美国监管机构", "external_regulation", "消费者保护", "联邦公报"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
+    },
+    {
+      "id": "ads-policy-pages",
+      "name": "亚马逊官方｜Amazon Ads 政策页（浏览器渲染）",
+      "kind": "web_list",
+      "config": {
+        "adapter": "browser_help",
+        "url": "https://advertising.amazon.com/help/G29MAQ3YTK5LQ7VC",
+        "acceptLanguage": "en-US,en;q=0.9",
+        "allowUrlPrefixes": [
+          "https://advertising.amazon.com/help/G4U9JBZH3664JWX2",
+          "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N"
+        ],
+        "publisherRole": "organization",
+        "publisherUrlPrefixes": ["https://advertising.amazon.com/help/"],
+        "publisherRequiresDiscovery": true,
+        "_aihot": { "initialBackfillLimit": 3 }
+      },
+      "tier": "T1",
+      "owner_entity_id": null,
+      "participation_mode": "editorial",
+      "interval_minutes": 1440,
+      "tags": ["ads_policy", "亚马逊官方", "广告政策"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": false
+    },
+    {
+      "id": "amz123-policy-leads",
+      "name": "AMZ123｜第三方政策线索（仅元数据，隔离存储，不入正式政策）",
+      "kind": "web_list",
+      "config": {
+        "adapter": "amz123_leads",
+        "url": "https://www.amz123.com/t",
+        "allowUrlPrefixes": [
+          "https://www.amz123.com/t/",
+          "https://www.amz123.com/kx/"
+        ],
+        "_aihot": { "initialBackfillLimit": 25, "initialBackfillMonths": 1 }
+      },
+      "tier": "T2",
+      "owner_entity_id": null,
+      "participation_mode": "isolated",
+      "interval_minutes": 360,
+      "tags": ["第三方线索", "amz123", "美国站", "政策线索"],
+      "site_fulltext": false,
+      "syndicate_fulltext": false,
+      "enabled": true
     }
   ]
 }

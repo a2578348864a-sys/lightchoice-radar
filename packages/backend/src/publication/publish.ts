@@ -16,6 +16,7 @@ import {
   bodyModeOf, channelOf, displayTags, isIndexable, isPoolEligible, isSelectable, isIndependentSelectedSource, mayRedistribute, publicSourceName, type SourceFacts,
 } from "./rules.ts";
 import { foldableSelectionCondition, latestCompositeCondition, ownFactEvidenceCondition } from "./scope.ts";
+import { dateOnlyPublicationDate } from "./time-precision.ts";
 
 interface ArticleRow {
   id: string;
@@ -25,6 +26,8 @@ interface ArticleRow {
   language: string | null;
   published_at: Date | null;
   discovered_at: Date;
+  /** The source's own update date; it makes an undated policy document listable. */
+  source_updated_at: Date | null;
   timeline_at: Date;
   backfill: boolean;
   body_status: string;
@@ -96,6 +99,7 @@ export interface V1ItemPayload {
   source: { name: string };
   links: { aihot: string; original: string };
   publishedAt: string | null;
+  publishedDate?: string;
   discoveredAt: string;
   category: string | null;
   score: number | null;
@@ -132,9 +136,10 @@ function round1(n: number | null): number | null {
 
 export function v1Payload(p: {
   articleId: string; title: string; originalTitle: string | null; summary: string | null; sourceName: string; url: string;
-  publishedAt: Date | null; discoveredAt: Date; category: string | null; score: number | null; selected: boolean; reason: string | null;
+  publishedAt: Date | null; publicationTime?: string | null; discoveredAt: Date; category: string | null; score: number | null; selected: boolean; reason: string | null;
 }): V1ItemPayload {
   const aihot = itemUrl(p.articleId);
+  const publishedDate = dateOnlyPublicationDate(p.publicationTime);
   return {
     id: p.articleId,
     title: p.title,
@@ -143,6 +148,7 @@ export function v1Payload(p: {
     source: { name: p.sourceName },
     links: { aihot, original: p.url },
     publishedAt: p.publishedAt ? p.publishedAt.toISOString() : null,
+    ...(publishedDate ? { publishedDate } : {}),
     discoveredAt: p.discoveredAt.toISOString(),
     category: toPublicApiCategory(p.category),
     score: p.score === null ? null : Math.round(p.score),
@@ -195,16 +201,16 @@ async function settleSeats(tx: Tx, factId: number | null, self: string | null, n
 async function syncLedger(tx: Tx, articleId: string, now: Date): Promise<"upsert" | "remove" | null> {
   const [p] = await tx<Array<{ selected: boolean; visibility: string; seat: boolean; title: string; original_title: string | null; summary: string | null;
     url: string; published_at: Date | null; discovered_at: Date; category: string | null; score: string | number | null; reason: string | null;
-    source_name: string }>>`
+    source_name: string; publication_time: string | null }>>`
     SELECT p.selected, p.visibility, p.seat, p.title, p.original_title, p.summary, p.url, p.published_at, p.discovered_at, p.category,
-           p.score, p.reason, s.name AS source_name
-    FROM publications p JOIN sources s ON s.id = p.source_id WHERE p.article_id = ${articleId}`;
+           p.score, p.reason, s.name AS source_name, a.publication_time
+    FROM publications p JOIN sources s ON s.id = p.source_id JOIN articles a ON a.id = p.article_id WHERE p.article_id = ${articleId}`;
   if (!p) return null;
   const [state] = await tx<{ in_set: boolean; payload_hash: string | null }[]>`SELECT in_set, payload_hash FROM selected_state WHERE article_id = ${articleId}`;
   if (p.selected && p.visibility === "public" && p.seat) {
     const payload = v1Payload({
       articleId, title: p.title, originalTitle: p.original_title, summary: p.summary, sourceName: p.source_name, url: p.url,
-      publishedAt: p.published_at, discoveredAt: p.discovered_at, category: p.category, score: p.score === null ? null : Number(p.score), selected: true, reason: p.reason,
+      publishedAt: p.published_at, publicationTime: p.publication_time, discoveredAt: p.discovered_at, category: p.category, score: p.score === null ? null : Number(p.score), selected: true, reason: p.reason,
     });
     const payloadHash = sha256(stableJson(payload));
     if (state?.in_set && state.payload_hash === payloadHash) return null;
@@ -234,7 +240,7 @@ export async function publishArticle(articleId: string, options: PublishOptions 
 
 export async function publishArticleTx(tx: Tx, articleId: string, options: PublishOptions = {}): Promise<PublishResult | null> {
   const [article] = await tx<ArticleRow[]>`
-    SELECT id, source_id, url, title, language, published_at, discovered_at, timeline_at, backfill, body_status,
+    SELECT id, source_id, url, title, language, published_at, discovered_at, source_updated_at, timeline_at, backfill, body_status,
            body_text, x_post, x_article, grouped_at, grouping_status, selection_adds_value
     FROM articles WHERE id = ${articleId} FOR UPDATE`;
   if (!article) return null;
@@ -284,7 +290,9 @@ export async function publishArticleTx(tx: Tx, articleId: string, options: Publi
   // An undated archive has a readable detail page, but its discovery is not a news timestamp.
   // Explicit imports can retain an editorial decision already published elsewhere.
   const eligible = isPoolEligible({ participationMode: source.participation_mode, relevance, title, summary, originalPost: !!original })
-    && (!article.backfill || article.published_at !== null || !!options.releasedAt);
+    // A first import with no publication date is still listable when the source states its own
+    // update date: that date, not the crawl day, is what the card shows (see decideTimeline).
+    && (!article.backfill || article.published_at !== null || article.source_updated_at !== null || !!options.releasedAt);
   const selectionCandidate = isSelectable(eligible, judgedSelected, source.tier);
   // Scoring nominates a report; a completed identity/value decision admits it to selection.
   // A historical import already has its public decision. Preserve that confirmed state on rebuild.

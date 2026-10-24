@@ -10,7 +10,7 @@ export interface RadarExportItem extends FeedItemSummary {
 
 export interface RadarExport {
   generatedAt: string;
-  filters: { q: string | null; from: string | null; to: string | null; channel: string; category: string | null; tag: string | null };
+  filters: { q: string | null; from: string | null; to: string | null; dateBasis: "collected" | "published"; sourceId: string | null; channel: string; category: string | null; tag: string | null };
   total: number;
   truncated: boolean;
   items: RadarExportItem[];
@@ -42,6 +42,7 @@ export async function loadRadarExport(query: PoolQuery): Promise<RadarExport> {
     generatedAt: new Date().toISOString(),
     filters: {
       q: query.q?.trim() || null, from: query.discoveredFrom ?? null, to: query.discoveredTo ?? null,
+      dateBasis: query.dateBasis ?? "collected", sourceId: query.sourceId ?? null,
       channel: query.channel, category: query.category, tag: query.tag,
     },
     total: first.total,
@@ -56,14 +57,15 @@ export async function loadRadarExport(query: PoolQuery): Promise<RadarExport> {
 const md = (value: string) => value.replace(/([\\`*_{}\[\]()#+.!|>])/g, "\\$1");
 
 export function radarExportMarkdown(data: RadarExport): string {
+  const dateLabel = data.filters.dateBasis === "published" ? "发布日期" : "收录日期";
   const range = data.filters.from || data.filters.to
-    ? `${data.filters.from ?? "最早"} 至 ${data.filters.to ?? "最近"}（北京时间收录日期）`
+    ? `${data.filters.from ?? "最早"} 至 ${data.filters.to ?? "最近"}（北京时间${dateLabel}）`
     : "全部可见历史";
   const lines = [
     "# LightChoice Radar 情报导出",
     "",
     `- 导出时间：${data.generatedAt}`,
-    `- 收录日期：${range}`,
+    `- ${dateLabel}：${range}`,
     `- 搜索词：${data.filters.q ?? "无"}`,
     `- 频道：${data.filters.channel}`,
     `- 分类：${data.filters.category ?? "无"}`,

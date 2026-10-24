@@ -9,6 +9,7 @@ import { pagePublicationDate, pageRules, readableDocument, type ExtractedBody } 
 import { sanitizeBody } from "../content/sanitize.ts";
 import { JINA_PREFIX, jinaRead } from "../providers/jina.ts";
 import { articleUtcOffset, readPublicationDate, type PublicationDate } from "./dates.ts";
+import { HttpStatusError } from "../lib/http-fetch.ts";
 import { FetchError, type Candidate, type SourceRow } from "./types.ts";
 
 
@@ -23,6 +24,116 @@ function elementDate(el: ReturnType<cheerio.CheerioAPI>, utcOffset?: string): Pu
 
 /** Prefix rules ignore the scheme: a Jina listing of an http:// address links its posts over http. */
 const overHttps = (url: string) => url.replace(/^http:\/\//i, "https://");
+
+const AMAZON_BLOG_SITEMAP = "https://sell.amazon.com/blog/sitemap.xml";
+const SITEMAP_MAX_BYTES = 2 * 1024 * 1024;
+const SITEMAP_MAX_REQUESTS = 21; // distinct URLs: root plus at most 20 monthly child files
+const SITEMAP_MAX_DEPTH = 2;
+const SITEMAP_MAX_ARTICLES = 500;
+
+function approvedAmazonSitemapUrl(raw: string, sitemap = false): string | null {
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:" || url.hostname !== "sell.amazon.com" || url.port || url.username || url.password || url.search || url.hash) return null;
+    if (sitemap) {
+      if (url.href === AMAZON_BLOG_SITEMAP || /^\/blog\/sitemap-\d{6}\.xml$/.test(url.pathname) || /^\/zh\/blog\/sitemap-\d{6}\.xml$/.test(url.pathname)) return url.href;
+      return null;
+    }
+    if (!url.pathname.startsWith("/blog/") || /\/sitemap(?:-|\.)/i.test(url.pathname)) return null;
+    return url.href;
+  } catch { return null; }
+}
+
+export interface SitemapDocument {
+  status: number;
+  url: string;
+  contentType: string | null;
+  text: string;
+}
+
+export type SitemapLoader = (url: string) => Promise<SitemapDocument>;
+
+/** A later sitemap lastmod schedules one detail refresh; it is never a publication date. */
+export function sitemapLastmodAdvanced(next: Date | null | undefined, previous: Date | null | undefined): boolean {
+  return !!next && Number.isFinite(next.getTime()) && (!previous || !Number.isFinite(previous.getTime()) || next.getTime() > previous.getTime());
+}
+
+function sitemapElements(xml: string, selector: "sitemap" | "url"): Array<{ loc: string; lastmod: string | null }> {
+  const doc = cheerio.load(xml, { xmlMode: true });
+  const nodes = doc(selector).toArray();
+  return nodes.map((node) => {
+    const entry = doc(node);
+    const loc = collapseWhitespace(entry.children("loc").first().text());
+    const lastmod = collapseWhitespace(entry.children("lastmod").first().text()) || null;
+    return { loc, lastmod };
+  }).filter((entry) => !!entry.loc);
+}
+
+function sourceUpdatedAt(value: string | null): Date | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2}))?$/.test(value)) return null;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? parsed : null;
+}
+
+/**
+ * Amazon blog's sitemap is a discovery hint only. This adapter follows a fixed official root and
+ * exact monthly child paths, caps depth, requests, bytes and article URLs, and never treats lastmod
+ * as publication time. A child returning HTML/202 is a failed source run, not an empty success.
+ */
+export async function fromAmazonBlogSitemap(source: SourceRow, load?: SitemapLoader): Promise<Candidate[]> {
+  if (source.id !== "amazon-us-announcements" || source.config.url !== AMAZON_BLOG_SITEMAP || source.config.parseMode !== "sitemap") {
+    throw new FetchError("sitemap source is not the approved Amazon blog entry");
+  }
+  const loader: SitemapLoader = load ?? (async (url) => {
+    const res = requireOk(await fetchListing(url, {
+      headers: { accept: "application/xml,text/xml;q=0.9,*/*;q=0.8", ...languageHeaders(source.config.acceptLanguage) },
+      timeoutMs: 25_000, maxBytes: SITEMAP_MAX_BYTES, redirectPolicy: "same-origin",
+    }), "sitemap");
+    return { status: res.status, url: res.url, contentType: res.headers.get("content-type"), text: res.text() };
+  });
+  const queue: Array<{ url: string; depth: number }> = [{ url: AMAZON_BLOG_SITEMAP, depth: 0 }];
+  const visited = new Set<string>();
+  const articleUrls = new Map<string, Date | null>();
+  let requests = 0;
+  while (queue.length) {
+    const next = queue.shift()!;
+    if (visited.has(next.url)) continue;
+    if (requests >= SITEMAP_MAX_REQUESTS) throw new FetchError("sitemap request limit exceeded");
+    if (!approvedAmazonSitemapUrl(next.url, true)) throw new FetchError("sitemap URL outside approved Amazon blog paths");
+    visited.add(next.url);
+    requests += 1;
+    const response = await loader(next.url);
+    if (response.status !== 200) throw new HttpStatusError(response.status, `HTTP ${response.status} for sitemap`);
+    if (approvedAmazonSitemapUrl(response.url, true) !== next.url) throw new FetchError("sitemap final URL outside approved Amazon blog paths");
+    if (!/(?:application|text)\/(?:xml|rss\+xml|atom\+xml)(?:\s*;|$)/i.test(response.contentType ?? "")) {
+      throw new FetchError(`sitemap response is not XML (${response.contentType ?? "unknown content type"})`);
+    }
+    if (Buffer.byteLength(response.text) > SITEMAP_MAX_BYTES || !/^\s*<\?xml|^\s*<(?:urlset|sitemapindex)\b/i.test(response.text)) {
+      throw new FetchError("invalid or oversized sitemap XML");
+    }
+    const childSitemaps = sitemapElements(response.text, "sitemap");
+    if (childSitemaps.length) {
+      if (next.depth >= SITEMAP_MAX_DEPTH) throw new FetchError("sitemap depth limit exceeded");
+      const sorted = childSitemaps.map((child) => ({ ...child, url: approvedAmazonSitemapUrl(child.loc, true), lastmodAt: sourceUpdatedAt(child.lastmod) }))
+        .filter((child): child is typeof child & { url: string } => child.url !== null)
+        .sort((a, b) => (b.lastmodAt?.getTime() ?? 0) - (a.lastmodAt?.getTime() ?? 0));
+      // Monthly sitemaps are listed newest-first and bounded to keep a long publisher history cheap.
+      for (const child of sorted.slice(0, SITEMAP_MAX_REQUESTS - requests)) queue.push({ url: child.url, depth: next.depth + 1 });
+      continue;
+    }
+    const entries = sitemapElements(response.text, "url");
+    for (const entry of entries) {
+      const url = approvedAmazonSitemapUrl(entry.loc);
+      if (url) articleUrls.set(url, sourceUpdatedAt(entry.lastmod));
+    }
+    if (articleUrls.size > SITEMAP_MAX_ARTICLES) throw new FetchError("sitemap article URL limit exceeded");
+  }
+  return [...articleUrls].map(([url, updated]) => {
+    const slug = new URL(url).pathname.split("/").filter(Boolean).at(-1) ?? "";
+    const title = collapseWhitespace(decodeURIComponent(slug).replace(/[-_]+/g, " ")) || url;
+    return { url, title, publishedAt: null, publicationTime: null, sourceUpdatedAt: updated };
+  });
+}
 
 export function allowed(url: string, source: SourceRow): boolean {
   const allow: string[] = (source.config.allowUrlPrefixes ?? []).map(overHttps);
@@ -328,14 +439,19 @@ async function fromMimoHome(html: string, base: string, source: SourceRow): Prom
 }
 
 export async function fetchWebList(source: SourceRow): Promise<Candidate[]> {
-  const { text, viaJina, base } = await fetchListingText(source);
-  const mode = source.config.adapter === "mimo_home" ? "mimo_home" : source.config.parseMode ?? (viaJina ? "markdown" : "html");
+  let mode = source.config.adapter === "mimo_home" ? "mimo_home" : source.config.parseMode ?? "html";
   let out: Candidate[];
-  if (mode === "mimo_home") out = await fromMimoHome(text, base, source);
-  else if (mode === "markdown") out = fromMarkdown(text, base, source);
-  else if (mode === "docusaurus_changelog") out = fromDocusaurusChangelog(text, base, source);
-  else if (mode === "intercom_changelog") out = fromIntercomChangelog(text, base, source);
-  else out = fromHtml(text, base, source);
+  if (mode === "sitemap") out = await fromAmazonBlogSitemap(source);
+  else {
+    const { text, viaJina, base } = await fetchListingText(source);
+    const effectiveMode = source.config.adapter === "mimo_home" ? "mimo_home" : source.config.parseMode ?? (viaJina ? "markdown" : "html");
+    mode = effectiveMode;
+    if (effectiveMode === "mimo_home") out = await fromMimoHome(text, base, source);
+    else if (effectiveMode === "markdown") out = fromMarkdown(text, base, source);
+    else if (effectiveMode === "docusaurus_changelog") out = fromDocusaurusChangelog(text, base, source);
+    else if (effectiveMode === "intercom_changelog") out = fromIntercomChangelog(text, base, source);
+    else out = fromHtml(text, base, source);
+  }
   if (out.length === 0) throw new FetchError(`no items matched (${mode})`);
   return out;
 }
@@ -366,7 +482,8 @@ export async function fetchDetail(url: string, source: SourceRow, need: DetailNe
   if ((need.date && !dateInJina) || (need.title && !titleInJina) || need.summary) {
     // The rules read a page's head and byline. A page past the size limit (a long paper with inline
     // figures) is read up to it rather than failing on every run; a body cut there is not kept.
-    const res = requireOk(await guardedFetch(url, { headers: languageHeaders(source.config.acceptLanguage), timeoutMs: 20_000, truncate: true }), "detail");
+    // Detail reads use the same bounded transient-network retry as listing reads (one retry, one deadline).
+    const res = requireOk(await fetchListing(url, { headers: languageHeaders(source.config.acceptLanguage), timeoutMs: 20_000, truncate: true }), "detail");
     html = res.text();
     page = { document: contentDocument(html), url: res.url, whole: !res.truncated && /html/.test(res.headers.get("content-type") ?? "") };
   }

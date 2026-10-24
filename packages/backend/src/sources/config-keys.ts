@@ -47,8 +47,10 @@ const preserveRules = (value: unknown) => Array.isArray(value) && value.every((r
 
 const VALUES: Record<string, string[]> = {
   publisherRole: ["organization", "person"],
-  adapter: ["mimo_home"],
-  parseMode: ["html", "markdown", "docusaurus_changelog", "intercom_changelog"],
+  // browser_help: the page (and its sub-pages) only exists after JavaScript runs; see ads-policy.ts.
+  // amz123_leads: a third-party lead source with its own robots gate and discovery; see amz123.ts.
+  adapter: ["mimo_home", "browser_help", "amz123_leads"],
+  parseMode: ["html", "markdown", "docusaurus_changelog", "intercom_changelog", "sitemap"],
 };
 
 // An Accept-Language value: language ranges with optional weights, e.g. "en-US,en;q=0.9".

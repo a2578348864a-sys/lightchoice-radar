@@ -6,10 +6,11 @@ import { beijingDate } from "@aihot/contracts/time";
 import type { ReportIndexResponse, ReportLatestPage, ReportNavigationResponse, SearchSuggestions, SiteContact } from "@aihot/contracts/site";
 import { InvalidCursorError } from "@aihot/backend/lib/cursor";
 import { exportMarkdown, loadItemDetail } from "@aihot/backend/publication/detail";
-import { loadPool, SearchBusyError } from "@aihot/backend/publication/pool";
+import { loadPool, loadPoolSources, SearchBusyError } from "@aihot/backend/publication/pool";
 import { loadRadarExport, radarExportMarkdown } from "@aihot/backend/publication/radar";
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadStoryFollowups } from "@aihot/backend/publication/followups";
+import { loadLeadDetail, loadLeads, loadLeadStatus } from "@aihot/backend/publication/leads";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
 import { hotSearchLinks, loadHotStrip } from "@aihot/backend/publication/hot";
 import { loadChangelog, siteMeta } from "@aihot/backend/site/meta";
@@ -41,6 +42,19 @@ function radarDateRange(q: Record<string, string>) {
   const to = radarDate(q.to, "to");
   if (from && to && from > to) throw new BadRequest("from must not be after to");
   return { from, to };
+}
+
+function radarDateBasis(value: string | undefined): "collected" | "published" {
+  if (value === undefined || value === "" || value === "collected") return "collected";
+  if (value === "published") return "published";
+  throw new BadRequest("dateBasis must be collected or published");
+}
+
+function radarSourceId(value: string | undefined): string | null {
+  const sourceId = value?.trim() ?? "";
+  if (!sourceId) return null;
+  if (!/^[a-zA-Z0-9_-]{1,100}$/.test(sourceId)) throw new BadRequest("source must be a valid source id");
+  return sourceId;
 }
 
 export function siteHandler(fn: Handler): Handler {
@@ -102,7 +116,13 @@ export function registerSite(app: FastifyInstance) {
     const search = q.q?.trim() ? q.q.trim().slice(0, 200) : null;
     const tab = q.tab === "relevance" ? "relevance" : "time";
     const discoveredToday = q.discoveredToday === "1";
-    return sendJsonWithEtag(req, reply, await loadPool({ ...filters, q: search, tab, page, discoveredToday, discoveredFrom: from, discoveredTo: to }), { etagPrefix: "pool", cacheControl: "public, max-age=60, s-maxage=60" });
+    const dateBasis = radarDateBasis(q.dateBasis);
+    const sourceId = radarSourceId(q.source);
+    return sendJsonWithEtag(req, reply, await loadPool({ ...filters, q: search, tab, page, discoveredToday, discoveredFrom: from, discoveredTo: to, dateBasis, sourceId }), { etagPrefix: "pool", cacheControl: "public, max-age=60, s-maxage=60" });
+  }));
+
+  app.get("/api/site/pool/sources", siteHandler(async (req, reply) => {
+    return sendJsonWithEtag(req, reply, await loadPoolSources(), { etagPrefix: "pool-sources", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   app.get("/api/site/radar/export", siteHandler(async (req, reply) => {
@@ -112,7 +132,9 @@ export function registerSite(app: FastifyInstance) {
     const format = q.format === "md" ? "md" : q.format === "json" ? "json" : null;
     if (!format) throw new BadRequest("format must be md or json");
     const search = q.q?.trim() ? q.q.trim().slice(0, 200) : null;
-    const data = await loadRadarExport({ ...filters, q: search, tab: "time", discoveredFrom: from, discoveredTo: to });
+    const dateBasis = radarDateBasis(q.dateBasis);
+    const sourceId = radarSourceId(q.source);
+    const data = await loadRadarExport({ ...filters, q: search, tab: "time", discoveredFrom: from, discoveredTo: to, dateBasis, sourceId });
     const date = beijingDate(new Date());
     if (format === "md") {
       return reply.header("Cache-Control", "no-store")
@@ -248,6 +270,27 @@ export function registerSite(app: FastifyInstance) {
     const data = await loadReport(kind as ReportKind, key);
     if (!data) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "report not found", cacheControl: "public, max-age=60" });
     return sendJsonWithEtag(req, reply, data, { etagPrefix: "report", cacheControl: "public, max-age=120, s-maxage=120" });
+  }));
+
+  // Third-party policy leads: a read-only view of the isolated lead source. Metadata only (never a
+  // body), outside the pool, the search index and the fact tables; no caching, since the status the
+  // page shows next to the list changes with every round.
+  app.get("/api/site/leads", siteHandler(async (req, reply) => {
+    const q = looseQuery(req);
+    return reply.header("Cache-Control", "no-store")
+      .send(await loadLeads({ state: q.state, verification: q.verification ?? null, processing: q.processing ?? null }));
+  }));
+
+  app.get("/api/site/leads/status", siteHandler(async (req, reply) => {
+    return reply.header("Cache-Control", "no-store").send(await loadLeadStatus());
+  }));
+
+  app.get("/api/site/leads/:id", siteHandler(async (req, reply) => {
+    const id = (req.params as { id: string }).id;
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(id)) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "lead not found" });
+    const lead = await loadLeadDetail(id);
+    if (!lead) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "lead not found" });
+    return reply.header("Cache-Control", "no-store").send(lead);
   }));
 
   // Markdown export: attachment, 404 when there is nothing to export (same predicate as the button).

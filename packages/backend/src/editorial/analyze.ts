@@ -34,7 +34,9 @@ import { CATEGORY_GUIDE, CATEGORY_TAGS, ENTITIES, ENTITY_TAGS, ITEM_TYPES, norma
 import { promptText, promptVersion } from "./prompts.ts";
 import { originalPostCopy } from "../content/posts.ts";
 import { wordingProblems } from "./wording.ts";
-import { classifyRadarText, RADAR_RULE_VERSION, type RadarEvidence } from "./radar-rules.ts";
+import { classifyRadarText, RADAR_RULE_VERSION, summarizeRadarPolicy, type RadarEvidence } from "./radar-rules.ts";
+import { buildPolicyExplanation, keepCompleteExplanation } from "./policy-explain.ts";
+import type { PolicyExplanation } from "@aihot/contracts/site";
 
 export { buildMaterial, loadAnalyzeInput, type AnalyzeInputArticle };
 
@@ -216,6 +218,10 @@ export interface AnalysisRun {
   ruleOnly?: boolean;
   /** Exact stored text matches. Offsets are relative to each named field. */
   ruleEvidence?: RadarEvidence[];
+  /** Whether the Chinese summary was organised from the body by local rules (not source copy). */
+  ruleSummary?: boolean;
+  /** The Chinese policy explanation assembled with the rules; never a model output. */
+  explanation?: PolicyExplanation | null;
 }
 
 const isContentFilter = (error: unknown) => failureKind(error) === "refused" && /contentFilter|"1301"/.test((error as Error).message);
@@ -484,8 +490,16 @@ export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): 
   checkAnalysisRunning();
   if (config.ruleOnlyMode) {
     const title = collapseWhitespace(a.title);
-    const summary = collapseWhitespace(a.excerpt ?? a.bodyText ?? "").slice(0, 1200);
+    const ruleSummary = summarizeRadarPolicy({ bodyText: a.bodyText });
+    const summary = ruleSummary ?? collapseWhitespace(a.excerpt ?? a.bodyText ?? "").slice(0, 1200);
     const rules = classifyRadarText({ title: a.title, excerpt: a.excerpt, bodyText: a.bodyText });
+    // The explanation is assembled here, inside the worker's analysis job: a page read never computes one.
+    const explanation = buildPolicyExplanation({
+      revision: a.revision, title: a.title, url: a.url, publishedAt: a.publishedAt, publicationTime: a.publicationTime,
+      sourceUpdatedAt: a.sourceUpdatedAt, discoveredAt: a.discoveredAt, bodyText: a.bodyText, excerpt: a.excerpt,
+      bodyStatus: a.bodyStatus, source: { name: a.source.name, kind: a.source.kind, tags: a.source.tags },
+      tags: rules.tags, ruleEvidence: rules.evidence, hasRuleSummary: !!ruleSummary, translationZh: a.translationZh,
+    });
     return {
       prefilter: null,
       scores: null,
@@ -493,6 +507,8 @@ export async function runAnalysis(a: AnalyzeInputArticle, opts: StepOpts = {}): 
       structure: { scope: "unknown", category: null, tags: rules.tags, subjects: [], fact: null, model: "rules", receiptId: 0, reused: false },
       ruleOnly: true,
       ruleEvidence: rules.evidence,
+      ruleSummary: !!ruleSummary,
+      explanation,
     };
   }
   // Missing article text waits for a later revision, before any paid step; displayable original posts keep their judgement.
@@ -553,6 +569,8 @@ export function normalizeAnalysis(run: AnalysisRun) {
     scope: run.structure?.scope ?? "unknown",
     fact: run.structure?.fact ?? null,
     ruleEvidence: run.ruleOnly ? run.ruleEvidence ?? [] : undefined,
+    ruleSummary: run.ruleOnly ? run.ruleSummary ?? false : undefined,
+    explanation: run.ruleOnly ? run.explanation ?? null : null,
   };
 }
 
@@ -587,7 +605,7 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
       ? { label: "PASS", reason: "本地规则试验：仅展示 RSS 来源提供的原文，不代表语义相关性判断" }
       : run.prefilter && { label: run.prefilter.label, reason: run.prefilter.reason },
     ruleOnly: run.ruleOnly ?? false,
-    ...(run.ruleOnly ? { ruleVersion: RADAR_RULE_VERSION, ruleEvidence: run.ruleEvidence ?? [] } : {}),
+    ...(run.ruleOnly ? { ruleVersion: RADAR_RULE_VERSION, ruleEvidence: run.ruleEvidence ?? [], ruleSummary: run.ruleSummary ?? false } : {}),
     scores: out.scores, scoreModel: out.scoreModel, threshold: out.threshold, ...(out.scoreRefused ? { scoreRefused: true } : {}),
     ...(w ? { writer: w.kind, writerModel: w.model, itemType: w.itemType ?? null, authorRole: w.authorRole ?? null } : {}),
     ...(w?.identityGuard?.outcome === "fallback" ? { identityGuard: w.identityGuard } : {}),
@@ -598,12 +616,23 @@ export async function analyzeArticle(articleId: string, opts: StepOpts = {}): Pr
     const stale = !current || current.revision !== input.revision;
     const origin = run.ruleOnly ? "rule" : "model";
     const promptVersionForRun = run.ruleOnly ? RADAR_RULE_VERSION : ANALYZE_PROMPT_VERSION;
+    // Same-version downgrade guard: an incomplete explanation never shadows a complete one of the
+    // same material revision; a complete one replaces it whatever came before.
+    let explanation = out.explanation ?? null;
+    if (explanation) {
+      const [prior] = await tx<{ explanation: PolicyExplanation | null }[]>`
+        SELECT output->'explanation' AS explanation FROM analyses
+        WHERE article_id = ${articleId} AND input_revision = ${input.revision} AND origin = 'rule'
+        ORDER BY id DESC LIMIT 1`;
+      explanation = keepCompleteExplanation(prior?.explanation ?? null, explanation);
+    }
+    const stored = { ...detail, ...(explanation ? { explanation } : {}) };
     const [row] = await tx<{ id: number }[]>`
       INSERT INTO analyses (article_id, input_revision, origin, model, prompt_version, receipt_ids, relevance, category, tags,
         subjects, title_zh, summary_zh, reason_zh, score, selected, output)
       VALUES (${articleId}, ${input.revision}, ${origin}, ${w?.model ?? run.prefilter?.model ?? null}, ${promptVersionForRun}, ${receiptIds},
         ${out.relevance}, ${out.category}, ${out.tags}, ${out.subjects}, ${out.titleZh}, ${out.summaryZh}, ${out.reasonZh},
-        ${out.score}, ${out.selected}, ${tx.json(detail as never)})
+        ${out.score}, ${out.selected}, ${tx.json(stored as never)})
       RETURNING id`;
     for (const id of receiptIds) await completeReceipt(tx, id);
     if (!stale) {
