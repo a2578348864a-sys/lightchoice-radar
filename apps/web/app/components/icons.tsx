@@ -24,6 +24,7 @@ export const IconClock = (p: P) => (<Svg {...p}><circle cx="12" cy="12" r="8.5" 
 export const IconPlug = (p: P) => (<Svg {...p}><path d="M9 3v5M15 3v5M7 8h10v3a5 5 0 01-10 0zM12 16v5" /></Svg>);
 export const IconSparkles = (p: P) => (<Svg {...p}><path d="M11 3.5l1.7 4.8 4.8 1.7-4.8 1.7L11 16.5l-1.7-4.8L4.5 10l4.8-1.7z" /><path d="M18 14.5l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" /></Svg>);
 export const IconRss = (p: P) => (<Svg {...p}><path d="M5 11a8 8 0 018 8M5 4.5A14.5 14.5 0 0119.5 19" /><circle cx="6" cy="18" r="1.3" /></Svg>);
+export const IconRadar = (p: P) => (<Svg {...p}><circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="3.6" /><path d="M12 12l6-6" /></Svg>);
 export const IconCode = (p: P) => (<Svg {...p}><path d="M8 7.5L3.5 12 8 16.5M16 7.5l4.5 4.5-4.5 4.5M13.5 5l-3 14" /></Svg>);
 export const IconInfo = (p: P) => (<Svg {...p}><circle cx="12" cy="12" r="8.5" /><path d="M12 11v5M12 8h.01" /></Svg>);
 export const IconHistory = (p: P) => (<Svg {...p}><path d="M3.5 12a8.5 8.5 0 102.5-6" /><path d="M3.5 4v4h4" /><path d="M12 8v4l2.5 2" /></Svg>);

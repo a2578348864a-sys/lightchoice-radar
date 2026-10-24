@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { Await, isRouteErrorResponse, Link, useAsyncError, useLoaderData, useNavigate, useRevalidator, type ClientLoaderFunctionArgs } from "react-router";
 import type { Route } from "./+types/item";
 import type { FeedItemSummary, SiteItemDetail } from "@aihot/contracts/site";
+import { beijingDate } from "@aihot/contracts/time";
 import { ITEM_COPY, SITE } from "@aihot/site";
 import { cachedPage, loadOr404 } from "../lib/api.server";
 import { pageReuse } from "../lib/page-reuse";
@@ -21,6 +22,7 @@ import { MediaGallery } from "../features/item/MediaGallery";
 import { QuotedPost } from "../features/item/QuotedPost";
 import { ArticleBody } from "../features/item/ArticleBody";
 import { ActionsSheet, ReaderToolbar, type ActionRow } from "../features/item/ReaderTools";
+import { ReaderKeyFacts, ReaderQuickRead, ReaderSourceNotes, quickReadOf, readerAuthor, readerSourceName } from "../features/item/reading";
 import { OutlineSheet } from "../components/ui/OutlineSheet";
 import { scrollToAnchor } from "../lib/motion";
 import { takePreview } from "../features/item/preview";
@@ -66,10 +68,10 @@ export function meta({ loaderData }: Route.MetaArgs) {
     type: "article",
     noindex: !item.indexable,
     jsonLd: [
-      articleLd({ path: `/items/${item.id}`, headline: item.title, description: item.summary, publishedAt: item.publishedAt, image: `/og/items/${item.id}.png`, basedOn: item.links.original }),
+      articleLd({ path: `/items/${item.id}`, headline: item.title, description: item.summary, publishedAt: item.publishedDate ?? item.publishedAt, image: `/og/items/${item.id}.png`, basedOn: item.links.original }),
       breadcrumbLd([
         { name: SITE.name, path: "/" },
-        { name: item.selected ? "精选" : "全部动态", path: item.selected ? "/" : "/all" },
+        { name: item.selected ? "精选" : SITE.name === "LightChoice Radar" ? "平台政策情报" : "全部动态", path: item.selected ? "/" : "/all" },
         { name: item.title, path: `/items/${item.id}` },
       ]),
     ],
@@ -203,8 +205,11 @@ export default function ItemPage() {
 function ItemPreview({ preview }: { preview: FeedItemSummary }) {
   const [toast, setToast] = useToast();
   const isX = preview.channel === "x" && !!preview.x;
-  // Without a reliable date from the original, the card's time is when it was collected, and says so.
-  const shownAt = preview.publishedAt ?? preview.timelineAt;
+  // The source's publication date, else the document's own update date, else when it was collected:
+  // each one is labelled as what it is, and none stands in for another.
+  const shownAt = preview.publishedAt ?? preview.sourceUpdatedAt ?? preview.timelineAt;
+  const shownDate = preview.publishedAt ? (preview.publishedDate ?? fullDateTime(shownAt)) : preview.sourceUpdatedAt ? beijingDate(preview.sourceUpdatedAt) : fullDateTime(shownAt);
+  const shownPrefix = preview.publishedAt ? "发布于" : preview.sourceUpdatedAt ? "来源更新于" : "收录于";
   return (
     <div className="mx-auto max-w-[var(--page-max-reading)] pb-8">
       <PhoneBar back={{ to: preview.selected ? "/" : "/all", label: preview.selected ? "精选" : "全部" }} title={isX ? preview.x!.authorName : preview.title} />
@@ -213,8 +218,8 @@ function ItemPreview({ preview }: { preview: FeedItemSummary }) {
           <span className="font-semibold text-ink-2">{isX ? preview.x!.authorName : preview.source.name}</span>
           {isX && <span>· @{preview.x!.handle} · X</span>}
           <span>·</span>
-          {!preview.publishedAt && <span>收录于</span>}
-          <time dateTime={shownAt} className="mono">{fullDateTime(shownAt)}</time>
+          {shownPrefix && <span>{shownPrefix}</span>}
+          <time dateTime={preview.publishedAt ? (preview.publishedDate ?? shownAt) : shownAt} className="mono">{shownDate}</time>
           {preview.selected && <span className="ml-1">{preview.sameEvent ? <SameEventBadge /> : <SelectedBadge />}</span>}
           {shownScore(preview.score) !== null && (
             <span className="ml-1">
@@ -250,46 +255,6 @@ function ItemPreview({ preview }: { preview: FeedItemSummary }) {
       />
       <Toast text={toast} />
     </div>
-  );
-}
-
-function RadarEvidencePanel({ evidence }: { evidence: NonNullable<SiteItemDetail["ruleEvidence"]> }) {
-  if (evidence.length === 0) return null;
-  const fieldName = { title: "标题", excerpt: "来源摘要", body: "正文" } as const;
-  return (
-    <section className="mt-6 rounded-card border border-line bg-surface px-4 py-3">
-      <h2 className="text-[13px] font-semibold text-ink">规则命中依据</h2>
-      <p className="mt-1 text-[12px] leading-relaxed text-ink-4">这些标签是本地关键词命中得到的研究线索，不代表问题普遍存在或市场结论。</p>
-      <ul className="mt-2 space-y-2">
-        {evidence.slice(0, 12).map((hit, index) => {
-          const prefixLength = Math.min(hit.start, 70);
-          const before = hit.context.slice(0, prefixLength);
-          const after = hit.context.slice(prefixLength + hit.matchedText.length);
-          return <li key={`${hit.ruleId}:${hit.field}:${hit.start}:${index}`} className="text-[12.5px] leading-relaxed text-ink-2">
-            <span className="font-medium text-accent">{hit.label}</span><span className="ml-1 text-ink-4">· {fieldName[hit.field]}</span>
-            <blockquote className="mt-0.5 border-l-2 border-line pl-2 text-ink-3">{before}<mark className="rounded-sm bg-amber/25 text-ink">{hit.matchedText}</mark>{after}</blockquote>
-          </li>;
-        })}
-      </ul>
-    </section>
-  );
-}
-
-function RadarRevisionHistory({ revisions }: { revisions: NonNullable<SiteItemDetail["revisionHistory"]> }) {
-  if (revisions.length < 2) return null;
-  return (
-    <section className="mt-6 border-t border-line pt-4">
-      <h2 className="text-[13px] font-semibold text-ink">内容修订记录</h2>
-      <ol className="mt-2 space-y-3">
-        {revisions.map((revision) => <li key={revision.revision} className="rounded-card bg-well px-3 py-2.5">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[11.5px] text-ink-4">
-            <span>版本 {revision.revision}</span><time dateTime={revision.capturedAt}>{fullDateTime(revision.capturedAt)}</time>
-          </div>
-          <p className="mt-1 text-[13px] font-medium text-ink-2">{revision.title}</p>
-          {revision.excerpt ? <p className="mt-1 whitespace-pre-wrap text-[12.5px] leading-relaxed text-ink-3">{revision.excerpt}</p> : <p className="mt-1 text-[12px] text-ink-4">该历史版本没有保存来源摘要。</p>}
-        </li>)}
-      </ol>
-    </section>
   );
 }
 
@@ -355,12 +320,20 @@ function ItemView({ item }: { item: SiteItemDetail }) {
   const bodyHtml = lang === "zh" ? (item.body?.zh ?? item.body?.original) : (item.body?.original ?? item.body?.zh);
   const bodyLabel = !item.body ? null : lang === "zh" && item.body.zhKind === "translation" ? "正文 · 中文译文" : lang === "original" ? "正文 · 原文" : "正文";
   const isX = item.channel === "x" && !!item.x;
-  // Without a reliable date from the original, the time shown is when it was collected, labelled as such.
-  const shownAt = item.publishedAt ?? item.discoveredAt;
-  const timeLabel = item.publishedAt ? "发布时间" : "收录时间";
+  // The source's publication date, else the document's own update date, else when it was collected.
+  // The label changes with the date so a document's update date never reads as a publication date.
+  const shownAt = item.publishedAt ?? item.sourceUpdatedAt ?? item.discoveredAt;
+  const shownDate = item.publishedAt ? (item.publishedDate ?? fullDateTime(shownAt)) : item.sourceUpdatedAt ? beijingDate(item.sourceUpdatedAt) : fullDateTime(shownAt);
+  const timeLabel = item.publishedAt ? "发布时间" : item.sourceUpdatedAt ? "来源更新时间" : "收录时间";
+  const shownPrefix = item.publishedAt ? "发布于" : item.sourceUpdatedAt ? "来源更新于" : "收录于";
   const summaryOnly = item.readingMode === "summary-only";
   const showOutline = item.outline.length >= 3;
   const originalLabel = isX ? "在 X 查看原推" : "打开原文";
+  // The summary's identity comes from the server (how it was produced), not from matching its text.
+  const summaryRuleZh = item.identity?.summaryKind === "rule-zh";
+  // The quick read is the stored summary; when the summary is no longer than it, the reading area
+  // below would repeat the same paragraph.
+  const quickRead = SITE.name === "LightChoice Radar" && !isX ? quickReadOf(item) : null;
 
   const related = item.relatedStories.filter((s) => s.publicId !== item.story?.publicId);
 
@@ -429,17 +402,15 @@ function ItemView({ item }: { item: SiteItemDetail }) {
   // under the facts (or under the notes when only the right rail shows).
   const facts = (
     <RailSection title="来源">
-      <div className="text-[14px] font-semibold leading-snug text-ink">{isX ? item.x!.authorName : item.source.name}</div>
+      <div className="text-[14px] font-semibold leading-snug text-ink">{isX ? item.x!.authorName : readerSourceName(item.source.name)}</div>
       <div className="mt-1 text-[12.5px] leading-relaxed text-ink-3">
-        {isX ? `@${item.x!.handle} · X` : item.author ?? hostOf(item.links.original)}
+        {isX ? `@${item.x!.handle} · X` : readerAuthor(item.author, item.title) ?? hostOf(item.links.original)}
       </div>
       <div className="mt-3 text-[12px] text-ink-4">{timeLabel}</div>
-      <time dateTime={shownAt} className="mono mt-0.5 block text-[12.5px] text-ink-2">
-        {fullDateTime(shownAt)}
+      <time dateTime={item.publishedAt ? (item.publishedDate ?? shownAt) : shownAt} className="mono mt-0.5 block text-[12.5px] text-ink-2">
+        {shownDate}
       </time>
-      <div className="mt-0.5 text-[12px] text-ink-4" suppressHydrationWarning>
-        {relativeTime(shownAt)}
-      </div>
+      {!item.publishedAt && !item.sourceUpdatedAt && <div className="mt-0.5 text-[12px] text-ink-4" suppressHydrationWarning>{relativeTime(shownAt)}</div>}
     </RailSection>
   );
   const outline = showOutline && <ArticleOutline outline={item.outline} />;
@@ -514,13 +485,13 @@ function ItemView({ item }: { item: SiteItemDetail }) {
         <div className="sticky top-0 z-20 -mx-2 hidden bg-bg/95 px-2 py-1.5 backdrop-blur lg:block 2xl:hidden">{backButton}</div>
         <article className="pb-6 pt-3 lg:pt-2 2xl:pt-1">
           <div className={`flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[13px] text-ink-3 2xl:hidden ${isX ? "" : "mb-3"}`}>
-            <span className="font-semibold text-ink-2">{isX ? item.x!.authorName : item.source.name}</span>
+            <span className="font-semibold text-ink-2">{isX ? item.x!.authorName : readerSourceName(item.source.name)}</span>
             {isX && <span>· @{item.x!.handle} · X</span>}
-            {item.author && !isX && <span>· {item.author}</span>}
+            {!isX && readerAuthor(item.author, item.title) && <span>· {readerAuthor(item.author, item.title)}</span>}
             <span>·</span>
-            {!item.publishedAt && <span>收录于</span>}
-            <time dateTime={shownAt} className="mono">{fullDateTime(shownAt)}</time>
-            <span suppressHydrationWarning>· {relativeTime(shownAt)}</span>
+            {shownPrefix && <span>{shownPrefix}</span>}
+            <time dateTime={item.publishedAt ? (item.publishedDate ?? shownAt) : shownAt} className="mono">{shownDate}</time>
+            {!item.publishedAt && !item.sourceUpdatedAt && <span suppressHydrationWarning>· {relativeTime(shownAt)}</span>}
             {item.selected && (
               <span className="ml-1 lg:hidden">
                 {item.sameEvent ? <SameEventBadge /> : <SelectedBadge />}
@@ -532,18 +503,32 @@ function ItemView({ item }: { item: SiteItemDetail }) {
               </span>
             )}
           </div>
-          {!isX && <h1 data-page-title="" className="text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink lg:text-[32px] lg:leading-[1.34] xl:text-[36px] xl:leading-[1.3]">{item.title}</h1>}
-          {!isX && item.originalTitle && <p className="mt-2.5 text-[14px] leading-relaxed text-ink-4">{item.originalTitle}</p>}
-
-          {item.summary && (!isX || item.summary.replace(/\s+/g, " ").trim() !== item.title) && (
-            <section className={isX ? "mt-4" : "mt-7 xl:mt-8"}>
-              <div className="mb-2 text-[12px] font-semibold text-accent">{summaryOnly ? "摘要" : "来源摘要"}</div>
-              <p className="text-[18px] leading-[1.7] text-ink xl:text-[20px] xl:leading-[1.7]">{item.summary}</p>
-            </section>
+          {!isX && item.identity?.titleKind === "machine-zh" && (
+            <p className="mt-3 inline-flex items-center rounded-full bg-bg-sunk px-2 py-[2px] text-[11px] font-medium text-ink-3">机器翻译 · 未经人工核对</p>
+          )}
+          {!isX && <h1 data-page-title="" className="mt-2 text-[26px] font-bold leading-[1.38] tracking-[-0.01em] text-ink lg:text-[32px] lg:leading-[1.34] xl:text-[36px] xl:leading-[1.3]">{item.title}</h1>}
+          {/* One compact way back to the source on phones; the rail and the toolbar carry it on wide screens. */}
+          {!isX && (
+            <a href={item.links.original} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-[12.5px] text-ink-4 transition-colors hover:text-accent lg:hidden">
+              阅读原文 <IconExternal size={12} />
+            </a>
           )}
 
-          {SITE.name === "LightChoice Radar" && <RadarEvidencePanel evidence={item.ruleEvidence ?? []} />}
-          {SITE.name === "LightChoice Radar" && <RadarRevisionHistory revisions={item.revisionHistory ?? []} />}
+          {SITE.name === "LightChoice Radar" && <ReaderQuickRead item={item} />}
+          {SITE.name === "LightChoice Radar" && <ReaderKeyFacts item={item} />}
+
+          {item.summary && (!isX || item.summary.replace(/\s+/g, " ").trim() !== item.title) && !(quickRead?.repeatsSummary && !item.body) && (
+            <section className={isX ? "mt-4" : "mt-7 xl:mt-8"}>
+              <div className="mb-2 text-[12px] font-semibold text-ink-3">{summaryOnly ? "来源摘要" : summaryRuleZh ? "中文摘要" : item.identity?.summaryKind === "machine-zh" ? "来源摘要 · 中文" : "来源摘要 · 原文"}</div>
+              <p className="text-[16.5px] leading-[1.8] text-ink xl:text-[17.5px] xl:leading-[1.85]">{item.summary}</p>
+              {item.originalSummary && item.originalSummary !== item.summary && (
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[12.5px] text-ink-4">查看来源摘要原文</summary>
+                  <p className="mt-1.5 whitespace-pre-line text-[13.5px] leading-relaxed text-ink-3">{item.originalSummary}</p>
+                </details>
+              )}
+            </section>
+          )}
 
           {item.reason && !summaryOnly && (
             <section className="mt-6 border-t border-line pt-4 lg:hidden">
@@ -594,13 +579,16 @@ function ItemView({ item }: { item: SiteItemDetail }) {
             </section>
           )}
 
+          {/* Reading order: title → 重点速读 → 关键信息 → summary/body → folded provenance. */}
+          {SITE.name === "LightChoice Radar" && <ReaderSourceNotes item={item} />}
+
           {isX && item.x!.media.length > 0 && <MediaGallery media={item.x!.media} postUrl={item.links.original} />}
           {isX && item.x!.quoted?.text && <QuotedPost quoted={item.x!.quoted} original={lang === "original"} />}
 
           <p className="mt-8 text-[13px] text-ink-4">
             来源：
             <a href={item.links.original} target="_blank" rel="noopener noreferrer" className="text-ink-3 hover:text-accent">
-              {isX ? item.x!.authorName : item.source.name}
+              {isX ? item.x!.authorName : readerSourceName(item.source.name)}
             </a>
             <span> · {hostOf(item.links.original)}</span>
           </p>

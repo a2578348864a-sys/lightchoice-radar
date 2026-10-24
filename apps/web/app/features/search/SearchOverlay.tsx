@@ -15,6 +15,8 @@ let field: HTMLInputElement | null = null;
 const opener: { current: HTMLElement | null } = { current: null };
 let open = false;
 let openedAt = "default";
+let preservedSearchFilters: Record<string, string> = {};
+const SEARCH_KEEP_KEYS = new Set(["channel", "category", "tag", "source", "dateBasis", "from", "to"]);
 const listeners = new Set<() => void>();
 const subscribe = (l: () => void) => {
   listeners.add(l);
@@ -26,8 +28,12 @@ function setOpen(next: boolean) {
 }
 
 /** Opens the search over the page; call it from the tap itself so the keyboard comes up. */
-export function openSearch(query = "", trigger?: HTMLElement) {
+export function openSearch(query = "", trigger?: HTMLElement, keep: Record<string, string | null | undefined> = {}) {
   if (!open) opener.current = trigger ?? (document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  preservedSearchFilters = {};
+  for (const [key, value] of Object.entries(keep)) {
+    if (SEARCH_KEEP_KEYS.has(key) && typeof value === "string" && value.length > 0) preservedSearchFilters[key] = value;
+  }
   openedAt = (window.history.state as { key?: string } | null)?.key ?? "default";
   if (overlay && field) {
     overlay.inert = false; // closed, it is inert, and nothing inside an inert overlay takes focus
@@ -128,6 +134,7 @@ export function SearchOverlay() {
         }}
         className="flex h-14 shrink-0 items-center gap-1 pl-4 pr-1 pt-[env(safe-area-inset-top)]"
       >
+        {Object.entries(preservedSearchFilters).map(([name, value]) => <input key={name} type="hidden" name={name} value={value} />)}
         <label className="relative flex-1">
           <span className="sr-only">搜索标题、摘要和正文</span>
           <IconSearch size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-4" />

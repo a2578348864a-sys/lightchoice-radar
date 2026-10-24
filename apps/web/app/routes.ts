@@ -15,6 +15,9 @@ const moduleAdminPages: RouteConfigEntry[] = MODULES.flatMap((m) => (m.adminPage
 export default [
   index("routes/home.tsx"),
   route("all", "routes/all.tsx"),
+  // Third-party policy leads: a read-only view of the isolated lead source, not a policy record.
+  route("leads", "routes/leads.tsx"),
+  route("leads/:id", "routes/lead.tsx"),
   route("today", "routes/today.tsx"),
   route("all/search-busy", "routes/search-busy.tsx", { id: "all-search-busy" }),
   route("search-busy", "routes/search-busy.tsx", { id: "search-busy" }),

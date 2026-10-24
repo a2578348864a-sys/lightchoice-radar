@@ -21,7 +21,7 @@ export function DayList({ items, todayCount = null, headerAside, at = "timelineA
           <DayHeader day={day} today={today} count={day === today ? todayCount : null} aside={i === 0 ? headerAside : undefined} />
           <ol className="lg:pt-1">
             {list.map((it) => (
-              <TimelineSlot key={it.id} at={it[at]}>
+              <TimelineSlot key={it.id} at={it[at]} timeLabel={at === "timelineAt" && it.publishedDate && it.publishedAt === it.timelineAt ? null : undefined}>
                 <FeedItem item={it} read={readSet.has(it.id)} onOpen={markRead} showTags at={it[at]} />
               </TimelineSlot>
             ))}

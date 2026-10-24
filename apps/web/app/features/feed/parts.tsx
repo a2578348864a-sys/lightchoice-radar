@@ -1,6 +1,7 @@
 // Small building blocks shared by feed items, detail pages and lists.
 import { useState } from "react";
 import type { FeedItemSummary, MediaView } from "@aihot/contracts/site";
+import { beijingDate } from "@aihot/contracts/time";
 import { IconBookmark } from "../../components/icons";
 import { SourceAvatar } from "../../components/ui/SourceAvatar";
 import { Lightbox } from "../../components/ui/Lightbox";
@@ -21,6 +22,29 @@ export function SourceLine({ item, className = "" }: { item: Pick<FeedItemSummar
     );
   }
   return <span className={`min-w-0 truncate ${className}`}>{item.source.name}</span>;
+}
+
+/**
+ * What a card's date means, in the one place every list reads it. A publication date belongs to the
+ * source; a document's own "Updated on" date is not a publication and must not be read as one; and
+ * material with no date of its own says so rather than borrowing the day it was collected.
+ */
+export function itemDate(item: Pick<FeedItemSummary, "publishedAt" | "publishedDate" | "sourceUpdatedAt">): { label: string; date: string | null } {
+  if (item.publishedDate) return { label: "发布于", date: item.publishedDate };
+  if (item.publishedAt) return { label: "发布于", date: beijingDate(item.publishedAt) };
+  if (item.sourceUpdatedAt) return { label: "来源更新于", date: beijingDate(item.sourceUpdatedAt) };
+  return { label: "日期未确认", date: null };
+}
+
+/** The card's date line: the label says which date this is, so "来源更新于" never reads as "发布于". */
+export function ItemDate({ item, className = "" }: { item: Pick<FeedItemSummary, "publishedAt" | "publishedDate" | "sourceUpdatedAt">; className?: string }) {
+  const { label, date } = itemDate(item);
+  return (
+    <span data-item-date={date ?? "unknown"} className={`inline-flex min-w-0 items-center gap-1 ${className}`}>
+      <span className="shrink-0">{label}</span>
+      {date && <time dateTime={date} className="mono truncate">{date}</time>}
+    </span>
+  );
 }
 
 /** Up to four media thumbnails, kept small in lists (the detail page shows them larger). Videos are stills. */

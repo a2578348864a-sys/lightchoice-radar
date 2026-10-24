@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { NAV, SITE, subjectAfter, withSubject } from "@aihot/site";
 import { webModules } from "../../site-modules";
 import {
-  IconBolt, IconBookmark, IconDoc, IconFlame, IconGrid, IconHeart, IconHistory, IconList, IconMessage, IconPlug, IconUser,
+  IconBolt, IconBookmark, IconDoc, IconFlame, IconGrid, IconHeart, IconHistory, IconList, IconMessage, IconPlug, IconRadar, IconUser,
 } from "../icons";
 
 export interface NavItem {
@@ -22,7 +22,8 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
     title: "内容",
     items: [
       { to: "/", label: "情报", icon: IconBolt, end: true },
-      { to: "/all", label: subjectAfter("全部", "动态"), icon: IconList },
+      { to: "/all", label: SITE.name === "LightChoice Radar" ? "平台政策情报" : subjectAfter("全部", "动态"), icon: IconList },
+      { to: "/leads", label: "政策线索", icon: IconRadar },
       { to: "/hot", label: "热点榜", icon: IconFlame },
       { to: "/daily", label: withSubject("日报"), icon: IconDoc },
       { to: "/topics", label: "主题", icon: IconGrid },

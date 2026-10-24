@@ -10,10 +10,11 @@ import { ITEM_COPY } from "@aihot/site";
 import { SameEventBadge, SelectedBadge } from "../../components/ui/Badge";
 import { ScoreLabel } from "../../components/ui/Score";
 import { beijingTime } from "@aihot/contracts/time";
-import { MediaThumbs, SourceLine, StarButton, readTone } from "./parts";
+import { MediaThumbs, SourceLine, StarButton, ItemDate, readTone } from "./parts";
 import { GroupButton, GroupSources } from "./ReadingGroup";
 import { QuotedLine } from "../item/QuotedPost";
 import { rememberPreview } from "../item/preview";
+import { readerLine } from "../item/reading";
 
 export interface FeedItemProps {
   item: FeedItemSummary;
@@ -27,6 +28,20 @@ export interface FeedItemProps {
   at?: string;
 }
 
+/**
+ * One compact line of content identity on the card: what the title and summary are, whether a
+ * translation exists, and whether a Chinese explanation of the current version does. All of it is
+ * stored fact — the line never claims the content was translated or verified.
+ */
+/**
+ * One compact line of content identity on the card: whether the Chinese here is a machine translation,
+ * whether the summary is Chinese, and whether a Chinese reading of it exists. Stored fact, told the way
+ * a reader would say it (see features/item/reading.tsx).
+ */
+function identityLine(item: FeedItemSummary): string | null {
+  return readerLine(item.identity);
+}
+
 export const FeedItem = memo(function FeedItem({ item, group, filters, read = false, onOpen, showTags = false, at }: FeedItemProps) {
   const isX = item.channel === "x" && !!item.x;
   const open = () => {
@@ -35,12 +50,13 @@ export const FeedItem = memo(function FeedItem({ item, group, filters, read = fa
   };
   const showSources = !!group && (group.additionalSourceCount > 0 || group.reportCount > 1);
   const tags = showTags ? item.tags.slice(0, 3) : [];
+  const identity = identityLine(item);
 
   return (
     <article className="relative min-w-0 lg:card lg:card-hover lg:px-[18px] lg:pb-[14px] lg:pt-[15px]" data-item-id={item.id}>
       <header className="flex min-h-[22px] items-center gap-1.5 text-[12.5px] leading-[18px] text-ink-4 lg:min-h-[18px] lg:gap-2">
         <SourceLine item={item} className="text-ink-4" />
-        {at && (
+        {at && !(item.publishedDate && item.publishedAt === at) && (
           <time dateTime={at} className="mono shrink-0 text-[12px] lg:hidden">
             · {beijingTime(at)}
           </time>
@@ -72,16 +88,31 @@ export const FeedItem = memo(function FeedItem({ item, group, filters, read = fa
       ) : (
         <>
           <h3 className={`mt-1.5 line-clamp-2 text-[17px] font-[650] leading-[1.5] lg:mt-2 lg:line-clamp-none lg:leading-[1.55] ${readTone(read, "text-ink")}`}>
+            {item.identity?.titleKind === "machine-zh" && (
+              <span className="mr-1.5 inline-block rounded-[3px] border border-line px-1 align-middle text-[11px] font-normal leading-[16px] text-ink-4">机器翻译</span>
+            )}
             <IntentLink viewTransition to={`/items/${item.id}`} onClick={open} className="after:absolute after:inset-0 after:content-['']">
               {item.title}
             </IntentLink>
           </h3>
+          {item.identity?.titleKind === "machine-zh" && item.originalTitle && (
+            <p className="mt-1 line-clamp-1 text-[12.5px] leading-[1.6] text-ink-4">原文标题：{item.originalTitle}</p>
+          )}
           {item.summary && <p className="mt-1 line-clamp-2 text-[14.5px] leading-[1.7] text-ink-3 lg:mt-2 lg:line-clamp-3 lg:text-[15px] lg:leading-[1.75]">{item.summary}</p>}
         </>
       )}
 
       {isX && item.x!.media.length > 0 && <MediaThumbs media={item.x!.media} className="mt-2.5" />}
       {isX && item.x!.quoted?.text && <QuotedLine quoted={item.x!.quoted} />}
+
+      {identity && (
+        <p className="relative z-10 mt-1 text-[12px] leading-5 text-ink-4">{identity}</p>
+      )}
+
+      {/* Which date this is: published by the source, stated by the document itself, or unknown. */}
+      <div className="relative z-10 mt-1.5 text-[12px] leading-5">
+        <ItemDate item={item} />
+      </div>
 
       {(tags.length > 0 || (showTags && item.category)) && (
         <div className="relative z-10 mt-2 hidden flex-wrap gap-x-2.5 gap-y-1 text-[12px] text-ink-4 lg:flex">

@@ -106,21 +106,29 @@ export function DayHeader({ day, today, count, collapsed, onToggle, aside, aside
 }
 
 /**
- * One dated slot: the time, the rail (desktop) and the item. As on the original timeline, the rail is a
+ * One dated slot: the known time (if available), the rail (desktop) and the item. As on the original timeline, the rail is a
  * 1px line from this node's centre to the next one's, so the day reads as one continuous thread.
  */
-export function TimelineSlot({ at, children, fresh = false, delay = 0, dataKey }: { at: string; children: React.ReactNode; fresh?: boolean; delay?: number; dataKey?: string }) {
+export function TimelineSlot({ at, children, fresh = false, delay = 0, dataKey, timeLabel }: { at: string; children: React.ReactNode; fresh?: boolean; delay?: number; dataKey?: string; timeLabel?: string | null }) {
+  const shownTime = timeLabel === undefined ? beijingTime(at) : timeLabel;
   return (
     <li
       data-card-key={dataKey}
       className={`group/slot bleed touch:has-[a:active]:bg-bg-sunk/70 lg:mx-0 lg:px-0 lg:touch:has-[a:active]:bg-transparent ${fresh ? "animate-fade-up" : ""}`}
       style={fresh ? { animationDelay: `${delay}ms` } : undefined}
     >
-      {/* Phones: the row without the rail (the item shows its time); a hairline between rows. */}
+      {/* Phones: the row without the rail (the item shows its known time); a hairline between rows. */}
       <div className="grid grid-cols-[minmax(0,1fr)] border-b border-line-soft py-3.5 group-last/slot:border-b-0 lg:grid-cols-[64px_22px_minmax(0,1fr)] lg:border-b-0 lg:py-0 lg:pb-3 lg:group-last/slot:pb-0">
-        <time dateTime={at} className="mono hidden text-ink-3 lg:block lg:pt-[17px] lg:text-[12.5px] lg:font-semibold lg:leading-6">
-          {beijingTime(at)}
-        </time>
+        {shownTime !== null ? (
+          <time dateTime={at} className="mono hidden text-ink-3 lg:block lg:pt-[17px] lg:text-[12.5px] lg:font-semibold lg:leading-6">
+            {shownTime}
+          </time>
+        ) : (
+          // Keep the time column in the grid when the time is not shown (it would repeat the date the
+          // card already carries). Without this placeholder the rail span takes the 64px column and
+          // the card is auto-placed into the 22px rail track — a 38px-wide vertical strip.
+          <span aria-hidden="true" className="hidden lg:block" />
+        )}
         <span aria-hidden="true" className="relative hidden lg:block">
           <span className="absolute -bottom-[41px] left-[10.5px] top-[29px] w-px bg-line-strong group-last/slot:hidden" />
           <span className="absolute left-[7.5px] top-[25.5px] size-[7px] rounded-full bg-accent shadow-[0_0_0_4px_var(--bg)] transition-transform duration-300 group-hover/slot:scale-[1.15]" />
@@ -335,7 +343,7 @@ export function Timeline({ initial, filters }: { initial: TimelineResponse; filt
                     const fresh = freshKeys.has(c.key);
                     const delay = fresh ? Math.min(order++, 10) * 40 : 0;
                     return (
-                      <TimelineSlot key={c.key} dataKey={c.key} at={c.anchorAt} fresh={fresh} delay={delay}>
+                      <TimelineSlot key={c.key} dataKey={c.key} at={c.anchorAt} fresh={fresh} delay={delay} timeLabel={c.item.publishedDate && c.item.publishedAt === c.anchorAt ? null : undefined}>
                         <FeedItem item={c.item} group={c.group} filters={filters} read={readSet.has(c.item.id) && !(unreadOnly && unreadVisible(c))} onOpen={markRead} at={c.anchorAt} />
                       </TimelineSlot>
                     );
