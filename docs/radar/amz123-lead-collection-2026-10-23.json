@@ -1,0 +1,250 @@
+{
+  "source": {
+    "id": "amz123-policy-leads",
+    "name": "AMZ123｜第三方政策线索（仅元数据，隔离存储，不入正式政策）",
+    "kind": "web_list",
+    "tier": "T2",
+    "participation_mode": "isolated",
+    "first_party": false,
+    "interval_minutes": 360,
+    "enabled": true,
+    "tags": [
+      "第三方线索",
+      "amz123",
+      "美国站",
+      "政策线索"
+    ],
+    "health": "ok",
+    "fail_count": 0,
+    "last_ok_at": "2026-10-23T06:49:53.517Z",
+    "next_fetch_at": "2026-10-23T12:49:53.517Z",
+    "last_error": null,
+    "cursor": {
+      "gateVersion": "amz123-lead-gate-v1",
+      "rejectedIdentities": 47,
+      "pendingCandidates": 57,
+      "sitemapLastReadAt": "2026-10-23T06:23:13.406Z",
+      "sitemapApprovedUrls": 0,
+      "initializedAt": "2026-10-23T06:23:30.553Z"
+    }
+  },
+  "runs": [
+    {
+      "id": 78,
+      "status": "ok",
+      "found": 1,
+      "new": 1,
+      "error": null,
+      "started_at": "2026-10-23T06:23:12.210Z",
+      "finished_at": "2026-10-23T06:23:30.553Z",
+      "diagnostics": {
+        "leads": 1,
+        "robots": {
+          "url": "https://www.amz123.com/robots.txt",
+          "rules": 48,
+          "status": 200,
+          "allowedSections": [
+            "/t",
+            "/kx"
+          ]
+        },
+        "sitemap": {
+          "urls": 4000,
+          "known": 0,
+          "fetched": true
+        },
+        "failures": [
+          {
+            "url": "https://www.amz123.com/kx/9Knq0LcM",
+            "error": "the page no longer carries the article payload"
+          }
+        ],
+        "listings": [
+          {
+            "links": 4,
+            "status": 200,
+            "section": "/t",
+            "withTitle": 4
+          },
+          {
+            "links": 101,
+            "status": 200,
+            "section": "/kx",
+            "withTitle": 101
+          }
+        ],
+        "pageReads": 25,
+        "discovered": 105,
+        "alreadyStored": 0,
+        "rejectedReasons": {
+          "parse-failed": 1,
+          "not about Amazon": 4,
+          "no radar rule matched": 18,
+          "no policy wording in the title, description or tags": 1
+        }
+      }
+    },
+    {
+      "id": 111,
+      "status": "ok",
+      "found": 0,
+      "new": 0,
+      "error": null,
+      "started_at": "2026-10-23T06:49:35.580Z",
+      "finished_at": "2026-10-23T06:49:53.517Z",
+      "diagnostics": {
+        "leads": 0,
+        "robots": {
+          "url": "https://www.amz123.com/robots.txt",
+          "rules": 48,
+          "status": 200,
+          "allowedSections": [
+            "/t",
+            "/kx"
+          ]
+        },
+        "sitemap": {
+          "urls": 0,
+          "known": 4000,
+          "fetched": false
+        },
+        "failures": [
+          {
+            "url": "https://www.amz123.com/kx/A2CzjiIM",
+            "error": "the page no longer carries the article payload"
+          }
+        ],
+        "listings": [
+          {
+            "links": 4,
+            "status": 200,
+            "section": "/t",
+            "withTitle": 4
+          },
+          {
+            "links": 72,
+            "status": 200,
+            "section": "/kx",
+            "withTitle": 72
+          }
+        ],
+        "pageReads": 25,
+        "discovered": 76,
+        "alreadyStored": 1,
+        "rejectedReasons": {
+          "parse-failed": 1,
+          "not about Amazon": 3,
+          "no radar rule matched": 21
+        }
+      }
+    }
+  ],
+  "leads": [
+    {
+      "id": "e27uboy84azbker1m7d72n7ms",
+      "url": "https://www.amz123.com/t/5Z6bFgNc",
+      "title": "美国IOR监管趋严，亚马逊提醒卖家自查进口主体",
+      "author": "北美电商资讯",
+      "publishedAt": "2026-10-21T02:19:54.000Z",
+      "sourceUpdatedAt": "2026-10-23T04:24:17.000Z",
+      "publicationTime": "2026-10-21T02:19:54.000Z",
+      "description": "这次调整是美国收紧海关监管、整治空壳IOR漏洞的延续。",
+      "descriptionLength": 27,
+      "bodyStatus": "none",
+      "bodyTextNull": true,
+      "bodyHtmlNull": true,
+      "bodyLength": 0,
+      "discoveredAt": "2026-10-23T06:23:30.276Z",
+      "revision": 1,
+      "lead": {
+        "event": {
+          "of": null,
+          "key": "bb24ca2f176fb90a77c2b4b5",
+          "state": "new",
+          "domain": "类目合规线索",
+          "titleCore": "ior监管趋严 提醒卖家自查进口主体",
+          "officialRef": null,
+          "effectiveDate": "2026-08-19"
+        },
+        "column": "跨境头条",
+        "market": "US",
+        "source": "amz123",
+        "section": "/t",
+        "siteTags": [
+          "美国",
+          "Amazon",
+          "跨境卖家"
+        ],
+        "radarTags": [
+          "类目合规线索"
+        ],
+        "gateVersion": "amz123-lead-gate-v1",
+        "officialRef": null,
+        "radarRuleIds": [
+          "category-compliance"
+        ],
+        "discoveredVia": "listing",
+        "effectiveDate": "2026-08-19",
+        "marketEvidence": "title",
+        "officialVerification": {
+          "note": "本项目已收录的官方来源中没有对应记录，保持仅第三方报道状态。",
+          "status": "third-party-only",
+          "officialUrl": null,
+          "officialTitle": null,
+          "officialPublishedAt": null
+        }
+      }
+    }
+  ],
+  "policyStatistics": {
+    "note": "The three official families come from sources.tags; the lead source carries none of them, so its material is counted as 'other'.",
+    "families": [
+      {
+        "family": "ads_policy",
+        "n": 2
+      },
+      {
+        "family": "external_regulation",
+        "n": 20
+      },
+      {
+        "family": "other",
+        "n": 102
+      },
+      {
+        "family": "platform_policy",
+        "n": 3
+      }
+    ],
+    "officialBefore": {
+      "platform_policy": 3,
+      "ads_policy": 2,
+      "external_regulation": 20
+    }
+  },
+  "boundaries": {
+    "leadsInFactArticles": 0,
+    "leadsInStorySignals": 0,
+    "leadAnalyses": 0,
+    "leadPublicationRows": 0,
+    "leadsWithBodyOrOverlongExcerpt": 0,
+    "note": "An isolated source never reaches a public surface: its material is recorded as a lead and its publication row, if any, is withdrawn."
+  },
+  "permissions": {
+    "robotsUrl": "https://www.amz123.com/robots.txt",
+    "approvedPaths": [
+      "/t/",
+      "/kx/"
+    ],
+    "excludedPaths": [
+      "/b（服务商目录）",
+      "/report（行业报告）",
+      "/zb（每日多主题早报，本轮不纳入）",
+      "/search",
+      "/api",
+      "/tag-*"
+    ],
+    "enforcedInCode": "packages/backend/src/sources/amz123.ts: parseRobots + robotsAllows + amz123ApprovedUrl, checked before every request",
+    "note": "robots.txt carries two `User-agent: *` groups; both apply. A path robots forbids is never requested, whatever status it would answer."
+  }
+}

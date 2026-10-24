@@ -7,7 +7,7 @@ import http from "node:http";
 import { after, before, test } from "node:test";
 import { closeDb, sql } from "@aihot/backend/db";
 import { upsertMaterial } from "@aihot/backend/content/materials";
-import { translateArticle, translatePending } from "@aihot/backend/editorial/translate";
+import { storeTranslation, translateArticle, translatePending } from "@aihot/backend/editorial/translate";
 import { stopBoss } from "@aihot/backend/jobs/queue";
 import { autoReleaseUnknownReceipts } from "@aihot/backend/operations/recover";
 import { publishArticle } from "@aihot/backend/publication/publish";
@@ -237,6 +237,45 @@ test("links and images inside a paragraph survive the translation, or the paragr
   const receipts = await sql<{ status: string }[]>`SELECT status FROM receipts WHERE purpose = 'translate_body' AND subject LIKE ${`article:${id}@1#%`}`;
   assert.ok(receipts.length >= 2, "the initial batch and fallback/retry batches are retained");
   assert.ok(receipts.every((receipt) => receipt.status === "completed"), "every paid batch covered by the committed translation is completed");
+});
+
+// Same-version downgrade guard: a complete translation stored first must survive a later answer that
+// only translates part of the same material version, in the database and on the page. The model path
+// itself can never run in this repository (rule mode blocks paid requests before the network), so the
+// regression drives the exact storage function the run would commit with.
+test("a complete translation is never downgraded by a later partial one of the same revision", async () => {
+  const marker = `no-downgrade-${T}`;
+  const { articleId: id } = await upsertMaterial({
+    sourceId: SOURCE, url: `${URL_}-no-downgrade`, title: `No downgrade ${T}`, language: "en",
+    bodyText: `A full paragraph ${marker}. A paragraph that only translates in part.`,
+    bodyHtml: `<p>A full paragraph ${marker}.</p><p>A paragraph that only translates in part.</p>`,
+    bodyStatus: "ok", via: "fetch", publishedAt: new Date(), discoveredAt: new Date(Date.now() + 21_600_000),
+  });
+  await sql`INSERT INTO analyses (article_id, input_revision, origin, relevance, category, title_zh, summary_zh, reason_zh, score, selected)
+            VALUES (${id}, 1, 'rule', 'pass', 'ai-models', ${`不降级-${T}`}, '摘要', '理由', 90, true)`;
+  await publishArticle(id, { releasedAt: new Date(Date.now() - 60_000) });
+
+  const full = `<p>完整段落一。</p><p>完整段落二。</p>`;
+  const partial = `<p>完整段落一。</p><p>A paragraph that only translates in part.</p>`;
+  await storeTranslation(id, 1, `完整译文-${T}`, full, "完整段落一。完整段落二。", true, []);
+  // A slower run of the same material version answers with a partial translation afterwards.
+  await storeTranslation(id, 1, `部分译文-${T}`, partial, "完整段落一。", false, []);
+
+  const [tr] = await sql<{ complete: boolean; body_html: string; title: string }[]>`SELECT complete, body_html, title FROM translations WHERE article_id=${id}`;
+  assert.equal(tr!.complete, true, "the stored complete translation is not replaced by the partial one");
+  assert.equal(tr!.body_html, full, "the stored complete body is byte-for-byte intact");
+  assert.equal(tr!.title, `完整译文-${T}`, "the partial answer does not take over the translation's title either");
+  const page = await detail(id);
+  assert.equal(page.body.complete, true, "the page still offers the complete translation");
+  assert.equal(page.body.zh, full);
+
+  // The other direction is not a downgrade: a complete answer may replace a partial one of the same version.
+  const fixed = `<p>完整段落一。</p><p>完整段落二（修复后）。</p>`;
+  await storeTranslation(id, 1, `修复后完整译文-${T}`, fixed, "完整段落一。完整段落二（修复后）。", true, []);
+  const [upgraded] = await sql<{ complete: boolean; body_html: string }[]>`SELECT complete, body_html FROM translations WHERE article_id=${id}`;
+  assert.equal(upgraded!.complete, true);
+  assert.equal(upgraded!.body_html, fixed);
+  assert.equal((await detail(id)).body.zh, fixed);
 });
 
 test("the post a selected X post quotes is translated once and shown with the item", async () => {

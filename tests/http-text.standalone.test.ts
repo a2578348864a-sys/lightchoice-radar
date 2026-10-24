@@ -42,3 +42,8 @@ test("NUL is handled after decoding a declared non-UTF8 charset", async () => {
 test("a quoted charset in Content-Type is honoured", async () => {
   assert.equal((await read("/quoted", Buffer.from([0xd6, 0xd0, 0xce, 0xc4]), 'text/html; charset="gb2312"')).text(), "中文");
 });
+
+test("outbound requests use the standard compression formats supported by native fetch", async () => {
+  mock.get("https://text.invalid").intercept({ path: "/compression", headers: { "accept-encoding": "br, gzip, deflate" } }).reply(200, "ok");
+  assert.equal((await guardedFetch("https://text.invalid/compression", { route: "direct" })).text(), "ok");
+});

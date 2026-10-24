@@ -41,7 +41,8 @@
 - **模型侧配置处于停用状态**：`industry/prompts/` 的评分/写作提示词、`industry/selection.ts` 的入选门槛、`site/models.ts` 的模型选择，在规则模式下不生效。未经授权不要"顺手校准"或重新接回，也不要基于它们描述当前行为。
 - **付费请求硬拦截**：`packages/backend/src/providers/receipts.ts` 在规则模式下直接抛错。不得注释、绕过或用其它入口替代。
 - **回执与预算熔断**：付费请求先记回执、结果先存再用；不要绕开 `providers/receipts.ts`。
-- **安全阀默认关**：`COLLECT_ENABLED`、`MODEL_CALLS_ENABLED`、`FEISHU_*_ENABLED`、`INDEXNOW_SUBMIT_ENABLED` 只有设成 `true` 才打开，没写就是关。开发与验证时保持关闭。
+- **安全阀默认关**：`COLLECT_ENABLED`、`MODEL_CALLS_ENABLED`、`FEISHU_*_ENABLED`、`INDEXNOW_SUBMIT_ENABLED`、`RADAR_TRANSLATE_ENABLED` 只有设成 `true` 才打开，没写就是关。开发与验证时保持关闭。
+- **自动中文翻译是唯一被允许的付费能力，且必须走受管入口**：`RADAR_TRANSLATE_ENABLED=true` 只放行 `translate_title` / `translate_excerpt` / `translate_body` / `translate_quoted` 四个用途，且只翻 `tier=T1` 且 `participation_mode=editorial` 的第一主线来源。**启动它只能用 `start-radar.cmd translate`**（即 `scripts/radar-local.ts start translate` → `radar-ops.ts start translate`），由启动器注入 `COLLECT_ENABLED=false`、`RADAR_WORKER_SCOPE=content`、`RADAR_ANALYZE_SINCE`（读 `settings.translate.baseline`）、`RADAR_ANALYZE_SOURCES`（官方/监管五来源）。不要用手写 `COLLECT_ENABLED=false RADAR_TRANSLATE_ENABLED=true node apps/worker/src/main.ts` 启动——那仍会注册事件/热点/运维等定时任务并重评估历史 editorial 文章。预算与基线都在 `settings`（`translate.budget` / `translate.rounds` / `translate.lease` / `translate.baseline`），重启不重置；新额度只能由用户单独批准新预算窗口。日常操作与状态口径见 `docs/radar/本地运行说明.md`。
 - **一个公开读取层**：所有对外出口都从 `packages/backend/src/publication/` 读，新增出口同样；不要把数据库查询散到路由里。
 - **前端只通过 HTTP 读后端**：`apps/web` 不碰数据库；数据库连接、模型调用和密钥只在后端进程。
 - **页面不调模型**：读者打开页面只读已有结果；模型只在 worker 任务里调用。

@@ -1,0 +1,313 @@
+{
+  "title": "Amazon 公开政策页面：HTTP 与真实浏览器渲染对照实验（2026-10-23）",
+  "goal": "验证 HTTP 采集器拿不到正文的 Amazon 公开页面，能否用真实浏览器（Playwright + 本机 Chrome，channel=chrome，headless）取得完整正文并用于政策证据判定。",
+  "environment": {
+    "browser": {
+      "channel": "chrome",
+      "version": "155.0.8059.85"
+    },
+    "launch": "chromium.launch({ channel: 'chrome', headless: true })，使用本机已安装的 Chrome，未下载任何浏览器、未安装依赖",
+    "viewport": "1366x900，locale=en-US",
+    "login": "全程未登录，Ads 页面显示 No account selected",
+    "robots": "advertising.amazon.com 与 sell.amazon.com 的 robots 均未禁止实验路径（2026-10-23 已核查）",
+    "dbWrites": 0,
+    "codeChanges": 0
+  },
+  "pages": [
+    {
+      "id": "ads-creative-acceptance",
+      "url": "https://advertising.amazon.com/resources/ad-policy/creative-acceptance",
+      "http": {
+        "status": 200,
+        "bytes": 176203,
+        "ms": 2120,
+        "title": "Amazon",
+        "textChars": 6
+      },
+      "httpFirstProbe": {
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 176215,
+        "ms": 1910,
+        "title": "Amazon",
+        "textChars": 6,
+        "dates": [],
+        "signIn": false,
+        "notFound": false,
+        "sample": "Amazon"
+      },
+      "browser": {
+        "status": 200,
+        "finalUrl": "https://advertising.amazon.com/help/G29MAQ3YTK5LQ7VC",
+        "ms": 18991,
+        "title": "Amazon Ads policies | Amazon Ads Support Center",
+        "h1": "Amazon Ads policies",
+        "headings": [
+          "Amazon Ads policies",
+          "Amazon Ads policies"
+        ],
+        "textChars": 3059,
+        "dates": [],
+        "signIn": false,
+        "notFound": false,
+        "scripts": 42,
+        "consoleErrors": []
+      },
+      "renderedText": {
+        "chars": 3059,
+        "updatedOn": "Oct 12, 2026",
+        "file": ".data/_diag/pw/ads-creative-acceptance.txt"
+      },
+      "classification": {
+        "tags": [
+          "类目合规线索"
+        ],
+        "evidenceCount": 1,
+        "gate": false,
+        "evidence": [
+          "category-compliance: Prohibited products"
+        ]
+      }
+    },
+    {
+      "id": "ads-help-policy",
+      "url": "https://advertising.amazon.com/help/GVZ7PMBSF7DZ8N2S",
+      "http": {
+        "status": 200,
+        "bytes": 167136,
+        "ms": 1125,
+        "title": "Amazon",
+        "textChars": 6
+      },
+      "httpFirstProbe": {
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 167148,
+        "ms": 861,
+        "title": "Amazon",
+        "textChars": 6,
+        "dates": [],
+        "signIn": false,
+        "notFound": false,
+        "sample": "Amazon"
+      },
+      "browser": {
+        "status": 200,
+        "finalUrl": "https://advertising.amazon.com/help/GVZ7PMBSF7DZ8N2S",
+        "ms": 17121,
+        "title": "Amazon",
+        "h1": "",
+        "headings": [],
+        "textChars": 557,
+        "dates": [],
+        "signIn": false,
+        "notFound": false,
+        "scripts": 42,
+        "consoleErrors": []
+      },
+      "renderedText": {
+        "chars": 557,
+        "updatedOn": null,
+        "file": ".data/_diag/pw/ads-help-policy.txt"
+      },
+      "classification": {
+        "tags": [],
+        "evidenceCount": 0,
+        "gate": false,
+        "evidence": []
+      }
+    },
+    {
+      "id": "sell-pricing",
+      "url": "https://sell.amazon.com/pricing",
+      "http": {
+        "status": 200,
+        "bytes": 402050,
+        "ms": 1883,
+        "title": "How much does it cost to sell on Amazon? | Sell on Amazon",
+        "textChars": 14865
+      },
+      "httpFirstProbe": {
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 402137,
+        "ms": 1939,
+        "title": "How much does it cost to sell on Amazon? | Sell on Amazon",
+        "textChars": 14865,
+        "dates": [],
+        "signIn": false,
+        "notFound": false,
+        "sample": "How much does it cost to sell on Amazon? | Sell on Amazon Unlock $50K in new seller credits, bonuses, and exclusive benefits. Learn how Search Quick links: Selling on Amazon Fulfillment by Amazon English Select your preferred language English - US Español - US 中文 - CN Start Start selling Learn how to sell Get an overview of how to sell on Amazon Register as a seller Review steps for creating a sel"
+      },
+      "browser": {
+        "status": 200,
+        "finalUrl": "https://sell.amazon.com/pricing",
+        "ms": 11674,
+        "title": "How much does it cost to sell on Amazon? | Sell on Amazon",
+        "h1": "Standard selling fees",
+        "headings": [
+          "Select your preferred language",
+          "Start selling",
+          "Seller registration guide",
+          "Review fees and costs",
+          "Estimate revenue and fulfillment costs",
+          "Build and protect your brand",
+          "Guide to growing your brand on Amazon",
+          "Programs to help you grow"
+        ],
+        "textChars": 6858,
+        "dates": [],
+        "signIn": false,
+        "notFound": false,
+        "scripts": 43,
+        "consoleErrors": []
+      },
+      "renderedText": {
+        "chars": 6858,
+        "updatedOn": null,
+        "file": ".data/_diag/pw/sell-pricing.txt"
+      },
+      "classification": {
+        "tags": [
+          "费用与物流线索"
+        ],
+        "evidenceCount": 8,
+        "gate": false,
+        "evidence": [
+          "fees-logistics: selling fees",
+          "fees-logistics: referral fees",
+          "fees-logistics: selling fees",
+          "fees-logistics: selling fees"
+        ]
+      }
+    },
+    {
+      "id": "announcements-p1",
+      "url": "https://sell.amazon.com/blog/announcements?p=1&mons_sel_locale=en_US",
+      "http": {
+        "status": 200,
+        "bytes": 359248,
+        "ms": 1393,
+        "title": "Announcements - Sell on Amazon",
+        "textChars": 10070
+      },
+      "httpFirstProbe": {
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 359350,
+        "ms": 3020,
+        "title": "Announcements - Sell on Amazon",
+        "textChars": 10070,
+        "dates": [
+          "May 22, 2026",
+          "May 19, 2026"
+        ],
+        "signIn": false,
+        "notFound": false,
+        "sample": "Announcements - Sell on Amazon Unlock $50K in new seller credits, bonuses, and exclusive benefits. Learn how Search Quick links: Selling on Amazon Fulfillment by Amazon English Select your preferred language English - US Español - US 中文 - CN Start Start selling Learn how to sell Get an overview of how to sell on Amazon Register as a seller Review steps for creating a seller account List products F"
+      },
+      "browser": {
+        "status": 200,
+        "finalUrl": "https://sell.amazon.com/blog/announcements?p=1&mons_sel_locale=en_US",
+        "ms": 13040,
+        "title": "Announcements - Sell on Amazon",
+        "h1": "Announcements",
+        "headings": [
+          "Select your preferred language",
+          "Start selling",
+          "Seller registration guide",
+          "Review fees and costs",
+          "Estimate revenue and fulfillment costs",
+          "Build and protect your brand",
+          "Guide to growing your brand on Amazon",
+          "Programs to help you grow"
+        ],
+        "textChars": 5799,
+        "dates": [
+          "May 22, 2026",
+          "May 19, 2026"
+        ],
+        "signIn": false,
+        "notFound": false,
+        "scripts": 43,
+        "consoleErrors": []
+      },
+      "renderedText": {
+        "chars": 5799,
+        "updatedOn": null,
+        "file": ".data/_diag/pw/announcements-p1.txt"
+      },
+      "classification": {
+        "tags": [
+          "费用与物流线索"
+        ],
+        "evidenceCount": 3,
+        "gate": false,
+        "evidence": [
+          "fees-logistics: selling fees",
+          "fees-logistics: referral fees",
+          "fees-logistics: selling fees"
+        ]
+      }
+    },
+    {
+      "id": "ads-general-requirements",
+      "url": "https://advertising.amazon.com/help/G4U9JBZH3664JWX2",
+      "note": "从 Ads 政策 hub 页的目录链接进入的子政策页",
+      "http": {
+        "status": 200,
+        "bytes": 174883,
+        "ms": 1150,
+        "title": "Amazon",
+        "textChars": 6
+      },
+      "renderedText": {
+        "chars": 3098,
+        "updatedOn": "Jul 22, 2026",
+        "file": ".data/_diag/pw/general-requirements.txt"
+      },
+      "classification": {
+        "tags": [],
+        "evidenceCount": 0,
+        "gate": false,
+        "evidence": []
+      }
+    },
+    {
+      "id": "ads-prohibited-products",
+      "url": "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N",
+      "note": "从 Ads 政策 hub 页的目录链接进入的子政策页",
+      "http": {
+        "status": 200,
+        "bytes": 180155,
+        "ms": 753,
+        "title": "Amazon",
+        "textChars": 6
+      },
+      "renderedText": {
+        "chars": 4192,
+        "updatedOn": "Jun 25, 2026",
+        "file": ".data/_diag/pw/prohibited-products.txt"
+      },
+      "classification": {
+        "tags": [
+          "类目合规线索"
+        ],
+        "evidenceCount": 3,
+        "gate": false,
+        "evidence": [
+          "category-compliance: Prohibited products",
+          "category-compliance: Prohibited products",
+          "category-compliance: prohibited products"
+        ]
+      }
+    }
+  ],
+  "verdict": {
+    "browserRender": "四个指定页面全部成功渲染（HTTP 200，无登录墙、无验证码）",
+    "fullText": "只有 Amazon Ads 政策页拿到完整正文：hub 3059 字符、General requirements 3098 字符、Prohibited products 4192 字符；HTTP 对同页只有 6 字符或 2304 字符的壳",
+    "policyEvidence": "Ads 政策页含真实条款与 Updated on 日期（Oct 12 / Jul 22 / Jun 25, 2026），但现有规则只命中标题里的 Prohibited products（类目合规线索），没有命中真正的义务句",
+    "noGain": "sell.amazon.com/pricing 与公告列表用浏览器反而更短（innerText 去掉了 HTTP 文本里的隐藏/折叠内容），浏览器没有新增信息"
+  },
+  "recommendation": "仅适合个别页面：Amazon Ads 政策页值得用浏览器渲染接入；公告列表与费用页继续用现有 HTTP 链路。若要入库 Ads 政策，还需要为「广告政策条款」补一条最小规则，否则只能存正文、拿不到规则证据。"
+}

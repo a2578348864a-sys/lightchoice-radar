@@ -1,0 +1,360 @@
+{
+  "meta": {
+    "title": "Amazon 官方政策历史回测样本（最多 10 条）",
+    "purpose": "用真实、可核查的 Amazon 官方公开公告，检验 Radar 的规则准入与标签在历史政策上的表现；同时为第一主线的「抽检 10 条事实准确性」提供可复核的原始依据。",
+    "builtAt": "2026-10-22",
+    "engine": {
+      "ruleVersion": "radar-policy-v1",
+      "gate": "isQualifyingAmazonPolicyAnnouncement（仅 amazon-us-announcements 使用）",
+      "classifier": "classifyRadarText / summarizeRadarPolicy",
+      "gateEvidenceFamilies": [
+        "原有卖家规则句式（removing the requirement / no longer need to / fewer than N orders / policy change 等）",
+        "参与方式切换：同一句内同时出现 opt-in 与 opt-out，且指向 program / enrollment / inclusion / participation",
+        "明确生效日期 + 政策主体：effective / takes effect / goes into effect 与库容、费率、政策、资格等主体在 ±160 字符内同时出现"
+      ]
+    },
+    "classification": {
+      "政策变化": "平台对卖家义务、费用、权限或流程做出带生效含义的变更（通常有明确生效日期）",
+      "项目规则": "卖家参与某官方项目的资格、义务或参与方式发生变更，卖家需要据此调整操作",
+      "功能上线": "新增工具、界面、报表或权益，不改变卖家义务与资格",
+      "营销内容": "会议、活动、优惠、品牌宣传"
+    },
+    "decisionRule": "人工判定为「政策变化」或「项目规则」= 期望入库（accept）；「功能上线」或「营销内容」= 期望拒绝（reject）。引擎结论与期望一致为 pass，不一致为 fail，原文或元数据无法核实为 unconfirmed。",
+    "evidenceBasis": {
+      "fullBody": "amazon-policy-backtest-bodies.json 保存 10 条样本的官方正文原文、抓取时间与 sha256；测试用它对当前分类器重新判定，engine 字段不是判定依据。",
+      "excerpt": "gateText 是从同一份正文逐字截取的决定性句子，只用于「摘录回归」辅助断言（摘录结论必须与完整正文一致）。",
+      "hashes": "测试会重算每份正文的 sha256，正文被改动时直接失败，避免手写或替换全文。"
+    },
+    "provenance": "标题、链接、发布日期均由项目自身的 fetchWebList / fetchDetail 读取官方页面得到；9 条公告的列表标题与详情 h1、列表日期与详情 datePublished 全部一致（2026-10-22 实测）。",
+    "boundary": "本文件是历史回填样本，不写入生产库，不代表最新生产公告；生产覆盖率与回测准确率分别统计，不互相替代。正文原文仅用于本地可核查验证，不对外转载（来源 site_fulltext=false）。"
+  },
+  "samples": [
+    {
+      "id": "S01",
+      "sourceId": "amazon-us-fee-updates",
+      "title": "Update to U.S. Referral and Fulfillment by Amazon fees for 2026",
+      "url": "https://sellingpartners.aboutamazon.com/update-to-u-s-referral-and-fulfillment-by-amazon-fees-for-2026",
+      "publishedAt": "2025-10-15",
+      "publishedAtNote": "列表 .PagePromo-date 为 2025-10-15；详情 datePublished 为 2025-10-15T17:00Z（北京时间 2025-10-16 01:00）。",
+      "effectiveDate": "2026-01-15",
+      "effectiveDateEvidence": "Unless otherwise noted, all changes will be effective January 15, 2026.",
+      "scope": "美国站 Referral 佣金、FBA 配送费及其他销售相关费用",
+      "humanClass": "政策变化",
+      "humanDecision": "accept",
+      "fullBody": {
+        "sha256": "98e18f36e125f71932bc8bedcb0c70d44123dfda6806a2189735efd14cd8a097",
+        "chars": 5573
+      },
+      "engine": {
+        "gate": false,
+        "tags": [
+          "费用与物流线索",
+          "FBA 入库与分仓线索"
+        ],
+        "evidenceCount": 9,
+        "summary": null,
+        "gateOnExcerpt": false
+      },
+      "admissionPath": "来源白名单（amazon-us-fee-updates 专用配置），不经公告正文门禁",
+      "verdict": "pass",
+      "problem": null,
+      "note": "正文只写 all changes will be effective，未点明政策主体，因此公告门禁对它为 false；该来源走白名单准入，两条路径不混用。",
+      "gateText": "Near the end of each year, we provide our selling partners with an update on changes to Referral, Fulfillment by Amazon (FBA), and other fees related to selling in Amazon’s store. Unless otherwise noted, all changes will be effective January 15, 2026."
+    },
+    {
+      "id": "S02",
+      "sourceId": "amazon-us-announcements",
+      "title": "Upgrades to Customer Service by Amazon help sellers save time and reduce refunds",
+      "url": "https://sell.amazon.com/blog/announcements/upgrades-to-customer-service-by-amazon",
+      "publishedAt": "2026-05-22",
+      "publishedAtNote": "列表 .PagePromo-date 与详情 datePublished 均为 2026-05-22。",
+      "effectiveDate": null,
+      "effectiveDateEvidence": "正文只写 available now，没有单独列出生效日期。",
+      "scope": "使用 Customer Service by Amazon（付费客服代管）的自配送卖家：无退货退款条件、免费资格门槛",
+      "humanClass": "项目规则",
+      "humanDecision": "accept",
+      "fullBody": {
+        "sha256": "551e8f89ea56929fc0fd1f47bc722a3d1e8bf4ee094ac3147ee4391bafddd738",
+        "chars": 2820
+      },
+      "engine": {
+        "gate": true,
+        "tags": [
+          "亚马逊卖家项目规则线索"
+        ],
+        "evidenceCount": 5,
+        "summary": "有（中文规则摘要）",
+        "gateOnExcerpt": true
+      },
+      "admissionPath": "公告正文门禁（原有卖家规则证据）",
+      "verdict": "pass",
+      "problem": null,
+      "note": null,
+      "gateText": "Fewer refunds We’ve updated our process to reduce instances where buyers are granted a refund without needing to return the product, which is known as a “return-less” refund. These changes ensure that return-less refunds only occur when the customer has not received the product by the promised timeline, they received a damaged or defective product that is non-returnable, or the product is unsafe to return. Get time back from managing SAFE-T claims You no longer need to manage SAFE-T claims for refunds related to delivery issues if you purchase ”claims protected” labels through Amazon Buy Shipping or Veeqo . We’ve also made it easier to qualify for the free program by removing the requirement of maintaining a 95% valid tracking rate. Plus, the program is now free if you are a low-volume seller with fewer than 30 orders per quarter."
+    },
+    {
+      "id": "S03",
+      "sourceId": "amazon-us-announcements",
+      "title": "New features and updates to Amazon’s FBA Grade and Resell program",
+      "url": "https://sell.amazon.com/blog/announcements/fba-grade-and-resell-updates",
+      "publishedAt": "2026-02-03",
+      "publishedAtNote": "列表 .PagePromo-date 与详情 datePublished 均为 2026-02-03。",
+      "effectiveDate": null,
+      "effectiveDateEvidence": "正文无生效日期，只有 What’s next 的推广表述。",
+      "scope": "参与 FBA Grade and Resell 的卖家：可回收类目、参与方式（opt-in）、单账号 ASIN 上限 2,000、自动调价",
+      "humanClass": "项目规则",
+      "humanDecision": "accept",
+      "fullBody": {
+        "sha256": "7ce7d1920a8c08381c6563a8cbddcbc23a8bd7fcb066143bb224cb448810b113",
+        "chars": 2269
+      },
+      "engine": {
+        "gate": true,
+        "tags": [
+          "亚马逊卖家项目规则线索"
+        ],
+        "evidenceCount": 1,
+        "summary": null,
+        "gateOnExcerpt": true
+      },
+      "admissionPath": "公告正文门禁（参与方式切换：opt-in 对 opt-out）",
+      "verdict": "pass",
+      "problem": null,
+      "note": "2026-10-22 修复：门禁补「同一句 opt-in 对 opt-out」证据后放行；标签规则同步补同一条句式，得到「亚马逊卖家项目规则线索」。",
+      "gateText": "New expanded product categories The program has been expanded to include five popular product categories. Grade and Resell ASIN inclusion The Grade and Resell ASIN inclusion feature introduces a new opt-in approach that transforms how sellers participate in the Grade and Resell program. With the new ASIN inclusion feature, sellers gain more precise control over their Grade and Resell enrollment by taking an “opt-in” approach rather than an “opt-out” approach. Sellers can now handpick up to 2,000 ASINs that they want to include in the program or enroll their entire catalog, excluding specific items."
+    },
+    {
+      "id": "S04",
+      "sourceId": "amazon-us-announcements",
+      "title": "Amazon announces new streamlined FBA capacity management system",
+      "url": "https://sell.amazon.com/blog/announcements/fba-capacity",
+      "publishedAt": "2023-01-17",
+      "publishedAtNote": "列表 .PagePromo-date 与详情 datePublished 均为 2023-01-17。",
+      "effectiveDate": "2023-03-01",
+      "effectiveDateEvidence": "This new capacity management system goes into effect March 1, 2023.",
+      "scope": "全部 FBA 卖家的库容管理：月度单一库容上限、未来两个月预估、付费申请扩容、按立方英尺计量",
+      "humanClass": "政策变化",
+      "humanDecision": "accept",
+      "fullBody": {
+        "sha256": "57a37d558738042e9f76513aaeadc440a21a7345880bc244c2e83f445f67f274",
+        "chars": 4078
+      },
+      "engine": {
+        "gate": true,
+        "tags": [
+          "FBA 入库与分仓线索"
+        ],
+        "evidenceCount": 8,
+        "summary": null,
+        "gateOnExcerpt": true
+      },
+      "admissionPath": "公告正文门禁（明确生效日期 + 政策主体）",
+      "verdict": "pass",
+      "problem": null,
+      "note": "2026-10-22 修复：门禁补「生效日期 + 政策主体」证据后放行。",
+      "gateText": "This new capacity management system goes into effect March 1, 2023. FBA capacity limits will resolve these pain points by offering a single monthly limit to determine how much inventory sellers can send to and store at Amazon. FBA capacity limits in volume to better reflect capacity usage We’ll set capacity limits and measure sellers’ inventory usage in cubic feet (vs."
+    },
+    {
+      "id": "S05",
+      "sourceId": "amazon-us-announcements",
+      "title": "Amazon announces new benefit for sellers, just in time for the busy holiday shopping season",
+      "url": "https://sell.amazon.com/blog/announcements/seller-account-health-assurance",
+      "publishedAt": "2022-11-16",
+      "publishedAtNote": "列表 .PagePromo-date 与详情 datePublished 均为 2022-11-16。",
+      "effectiveDate": null,
+      "effectiveDateEvidence": "正文只写 launching first with U.S. and Canadian stores，无具体日期。",
+      "scope": "美国站与加拿大站卖家账号健康项目（Account Health Assurance）权益上线",
+      "humanClass": "功能上线",
+      "humanDecision": "reject",
+      "fullBody": {
+        "sha256": "410c81334ffe74e479a865490392c082dac058e5eb3a863dafd10bb21117c00c",
+        "chars": 1646
+      },
+      "engine": {
+        "gate": false,
+        "tags": [
+          "亚马逊账号健康与申诉线索"
+        ],
+        "evidenceCount": 6,
+        "summary": null,
+        "gateOnExcerpt": false
+      },
+      "admissionPath": "公告正文门禁拒绝",
+      "verdict": "pass",
+      "problem": null,
+      "note": "诱饵：正文出现 enrolled 与项目名，但没有 opt-in/opt-out 切换，也没有生效日期。",
+      "gateText": "Under Account Health Assurance, a member of the Amazon team will proactively reach out and work one-on-one with sellers whose account may be at-risk to help them get back on track. Account Health Assurance provides sellers with added peace of mind so they can focus on growing and building their business in Amazon’s store. This shows Amazon is on our side and supporting sellers in the things we worry about!” Sellers know they are enrolled in Account Health Assurance when they see the badge at the top of their account page in Seller Central, Amazon’s internal seller portal. Account Health Assurance is launching first with selling partners in Amazon’s U.S."
+    },
+    {
+      "id": "S06",
+      "sourceId": "amazon-us-announcements",
+      "title": "Inbound shipping is now easier with the Amazon Partner Carrier program’s smart carrier options",
+      "url": "https://sell.amazon.com/blog/announcements/partner-carrier-program-smart-carrier-options",
+      "publishedAt": "2024-09-30",
+      "publishedAtNote": "列表 .PagePromo-date 与详情 datePublished 均为 2024-09-30。",
+      "effectiveDate": null,
+      "effectiveDateEvidence": "正文为 now have access，无生效日期。",
+      "scope": "使用 FBA 与 AWD 的美国站卖家入库运输（Partner Carrier 智能承运商选项）",
+      "humanClass": "功能上线",
+      "humanDecision": "reject",
+      "fullBody": {
+        "sha256": "91588ae14a6a7195c2465551bfe6f3d25ce9990eeba977498645fa54a687cbc4",
+        "chars": 1530
+      },
+      "engine": {
+        "gate": false,
+        "tags": [],
+        "evidenceCount": 0,
+        "summary": null,
+        "gateOnExcerpt": false
+      },
+      "admissionPath": "公告正文门禁拒绝",
+      "verdict": "pass",
+      "problem": null,
+      "note": "诱饵：正文出现 program 与 capacity-aware，但没有规则变更或生效日期。",
+      "gateText": "Sellers who use Fulfillment by Amazon (FBA) and Amazon Warehousing and Distribution (AWD) now have access to smart carrier options when sending inventory to the Amazon network. Available through the Amazon Partner Carrier program, these options allow sellers to choose their preferred partner carrier and method of transport from a dynamic list that includes capacity-aware freight-ready dates and cost estimates to better optimize their business."
+    },
+    {
+      "id": "S07",
+      "sourceId": "amazon-us-announcements",
+      "title": "Report brand violations faster with one guided experience",
+      "url": "https://sell.amazon.com/blog/announcements/report-a-violation",
+      "publishedAt": "2026-07-31",
+      "publishedAtNote": "列表 .PagePromo-date 与详情 datePublished 均为 2026-07-31。",
+      "effectiveDate": null,
+      "effectiveDateEvidence": "正文无生效日期。",
+      "scope": "已注册 Brand Registry 的品牌方举报流程（Report a Violation 工具改版）",
+      "humanClass": "功能上线",
+      "humanDecision": "reject",
+      "fullBody": {
+        "sha256": "a52bd013c333a7345c9b1558d479d37d5ed42528f4c31c092f64bce0ca64d479",
+        "chars": 1324
+      },
+      "engine": {
+        "gate": false,
+        "tags": [],
+        "evidenceCount": 0,
+        "summary": null,
+        "gateOnExcerpt": false
+      },
+      "admissionPath": "公告正文门禁拒绝",
+      "verdict": "pass",
+      "problem": null,
+      "note": "诱饵：正文出现 store policy violations（命中政策主体词），但没有生效日期，因此不得放行。",
+      "gateText": "To help sellers more easily safeguard their brand, the Report a Violation tool in Amazon Brand Registry now offers a single, guided experience for reporting intellectual property (IP) infringement, store policy violations, and regulatory compliance concerns. Structured forms walk you step-by-step through the reporting process, and a Submission History tab tracks every report’s status in real time. Brands must be enrolled in Brand Registry to access Report a Violation."
+    },
+    {
+      "id": "S08",
+      "sourceId": "amazon-us-announcements",
+      "title": "Sellers who use FBA Donations now have access to donation certificates",
+      "url": "https://sell.amazon.com/blog/announcements/fba-donation-certificate",
+      "publishedAt": "2026-03-09",
+      "publishedAtNote": "列表 .PagePromo-date 与详情 datePublished 均为 2026-03-09。",
+      "effectiveDate": null,
+      "effectiveDateEvidence": "正文无生效日期，只说按年生成。",
+      "scope": "使用 FBA Donations 的卖家：可在 Seller Central 下载年度捐赠凭证",
+      "humanClass": "功能上线",
+      "humanDecision": "reject",
+      "fullBody": {
+        "sha256": "fc417620f4a00dc8cc7d779ad73a45349568768823a924c059703b35a242ceec",
+        "chars": 3582
+      },
+      "engine": {
+        "gate": false,
+        "tags": [],
+        "evidenceCount": 0,
+        "summary": null,
+        "gateOnExcerpt": false
+      },
+      "admissionPath": "公告正文门禁拒绝",
+      "verdict": "pass",
+      "problem": null,
+      "note": "诱饵：正文多次出现 program，但没有参与方式切换或生效日期。",
+      "gateText": "The Fulfillment by Amazon (FBA) Donations program helps sellers donate unwanted product, including returns and eligible overstock FBA inventory. Now sellers using the program have access to a donation certificate from our nonprofit partners in Seller Central (login required). Your donation certificate will be generated on a yearly basis and can be found on the Donations page in Seller Central."
+    },
+    {
+      "id": "S09",
+      "sourceId": "amazon-us-announcements",
+      "title": "Seller University is now available for everyone",
+      "url": "https://sell.amazon.com/blog/announcements/seller-university-is-for-everyone",
+      "publishedAt": "2026-07-02",
+      "publishedAtNote": "列表 .PagePromo-date 与详情 datePublished 均为 2026-07-02。",
+      "effectiveDate": null,
+      "effectiveDateEvidence": "正文无生效日期。",
+      "scope": "Seller University 访问权限：无需卖家账号即可浏览",
+      "humanClass": "功能上线",
+      "humanDecision": "reject",
+      "fullBody": {
+        "sha256": "711c46db46f80ada529e80af2fb6550df5d7b6d0b6e525915c1a0ee5cafaf2a2",
+        "chars": 866
+      },
+      "engine": {
+        "gate": false,
+        "tags": [],
+        "evidenceCount": 0,
+        "summary": null,
+        "gateOnExcerpt": false
+      },
+      "admissionPath": "公告正文门禁拒绝",
+      "verdict": "pass",
+      "problem": null,
+      "note": "诱饵：no selling account required 里含 required，但不是 required to maintain/meet/submit。",
+      "gateText": "Seller University, Amazon’s free education resource, is now available to everyone—no selling account required. This means prospective sellers, support teams, or anyone curious about selling on Amazon can explore a wide variety of on-demand, educational content spanning more than 125 topics."
+    },
+    {
+      "id": "S10",
+      "sourceId": "amazon-us-announcements",
+      "title": "Plan your Amazon Accelerate 2025 experience!",
+      "url": "https://sell.amazon.com/blog/announcements/plan-for-accelerate",
+      "publishedAt": "2025-08-12",
+      "publishedAtNote": "列表 .PagePromo-date 与详情 datePublished 均为 2025-08-12。",
+      "effectiveDate": null,
+      "effectiveDateEvidence": "会议活动，无政策生效日期。",
+      "scope": "Amazon Accelerate 2025 会议注册与预约（营销活动）",
+      "humanClass": "营销内容",
+      "humanDecision": "reject",
+      "fullBody": {
+        "sha256": "066a4d5ec9a10bbe36e8d492ef6ca6824bee5391d2ce0e5ff6900d061ff1a9e9",
+        "chars": 2400
+      },
+      "engine": {
+        "gate": false,
+        "tags": [],
+        "evidenceCount": 0,
+        "summary": null,
+        "gateOnExcerpt": false
+      },
+      "admissionPath": "公告正文门禁拒绝",
+      "verdict": "pass",
+      "problem": null,
+      "note": "诱饵：含活动日期与 booking 表述，但没有 effective / takes effect 句式。",
+      "gateText": "Register now The path to success at Amazon Accelerate 2025 begins with thoughtful planning. Today, we’re excited to announce that appointments for both Seller Café and Partner Connect are available for booking, and the Agenda Builder is live."
+    }
+  ],
+  "summary": {
+    "total": 10,
+    "pass": 10,
+    "fail": 0,
+    "unconfirmed": 0,
+    "accuracy": 1,
+    "falseNegatives": [],
+    "falsePositives": [],
+    "fixedAt": "2026-10-22",
+    "fixed": [
+      "S03",
+      "S04"
+    ],
+    "note": "判定依据是保存下来的官方正文原文（含 sha256），不是 JSON 里记录的旧结论。S03、S04 原为漏检，修门禁后通过；S05–S10 仍在诱饵文本下被拒绝。"
+  },
+  "coverage": {
+    "announcementIndexItems": 23,
+    "gateAdmittedInIndex": 3,
+    "truePolicyItemsInAnnouncementIndex": 3,
+    "gateRecall": 1,
+    "gateFalsePositivesInIndex": 0,
+    "storedPolicyLeads": 3,
+    "storedFromAnnouncementIndex": 1,
+    "backfillPolicy": "历史样本只用于检验规则，不回填生产库；生产库记录数不因本轮修复而变化。",
+    "note": "门禁召回 3/3 指公告列表页 23 条里人工判定为政策的 3 条现在都能通过；生产库公告记录仍只有 S02，S03/S04 是历史公告，未回填。"
+  }
+}

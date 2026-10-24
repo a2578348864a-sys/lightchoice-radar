@@ -1,0 +1,129 @@
+{
+  "title": "Amazon Ads 政策页渲染正文样本（2026-10-23 实采）",
+  "purpose": "浏览器渲染后的 innerText 原文，供离线测试判定用；不是手工摘录。",
+  "fetchedAt": "2026-10-23T02:40:00+08:00",
+  "browser": "Playwright 1.61.1 + 本机 Chrome（channel=chrome，headless），viewport 1366x900，locale en-US，未登录",
+  "pages": {
+    "hub": {
+      "url": "https://advertising.amazon.com/help/G29MAQ3YTK5LQ7VC",
+      "kind": "directory",
+      "text": "Skip to main content Tools & resources Support center Set Support center as your homepage Support Center Policies and guidelines Amazon Ads policies No account selected Your preferences Create campaign Campaigns Set Campaigns as your homepage Reporting Set Reporting as your homepage MORE ADVERTISING TOOLS Amazon Ads Academy Support center Set Support center as your homepage Account access & settings Set Account access & settings as your homepage BILLING & PAYMENT Billing Set Billing as your homepage Amazon Ads policies Learn about Amazon Ads policies to ensure that your advertisements comply with guidelines and maintain customer trust while achieving your marketing objectives. Updated on Oct 12, 2026 Our policies are designed to help advertisers connect with their audiences, while providing customers with high quality, trustworthy ads. It's your responsibility as an advertiser to make sure that your ads comply with all applicable laws, rules, regulations, and industry standards in the geographical areas where your advertisements appear. Our policies aren’t legal advice. It's your responsibility to consult with legal counsel if you have questions about the laws and regulations concerning your ads. These global ad policies apply to all Amazon Ads unless otherwise noted. This is inclusive of Amazon owned and operated (O&O) properties such as Amazon store and Prime Video Display as well as Open Internet supply. All advertisements are subject to review. Review times may vary by ad product and may be extended during periods of high submission volume, including large numbers of simultaneous submissions. Amazon reserves the right to reject, remove, or require modifications to ads that don't meet its policies, at its sole discretion. Amazon may also take immediate action to protect the stability, security, or integrity of its advertising systems, including throttling delivery, restricting access, or excluding specific ad entities. When appropriate, Amazon will notify affected advertisers with information to help resolve the issue. Amazon may suspend or terminate ad accounts for severe or repeated policy violations. Policies are periodically updated. Review the change log for updates. Non industry-specific General requirements Prohibited content across all supply Claims and substantiation Targeting Prohibited products and services across all supply Event days Prohibited content and products for Amazon O&O supply Industry-specific Alcohol Employment and Recruitment News and journalism Animal related products and services Entertainment and books Public service announcements (PSAs) Baby formula and feeding accessories Financial products and services Real estate Charities Gambling and games Sports and outdoors products Dating and related services Healthcare products and services Search Related topics General requirements Targeting More Help Contact Us Case log Was this article helpful? Select feedback Yes No © 2026 Amazon.com, Inc. or its affiliates. Conditions of use Privacy notice Amazon Advertising Agreement Status",
+      "links": [
+        {
+          "text": "Skip to main content",
+          "href": "https://advertising.amazon.com/help/G29MAQ3YTK5LQ7VC#AACApplicationBody"
+        },
+        {
+          "text": "Amazon Ads Academy",
+          "href": "https://advertising.amazon.com/help/G29MAQ3YTK5LQ7VC"
+        },
+        {
+          "text": "change log",
+          "href": "https://advertising.amazon.com/help/G8X8M375UPCN4UUC"
+        },
+        {
+          "text": "General requirements",
+          "href": "https://advertising.amazon.com/help/G4U9JBZH3664JWX2"
+        },
+        {
+          "text": "Prohibited content across all supply",
+          "href": "https://advertising.amazon.com/help/GRW23T7LB4MFMBXQ"
+        },
+        {
+          "text": "Claims and substantiation",
+          "href": "https://advertising.amazon.com/help/G6UU66YLSCUYDULQ"
+        },
+        {
+          "text": "Targeting",
+          "href": "https://advertising.amazon.com/help/GD6SPCK5RJZL73PU"
+        },
+        {
+          "text": "Prohibited products and services across all supply",
+          "href": "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N"
+        },
+        {
+          "text": "Event days",
+          "href": "https://advertising.amazon.com/help/GQ3SJ5QCWCQCKCYQ"
+        },
+        {
+          "text": "Prohibited content and products for Amazon O&O supply",
+          "href": "https://advertising.amazon.com/help/GTEEH3E3J2BDELBA"
+        },
+        {
+          "text": "Alcohol",
+          "href": "https://advertising.amazon.com/help/G2MMCHZDCTW37V39"
+        },
+        {
+          "text": "Employment and Recruitment",
+          "href": "https://advertising.amazon.com/help/GH44NYF29M6QCYSE"
+        },
+        {
+          "text": "News and journalism",
+          "href": "https://advertising.amazon.com/help/G8LCCRSMMYE6255Z"
+        },
+        {
+          "text": "Animal related products and services",
+          "href": "https://advertising.amazon.com/help/GPHDMTD25DRYVRM7"
+        },
+        {
+          "text": "Entertainment and books",
+          "href": "https://advertising.amazon.com/help/G7NP3SWRVV6UV66V"
+        },
+        {
+          "text": "Public service announcements (PSAs)",
+          "href": "https://advertising.amazon.com/help/GEZ4XHT8TRXFB5WH"
+        },
+        {
+          "text": "Baby formula and feeding accessories",
+          "href": "https://advertising.amazon.com/help/GFNDKT3FYGDL54VB"
+        },
+        {
+          "text": "Financial products and services",
+          "href": "https://advertising.amazon.com/help/GSMUMHF989KULMEQ"
+        },
+        {
+          "text": "Real estate",
+          "href": "https://advertising.amazon.com/help/GYZ3NZ7PXJCZXSPT"
+        },
+        {
+          "text": "Charities",
+          "href": "https://advertising.amazon.com/help/GPRBZ3P2JA2UCU2U"
+        },
+        {
+          "text": "Gambling and games",
+          "href": "https://advertising.amazon.com/help/G29MAQ3YTK5LQ7VC"
+        },
+        {
+          "text": "Sports and outdoors products",
+          "href": "https://advertising.amazon.com/help/GD8U427Z7HJHHJGP"
+        },
+        {
+          "text": "Dating and related services",
+          "href": "https://advertising.amazon.com/help/G8S3JBS2CQQ5BXS5"
+        },
+        {
+          "text": "Healthcare products and services",
+          "href": "https://advertising.amazon.com/help/GPSSMTEAA6AEWY3A"
+        },
+        {
+          "text": "General requirements",
+          "href": "https://advertising.amazon.com/help/G4U9JBZH3664JWX2"
+        },
+        {
+          "text": "Targeting",
+          "href": "https://advertising.amazon.com/help/GD6SPCK5RJZL73PU"
+        }
+      ]
+    },
+    "generalRequirements": {
+      "url": "https://advertising.amazon.com/help/G4U9JBZH3664JWX2",
+      "kind": "policy",
+      "text": "Skip to main content Tools & resources Support center Set Support center as your homepage Support Center Policies and guidelines General requirements No account selected Your preferences Create campaign Campaigns Set Campaigns as your homepage Reporting Set Reporting as your homepage MORE ADVERTISING TOOLS Amazon Ads Academy Support center Set Support center as your homepage Account access & settings Set Account access & settings as your homepage BILLING & PAYMENT Billing Set Billing as your homepage General requirements Learn about Amazon Ads general requirements to create compliant, effective campaigns that align with our standards. Updated on Jul 22, 2026 This section covers requirements for all ads. Additional country-specific and supply-specific restrictions may apply. Advertisers are required to: Comply with all applicable local laws and regulations. Include legible disclosures as required by law. Ensure that ad content is accurate. Ensure that AI-generated content doesn't mislead customers. This includes photorealistic but inaccurate depictions, or content that mimics real people without consent. Failure to comply may result in ads being paused, removed, or restricted. Identify themselves and the product or service being promoted in the ad creative. Accurately declare their category upon campaign set-up. Comply with Brand Usage Guidelines if referencing Amazon, its products, or programs. Advertisers must not use unauthorized content that uses \"Amazon's Choice,\" \"Best Seller\" rankings, or altered Amazon logos. Refrain from misusing or manipulating Amazon Ads products. Ensure that ads are appropriate for the intended audience. Amazon doesn't promote self-harm or permit products or media to be advertised that glorify, depict or advocate for self-harm (including suicide, eating disorders, and self-injury). Ensure the accuracy of claims and provide factual substantiation if requested by Amazon. To review the full policy, visit Claims and Substantiation. Obtain and maintain all necessary rights and permissions for all content in ads, such as logos, music, images, and others. Comply with Open Internet supplier policies. Amazon respects all Open Internet supply source block requests. Advertisers are responsible for ensuring their promotions comply with applicable laws and regulations. All ads must clearly indicate that terms and conditions apply and make it easy for customers to understand where those terms can be found. Advertisers must comply with all applicable local laws and regulations governing advertising to children. Amazon reserves the right to pause or remove ads at any time based on customer feedback. It also reserves the right to remove content that attempts to trick or circumvent our ad review processes. Ads that refer to Amazon, its businesses, or people associated with them may be declined. Search Related topics Amazon Ads policies Targeting More Help Contact Us Case log Was this article helpful? Select feedback Yes No © 2026 Amazon.com, Inc. or its affiliates. Conditions of use Privacy notice Amazon Advertising Agreement Status"
+    },
+    "prohibitedProducts": {
+      "url": "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N",
+      "kind": "policy",
+      "text": "Skip to main content Tools & resources Support center Set Support center as your homepage Support Center Policies and guidelines Prohibited products and services across all supply No account selected Your preferences Create campaign Campaigns Set Campaigns as your homepage Reporting Set Reporting as your homepage MORE ADVERTISING TOOLS Amazon Ads Academy Support center Set Support center as your homepage Account access & settings Set Account access & settings as your homepage BILLING & PAYMENT Billing Set Billing as your homepage Prohibited products and services across all supply Learn about Amazon Ads prohibited products and services to ensure that your ads align with global and regional compliance standards. Updated on Jun 25, 2026 This section covers requirements for all ads. Additional country-specific and supply-specific restrictions may apply. The following products and services are prohibited globally: Products or services that facilitate deceptive or dishonest behavior Products or services that cause damage, harm, or injury Malware, spyware, and scams Counterfeit or intellectual property infringing products Inaccurate statements about prices, promotions, or discounts. Political ads such as campaigns for or against a politician or a political party, content related to an election, active legislation, or content related to political issues of robust public debate. Religious services, fundraising, proselytizing, or discriminatory religious content. This excludes religious books and merchandise. Astrology and mysticism Adult sexual products and services, such as: Sexual enhancement, sexualized adult costumes, fetish and bondage wear, novelty underwear, sex toys, sexually graphic novelty items, sex games, sex furniture, sexually explicit underwear/clothing, and other similar items. Review Healthcare products and services policy for allowed sexual wellness products. Sexual services such as escorts, prostitution, strip clubs, phone sex lines, pornography, or other similar services Products or services that facilitate human trafficking or sexual exploitation. Recreational drugs and all related products and services, including paraphernalia, masking products, nitrous oxide, storage devices, and products and services that make claims to 'cure' addiction. Products and services designed exclusively for use by military, law enforcement, or medical professionals. All tobacco and nicotine products, including e-cigarettes, nicotine pouches, heat-not-burn products, shisha/hookah, and related accessories. Weapons, including parts or accessories, such as: Guns, knives, and associated accessories (some knives are permitted, review Outdoor recreational weapons). Products to conceal weapons products. Products resembling realistic weapons. Instructional guides on how to use or how to build weapons. Permanent tattoo products and devices that puncture the skin, leave a permanent scar or marking, and/or apply pigment under the skin. Products that contain or imply that they contain THC, CBD, or full spectrum hemp. This excludes hemp products without THC or CBD. Imagery associated with recreational drugs or psychoactive effects. Premium pay-per-call services. Products that harm animals or contain parts or ingredients from endangered or threatened animals. News and journalism (excludes books and merchandise). Specific kinds of food where advertising of such products is prohibited by local law. For example, pork products. Infant formula, where it's prohibited by law. Review Baby formula and feeding accessories policy for regional guidelines. Grocery delivery service ads may not appear in sponsorship or takeover formats. Country-specific restrictions Expand all Australia and New Zealand Denmark, Finland, France, Germany, Netherlands, Norway, Poland, Sweden, and Switzerland Singapore United Kingdom Search On this page Country-specific restrictions Related topics Prohibited content across all supply Prohibited content and products for Amazon O&O supply More Help Contact Us Case log Was this article helpful? Select feedback Yes No © 2026 Amazon.com, Inc. or its affiliates. Conditions of use Privacy notice Amazon Advertising Agreement Status"
+    }
+  }
+}

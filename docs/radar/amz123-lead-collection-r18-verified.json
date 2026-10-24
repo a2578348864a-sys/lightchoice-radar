@@ -1,0 +1,530 @@
+{
+  "evidenceVersion": 1,
+  "generatedAt": "2026-10-23T07:33:57.022Z",
+  "timezone": "Asia/Shanghai",
+  "mode": "read-only-live-snapshot",
+  "source": {
+    "id": "amz123-policy-leads",
+    "name": "AMZ123｜第三方政策线索（仅元数据，隔离存储，不入正式政策）",
+    "kind": "web_list",
+    "tier": "T2",
+    "participation_mode": "isolated",
+    "first_party": false,
+    "interval_minutes": 360,
+    "enabled": true,
+    "tags": [
+      "第三方线索",
+      "amz123",
+      "美国站",
+      "政策线索"
+    ],
+    "health": "ok",
+    "fail_count": 0,
+    "last_fetch_at": "2026-10-23T06:49:53.517Z",
+    "last_ok_at": "2026-10-23T06:49:53.517Z",
+    "next_fetch_at": "2026-10-23T12:49:53.517Z",
+    "last_error": null,
+    "cursor": {
+      "gateVersion": "amz123-lead-gate-v1",
+      "sitemapLastReadAt": "2026-10-23T06:23:13.406Z",
+      "initializedAt": "2026-10-23T06:23:30.553Z",
+      "lastOkAt": "2026-10-23T06:49:53.516Z",
+      "rejectedIdentities": 47,
+      "pendingCandidates": 57,
+      "sitemapApprovedUrls": 0
+    },
+    "configuredAllowedPaths": [
+      "https://www.amz123.com/t/",
+      "https://www.amz123.com/kx/"
+    ]
+  },
+  "schedule": {
+    "intervalMinutes": 360,
+    "nextFetchAt": "2026-10-23T12:49:53.517Z",
+    "mechanism": "Existing sources.interval_minutes + private AMZ123 queue; generator does not start or schedule a worker.",
+    "announcementWorker": "not-running",
+    "jobRuns": [
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:50:18.389Z",
+        "finishedAt": "2026-10-22T19:50:18.389Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:49:18.339Z",
+        "finishedAt": "2026-10-22T19:49:18.339Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:48:18.289Z",
+        "finishedAt": "2026-10-22T19:48:18.289Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:47:18.244Z",
+        "finishedAt": "2026-10-22T19:47:18.245Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:46:18.201Z",
+        "finishedAt": "2026-10-22T19:46:18.213Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:45:18.172Z",
+        "finishedAt": "2026-10-22T19:45:18.198Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:44:18.116Z",
+        "finishedAt": "2026-10-22T19:44:18.149Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:43:18.088Z",
+        "finishedAt": "2026-10-22T19:43:18.107Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:42:18.059Z",
+        "finishedAt": "2026-10-22T19:42:18.059Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:41:18.015Z",
+        "finishedAt": "2026-10-22T19:41:18.019Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:40:17.955Z",
+        "finishedAt": "2026-10-22T19:40:17.956Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:39:17.916Z",
+        "finishedAt": "2026-10-22T19:39:17.923Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:38:17.868Z",
+        "finishedAt": "2026-10-22T19:38:17.869Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:37:17.830Z",
+        "finishedAt": "2026-10-22T19:37:17.831Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:36:17.768Z",
+        "finishedAt": "2026-10-22T19:36:17.768Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:35:17.745Z",
+        "finishedAt": "2026-10-22T19:35:17.746Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:34:17.694Z",
+        "finishedAt": "2026-10-22T19:34:17.695Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:33:17.647Z",
+        "finishedAt": "2026-10-22T19:33:17.648Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:32:27.608Z",
+        "finishedAt": "2026-10-22T19:32:27.609Z",
+        "error": null
+      },
+      {
+        "job": "radar.amazon-announcements.schedule",
+        "status": "ok",
+        "startedAt": "2026-10-22T19:31:27.566Z",
+        "finishedAt": "2026-10-22T19:31:27.567Z",
+        "error": null
+      }
+    ]
+  },
+  "runs": [
+    {
+      "id": 78,
+      "status": "ok",
+      "found": 1,
+      "new": 1,
+      "error": null,
+      "started_at": "2026-10-23T06:23:12.210Z",
+      "finished_at": "2026-10-23T06:23:30.553Z",
+      "diagnostics": {
+        "leads": 1,
+        "pageReads": 25,
+        "discovered": 105,
+        "alreadyStored": 0,
+        "robots": {
+          "url": "https://www.amz123.com/robots.txt",
+          "status": 200,
+          "rules": 48,
+          "allowedSections": [
+            "/t",
+            "/kx"
+          ]
+        },
+        "sitemap": {
+          "urls": 4000,
+          "known": 0,
+          "fetched": true
+        },
+        "listings": [
+          {
+            "links": 4,
+            "status": 200,
+            "withTitle": 4,
+            "section": "/t"
+          },
+          {
+            "links": 101,
+            "status": 200,
+            "withTitle": 101,
+            "section": "/kx"
+          }
+        ],
+        "failures": [
+          {
+            "url": "https://www.amz123.com/kx/9Knq0LcM",
+            "error": "the page no longer carries the article payload"
+          }
+        ],
+        "rejectedReasons": {
+          "parse-failed": 1,
+          "not about Amazon": 4,
+          "no radar rule matched": 18
+        }
+      }
+    },
+    {
+      "id": 111,
+      "status": "ok",
+      "found": 0,
+      "new": 0,
+      "error": null,
+      "started_at": "2026-10-23T06:49:35.580Z",
+      "finished_at": "2026-10-23T06:49:53.517Z",
+      "diagnostics": {
+        "leads": 0,
+        "pageReads": 25,
+        "discovered": 76,
+        "alreadyStored": 1,
+        "robots": {
+          "url": "https://www.amz123.com/robots.txt",
+          "status": 200,
+          "rules": 48,
+          "allowedSections": [
+            "/t",
+            "/kx"
+          ]
+        },
+        "sitemap": {
+          "urls": 0,
+          "known": 4000,
+          "fetched": false
+        },
+        "listings": [
+          {
+            "links": 4,
+            "status": 200,
+            "withTitle": 4,
+            "section": "/t"
+          },
+          {
+            "links": 72,
+            "status": 200,
+            "withTitle": 72,
+            "section": "/kx"
+          }
+        ],
+        "failures": [
+          {
+            "url": "https://www.amz123.com/kx/A2CzjiIM",
+            "error": "the page no longer carries the article payload"
+          }
+        ],
+        "rejectedReasons": {
+          "parse-failed": 1,
+          "not about Amazon": 3,
+          "no radar rule matched": 21
+        }
+      }
+    }
+  ],
+  "leads": [
+    {
+      "id": "e27uboy84azbker1m7d72n7ms",
+      "url": "https://www.amz123.com/t/5Z6bFgNc",
+      "title": "美国IOR监管趋严，亚马逊提醒卖家自查进口主体",
+      "author": "北美电商资讯",
+      "publishedAt": "2026-10-21T02:19:54.000Z",
+      "sourceUpdatedAt": "2026-10-23T04:24:17.000Z",
+      "publicationTime": "2026-10-21T02:19:54.000Z",
+      "description": "这次调整是美国收紧海关监管、整治空壳IOR漏洞的延续。",
+      "descriptionLength": 27,
+      "bodyStatus": "none",
+      "bodyTextNull": true,
+      "bodyHtmlNull": true,
+      "bodyLength": 0,
+      "discoveredAt": "2026-10-23T06:23:30.276Z",
+      "revision": 1,
+      "lead": {
+        "column": "跨境头条",
+        "market": "US",
+        "source": "amz123",
+        "section": "/t",
+        "siteTags": [
+          "美国",
+          "Amazon",
+          "跨境卖家"
+        ],
+        "radarTags": [
+          "类目合规线索"
+        ],
+        "gateVersion": "amz123-lead-gate-v1",
+        "radarRuleIds": [
+          "category-compliance"
+        ],
+        "discoveredVia": "listing",
+        "effectiveDate": "2026-08-19",
+        "marketEvidence": "title",
+        "event": {
+          "of": null,
+          "key": "bb24ca2f176fb90a77c2b4b5",
+          "state": "new",
+          "domain": "类目合规线索",
+          "titleCore": "ior监管趋严 提醒卖家自查进口主体",
+          "officialRef": null,
+          "effectiveDate": "2026-08-19"
+        },
+        "officialVerification": {
+          "note": "本项目已收录的官方来源中没有对应记录，保持仅第三方报道状态。",
+          "status": "third-party-only"
+        }
+      },
+      "revisionExcerptSnapshot": true,
+      "boundaryViolations": []
+    }
+  ],
+  "policyStatistics": {
+    "note": "Counts are computed from sources.tags and distinct articles in the live database.",
+    "families": [
+      {
+        "family": "ads_policy",
+        "n": 2
+      },
+      {
+        "family": "external_regulation",
+        "n": 20
+      },
+      {
+        "family": "other",
+        "n": 102
+      },
+      {
+        "family": "platform_policy",
+        "n": 3
+      }
+    ],
+    "officialBefore": {
+      "platform_policy": 3,
+      "ads_policy": 2,
+      "external_regulation": 20
+    },
+    "officialCountsUnchanged": true
+  },
+  "boundaries": {
+    "leadsInFactArticles": 0,
+    "leadsInStorySignals": 0,
+    "leadAnalyses": 0,
+    "leadPublicationRows": 0,
+    "leadPublicPublicationRows": 0,
+    "leadWithdrawnPublicationRows": 0,
+    "leadsWithBodyOrOverlongExcerpt": 0,
+    "bodyLeakCounts": {
+      "articleBodyRows": 0,
+      "articleRevisionBodyRows": 0,
+      "articleRevisionExcerptSnapshotRows": 1,
+      "articleRevisionOverlongBodyRows": 0,
+      "translationBodyRows": 0,
+      "rawBodyFieldArticles": 0,
+      "overlongExcerptRows": 0
+    },
+    "note": "This source is isolated; evidence output contains only allow-listed metadata. The generator never serializes article body fields or the raw JSON object. A revision row whose body_text equals the article excerpt is a short metadata snapshot written by the collector's fallback when the article_revisions.excerpt column is absent; it is listed separately and is not counted as a stored article body."
+  },
+  "permissions": {
+    "robotsUrl": "https://www.amz123.com/robots.txt",
+    "approvedPaths": [
+      "https://www.amz123.com/t/",
+      "https://www.amz123.com/kx/"
+    ],
+    "expectedPathsForThisIntegration": [
+      "/t/",
+      "/kx/"
+    ],
+    "excludedPaths": [
+      "/b（服务商目录）",
+      "/report（行业报告）",
+      "/zb（每日多主题早报，本轮不纳入）",
+      "/search",
+      "/api",
+      "/tag-*"
+    ],
+    "robotsFromLatestRun": {
+      "url": "https://www.amz123.com/robots.txt",
+      "status": 200,
+      "rules": 48,
+      "allowedSections": [
+        "/t",
+        "/kx"
+      ]
+    },
+    "enforcedInCode": "packages/backend/src/sources/amz123.ts (robots gate is checked before every request)",
+    "bodyStorage": "not selected into the evidence output; only null flags and lengths are queried"
+  },
+  "runtime": {
+    "http": {
+      "web3000": {
+        "url": "http://127.0.0.1:3000/",
+        "status": 200,
+        "firstStatus": 302,
+        "finalUrl": "http://127.0.0.1:3000/all",
+        "ok": true
+      },
+      "api3001": {
+        "url": "http://127.0.0.1:3001/api/site/meta",
+        "status": 200,
+        "firstStatus": 200,
+        "finalUrl": null,
+        "ok": true
+      }
+    },
+    "radarOpsStatus": {
+      "command": "node --env-file-if-exists=.env scripts/radar-ops.ts status",
+      "exitCode": 0,
+      "error": null,
+      "stderr": null,
+      "relevantLines": [
+        "Web  3000                  HTTP 200",
+        "API  3001                  HTTP 200",
+        "Ads 来源                     已停用 · health=ok · fail=0",
+        "Ads 调度开关                   关闭（RADAR_ADS_POLICY_ENABLED）",
+        "第三方线索来源                    已启用 · health=ok · fail=0 · 每 360 分钟一轮（6 小时）",
+        "Ads 采集进程                   未运行",
+        "Ads 监督进程                   未运行",
+        "公告 Worker                  未运行",
+        "记录数量                       ads_policy=2 · external_regulation=20 · other=102 · platform_policy=3",
+        "  ads-policy-pages           ok      found=2 new=2 2026-10-22 19:24:46",
+        "  amz123-policy-leads        ok      found=0 new=0 2026-10-23 06:49:35",
+        "  radar.amazon-announcements.schedule ok",
+        "  radar.regulatory.schedule          ok",
+        "  · Ads 采集关闭中（来源停用）；需要时按 CURRENT.md 的两步启用，不会自行启动"
+      ],
+      "announcementWorker": "not-running",
+      "adsWorker": "not-running"
+    },
+    "note": "Runtime status is observational only. This script does not start, stop, or restart workers."
+  },
+  "checks": [
+    {
+      "id": "source_enabled_and_isolated",
+      "status": "pass",
+      "detail": "enabled=true; participationMode=isolated"
+    },
+    {
+      "id": "interval_is_360_minutes",
+      "status": "pass",
+      "detail": "intervalMinutes=360"
+    },
+    {
+      "id": "official_family_counts_unchanged",
+      "status": "pass",
+      "detail": "expected={\"platform_policy\":3,\"ads_policy\":2,\"external_regulation\":20}; actual={\"platform_policy\":3,\"ads_policy\":2,\"external_regulation\":20}"
+    },
+    {
+      "id": "no_fact_article_links",
+      "status": "pass",
+      "detail": "count=0"
+    },
+    {
+      "id": "no_story_signals",
+      "status": "pass",
+      "detail": "count=0"
+    },
+    {
+      "id": "no_analyses",
+      "status": "pass",
+      "detail": "count=0"
+    },
+    {
+      "id": "no_public_publication_rows",
+      "status": "pass",
+      "detail": "count=0"
+    },
+    {
+      "id": "no_body_or_overlong_excerpt_leak",
+      "status": "pass",
+      "detail": "articlesWithStoredBody=0 (a revision row that only repeats the short excerpt is a metadata snapshot, not a stored body)"
+    },
+    {
+      "id": "web_3000_http_200",
+      "status": "pass",
+      "detail": "status=200"
+    },
+    {
+      "id": "api_3001_http_200",
+      "status": "pass",
+      "detail": "status=200"
+    },
+    {
+      "id": "announcement_worker_not_running",
+      "status": "pass",
+      "detail": "state=not-running; asserted=true"
+    }
+  ]
+}

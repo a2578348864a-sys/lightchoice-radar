@@ -1,0 +1,1602 @@
+{
+  "meta": {
+    "project": "LightChoice Radar（轻选情报中心）",
+    "topic": "AMZ123 情报来源深度研究与自动发现可行性验证",
+    "verifiedAt": "2026-10-23（北京时间）",
+    "dataSource": "https://www.amz123.com/ 公开页面",
+    "method": "真实访问 + SSR 解析（Nuxt __NUXT_DATA__ / JSON-LD）；未使用浏览器渲染即可取得文章级元数据；未登录、未绕验证码、未访问 robots 禁止路径做批量采集",
+    "baseline": {
+      "platform_policy": 3,
+      "ads_policy": 2,
+      "external_regulation": 20,
+      "note": "开发库 lightchoice_radar 实测，来源标签口径与 radar-ops status 一致"
+    },
+    "experimentDir": ".data/_diag/amz123/（gitignored，实验脚本与原始产出）"
+  },
+  "columns": [
+    {
+      "path": "/t",
+      "name": "跨境头条",
+      "sitemapArticleUrls": 2001,
+      "access": "SSR 可取 JSON-LD（datePublished/dateModified/author/headline）与 Nuxt payload 全文",
+      "discovery": "文章 URL 需从列表页（客户端渲染）取，sitemap 提供历史归档",
+      "robots": "robots.txt 显式 Allow:/t",
+      "value": "最高：单主题政策报道主来源",
+      "limits": "无 RSS；列表页需浏览器渲染；分页为客户端加载"
+    },
+    {
+      "path": "/kx",
+      "name": "跨境快讯",
+      "sitemapArticleUrls": 2001,
+      "access": "同上",
+      "discovery": "同上",
+      "robots": "未被 Disallow 覆盖（默认允许）",
+      "value": "高：短时效政策线索（小时级）",
+      "limits": "粒度碎、单条信息量小"
+    },
+    {
+      "path": "/b",
+      "name": "跨境百科",
+      "sitemapArticleUrls": 2001,
+      "access": "同上",
+      "discovery": "同上",
+      "robots": "robots.txt 显式 Allow:/b",
+      "value": "低：抽样显示以服务商/服务商目录条目为主（物流、检测认证公司），非政策报道",
+      "limits": "商业推广占比高；不应作为政策线索源"
+    },
+    {
+      "path": "/zb",
+      "name": "跨境早报",
+      "sitemapArticleUrls": 101,
+      "access": "同上",
+      "discovery": "按日期路径 /zb/YYYYMMDD",
+      "robots": "未被 Disallow 覆盖（默认允许）",
+      "value": "中：每日多主题摘要，可作线索雷达但单条对应多个事件",
+      "limits": "一篇多主题，难以作为“报道↔事件”的一一对应单元"
+    },
+    {
+      "path": "/report",
+      "name": "跨境报告",
+      "sitemapArticleUrls": 51,
+      "access": "同上",
+      "discovery": "分类 tag 页 /report/tag-N 在 robots 中被 Disallow（/tag-*），仅列表页可用",
+      "robots": "文章页允许；tag 页被禁止",
+      "value": "中：行业/市场报告，非政策变化",
+      "limits": "与政策事件口径不符"
+    },
+    {
+      "path": "/dagang",
+      "name": "亚马逊知识大纲/培训课程",
+      "sitemapArticleUrls": 1,
+      "access": "列表为客户端渲染，SSR 无文章链接",
+      "discovery": "无",
+      "robots": "未被 Disallow 覆盖",
+      "value": "低：课程大纲，非情报源",
+      "limits": "静态抓取拿不到内容"
+    },
+    {
+      "path": "/cp /pz /gm /hd",
+      "name": "查测评 / 骗子曝光 / 跟卖曝光 / 找活动",
+      "sitemapArticleUrls": "各 101（活动类多为营销位）",
+      "access": "同上",
+      "discovery": "同上",
+      "robots": "未被 Disallow 覆盖",
+      "value": "低：与平台政策无关；活动栏目为纯商业推广",
+      "limits": "不纳入本主线"
+    }
+  ],
+  "compliance": {
+    "robotsTxt": {
+      "url": "https://www.amz123.com/robots.txt",
+      "fetchedAt": "2026-10-23",
+      "keyRules": [
+        "User-agent:* 的 Disallow 列表：/admin /search /search.htm /api /user-* /thread-* /tag-* /cgi-bin /prouser-* /tools-*/search /toolbox 等",
+        "User-agent:* 的显式 Allow：/t、/b",
+        "Sitemap: https://www.amz123.com/sitemap_index.xml",
+        "针对 GPTBot / Amazonbot / SemrushBot 等 AI 爬虫单独 Disallow:/"
+      ],
+      "conclusion": "文章级路径（/t/xxx、/kx/xxx、/b/xxx、/zb/YYYYMMDD、/report/xxx）未被 Disallow 覆盖；/t 与 /b 被显式 Allow。站内搜索与 /api 被禁止，不得用于发现。"
+    },
+    "terms": {
+      "url": "https://www.amz123.com/disclaimer",
+      "title": "厦门品牌方舟科技有限公司用户服务协议",
+      "fetchedAt": "2026-10-23",
+      "keyClauses": [
+        "第 10 条：用户在平台发表的全部原创内容著作权归用户本人，用户可授权第三方以任何方式使用。",
+        "第 10 条：第三方若出于非商业目的将平台发表内容转载到平台之外，应在正文开头显著位置注明作者姓名、给出原始链接、注明「发表于厦门品牌方舟科技有限公司」，且不得修改演绎；若需修改或用于商业目的，应联系用户取得单独授权。",
+        "第 10 条：平台提供的标识、版面设计、文本、图片、图形等受著作权/商标权保护，未经相关权利人同意不得被直接或间接发布、使用、改写或再发行，或用于任何商业目的。",
+        "第 8.4.2 条：平台不允许用户以任何手段收集、编辑、出售或无偿传播其他用户的数据。",
+        "第 6.1 条：平台不对所提供信息与技术/信息的绝对有效、准确、可靠作出任何承诺或保证。"
+      ],
+      "conclusion": "授权未确认（转载/再展示条款与第 10 条平台自持权利条款存在张力）。可安全使用的边界：仅保存标题、URL、作者、发布时间、摘要与证据链接，并按协议要求署名作者、给出原始链接、注明发表于厦门品牌方舟科技有限公司；不得复制或改写整篇正文；不得作为商业用途再发布；不得把第三方报道升级为官方政策。"
+    },
+    "accessLimits": {
+      "captcha": "本轮全部抽样请求（含 47 篇样本全文回取）均未遇到验证码或登录墙",
+      "loginWall": "AMZ123 文章页无需登录；评论/论坛等需登录区域未进入",
+      "privateApi": "站点前端使用 api.amz123.com 私有接口渲染列表与正文，本轮未调用、逆向或依赖该接口"
+    },
+    "rightsStatus": "可自动访问并仅提取元数据：明确（robots 允许 + 文章页 SSR 公开）。可长期保存并再发布正文：授权未确认。本轮未保存整站正文，未写入正式政策库。"
+  },
+  "samples": [
+    {
+      "reportId": "EV-AWD-R1",
+      "eventId": "EV-AWD",
+      "title": "7月31日起生效！亚马逊AWD停止接收大件商品",
+      "url": "https://www.amz123.com/t/mhH3rWoo",
+      "column": "跨境头条",
+      "author": "至美通海外仓",
+      "authorIntro": "至美通是湖南省商务厅评定的省级公共海外仓，核心能力包括：海外仓储物流、跨境物流、知识产权保护、贸易保险、工商税务、供应链金融、数据分析。支持亚马逊、沃尔玛、Wayfair、Home Depot、速卖通、Shopify、eBay、Lowe's、Indiegogo等电商平台发货。",
+      "published_at": "2026-07-11",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 4004,
+      "tags": [
+        "FBA",
+        "Amazon",
+        "家具"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "FBA 仓储与配送",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "2026-07-31",
+      "effectiveDateBasis": "报道一致给出 2026-07-31 生效；阈值：长度≥18 英寸 / 宽度≥14 英寸 / 高度≥8 英寸 / 重量≥20 磅 任一即超限",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "服务商转载/解读（至美通海外仓）",
+      "contentType": "服务商业推广",
+      "sameEventAs": [
+        {
+          "title": "7/31起，美国 AWD 不再接受大件商品入仓",
+          "url": "https://www.amz123.com/t/S1dmELe3",
+          "author": "Regan跨境",
+          "published_at": "2026-07-31"
+        }
+      ],
+      "isRepostOrMarketing": true,
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialEvidence": "报道自述依据为 Seller Central 官方帮助页与 Seller Forums 官方回复；sellercentral.amazon.com 的 robots.txt 为 Disallow: / 且需登录，公开官方渠道无对应公告；官方 ASCS 产品页仅说明 AWD 用途，不含“停止大件”条款。官方正文不可公开核实。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无 AWD 相关政策记录（开发库检索无命中）",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "内容为服务商口径的规则摘要，无官方原文引用",
+      "bodyExcerpt": "根据亚马逊最新公告，自 2026 年 7 月 31 日起，Amazon Warehousing & Distribution（AWD）仅接收标准尺寸商品。 超过规定尺寸或重量的大件商品，将无法创建AWD入仓货件，需改为直接发往FBA，或选择Global Warehouse Distribution（GWD）等方案。 需要注意的是，已在AWD仓内的库存以及7月31日前创建的大件AWD货件均不受影响。7月31日后，新创建的大件AWD货件将无法提交。 哪些商品受到影响？ 自7月31日起，符合以下任一条件的商品，将无法通过AWD入仓： 长度≥18英寸 宽度≥14英寸 高度≥8英寸 重量≥20磅 以上四项条件满足任意一项，即属于此次调整范围。 为什么调整AWD？ AWD的定位一直是前置备货仓，卖家提前将商品存入AWD，再根据FBA库存情况进行自动或手动补货。 相比标准尺寸商品，大件商品占用仓储空间更大，补货效率和仓容利用率相对较低。因此，"
+    },
+    {
+      "reportId": "EV-AWD-R2",
+      "eventId": "EV-AWD",
+      "title": "7/31起，美国 AWD 不再接受大件商品入仓",
+      "url": "https://www.amz123.com/t/S1dmELe3",
+      "column": "跨境头条",
+      "author": "Regan跨境",
+      "authorIntro": "推送行业新闻，分享行业干货。四年亚马逊跨境电商人，喜欢结交朋友，分享经验。持续关注，我相信会是你一笔很好的投资，也能收获一个真心朋友。",
+      "published_at": "2026-07-31",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 4878,
+      "tags": [
+        "FBA",
+        "美国",
+        "海外仓",
+        "Amazon"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "FBA 仓储与配送",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "2026-07-31",
+      "effectiveDateBasis": "报道一致给出 2026-07-31 生效；阈值：长度≥18 英寸 / 宽度≥14 英寸 / 高度≥8 英寸 / 重量≥20 磅 任一即超限",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "自媒体的官方口径梳理（Regan跨境）",
+      "contentType": "经验梳理（自述查阅 Seller Central 帮助页与 Seller Forums）",
+      "sameEventAs": [
+        {
+          "title": "7月31日起生效！亚马逊AWD停止接收大件商品",
+          "url": "https://www.amz123.com/t/mhH3rWoo",
+          "author": "至美通海外仓",
+          "published_at": "2026-07-11"
+        }
+      ],
+      "isRepostOrMarketing": true,
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialEvidence": "报道自述依据为 Seller Central 官方帮助页与 Seller Forums 官方回复；sellercentral.amazon.com 的 robots.txt 为 Disallow: / 且需登录，公开官方渠道无对应公告；官方 ASCS 产品页仅说明 AWD 用途，不含“停止大件”条款。官方正文不可公开核实。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无 AWD 相关政策记录（开发库检索无命中）",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "明确区分“AWD 入仓资格变化”与“美国站 FBA 大件配送规则”，并给出旧口径 25×25×25 英寸/49 磅的作废提醒",
+      "bodyExcerpt": "先帮大家把全网相关信息捋一下。 我查了 Amazon Seller Central 官方帮助页、Seller Forums 亚马逊官方回复、AWD 费用说明、Amazon Warehousing and Distribution 官方介绍，以及近期跨境物流服务商和行业媒体的解读。这里先把已经过时、容易误导的内容删掉。 第一 官方核心口径很明确 ：从 2026年7月31日 开始，美国站 AWD 只接受 sortable items，也就是可分拣商品。尺寸要求是 小于 18 × 14 × 8 英寸 ， 重量 低于 20 磅 。超过这个阈值的商品，应通过 Send to Amazon 工作流直接发往 Amazon fulfillment network，也就是 FBA 运营中心。 第二 这不是普通 FBA 大件配送规则变化，而是 AWD 入仓资格变化 。很多卖家容易把 AWD、FBA、入仓外箱、商品销售包装混在一起。官方说的是 AWD"
+    },
+    {
+      "reportId": "EV-PEAK-FEE-R1",
+      "eventId": "EV-PEAK-FEE",
+      "title": "亚马逊公布2026年旺季履约费用，10月15日起执行",
+      "url": "https://www.amz123.com/t/YZUdy8Tw",
+      "column": "跨境头条",
+      "author": "亚马逊资讯",
+      "authorIntro": "AMZ123旗下亚马逊资讯发布平台，专注亚马逊全球热点事件，为广大卖家提供亚马逊最新动态、最热新闻。",
+      "published_at": "2026-07-15",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 16630,
+      "tags": [
+        "Amazon",
+        "FBA",
+        "物流"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "平台费用",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "2026-10-15",
+      "effectiveDateBasis": "报道给出旺季窗口 2026-10-15 至 2027-01-14；平均每件 +$0.32；3.5% 燃油与物流附加费自 2026-04-17 起执行且无截止日",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "AMZ123 自有资讯号（亚马逊资讯）",
+      "contentType": "资讯报道（转述官方口径，未给链接）",
+      "sameEventAs": [
+        {
+          "title": "亚马逊官宣旺季费上调！3.5%附加费全年叠加，卖家成本涨幅或达15%！",
+          "url": "https://www.amz123.com/t/Daf748UM",
+          "author": "紫鸟浏览器",
+          "published_at": "2026-07-15"
+        }
+      ],
+      "isRepostOrMarketing": false,
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialEvidence": "一则报道称“亚马逊公布”，另一则称“亚马逊在卖家论坛发布公告”；官方公开渠道（sell.amazon.com/blog 全量 77 篇 + sellingpartners 44 篇）检索“旺季/holiday + 履约费 + 10月15日”0 命中，“3.5% 燃油附加费”0 命中；sellingpartners 2026 费用页（已在 Radar）发布日期为 2025-10-15，是基础费率调整，非本旺季加价。官方正文不可公开核实。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 已有 2025-10-15《2026 年美国 Referral 与 FBA 费用更新》（基础费率），与本事件（旺季加价 + 燃油附加费）为不同事件，未覆盖",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "以“AMZ123获悉”开头，给出完整费率与生效窗口，无官方链接",
+      "bodyExcerpt": "AMZ123获悉，近日，亚马逊公布了2026年假日旺季履约安排，将再次针对Fulfillment by Amazon（FBA）、Remote Fulfillment with FBA、Multi-Channel Fulfillment（MCF）以及Buy with Prime服务收取更高的旺季履约费用。 此次旺季履约费将在2026年10月15日至2027年1月14日期间执行，与去年时间安排一致。 亚马逊表示，FBA费用通常在商品离开配送中心时计算，因此从2026年10月15日起发出的商品将按照旺季费率收费。此次旺季履约费用上涨幅度与去年相同，平均每件商品增加0.32美元。不过，亚马逊自2026年4月开始收取的3.5%燃油和物流附加费仍将在旺季期间叠加计算。 亚马逊方面表示，当运输成本持续处于较高水平时，公司会参考其他主要物流企业的做法，通过临时附加费覆盖部分实际成本上涨。针对卖家关于3.5%燃油和物流附加费何时结束的问题，亚马逊"
+    },
+    {
+      "reportId": "EV-PEAK-FEE-R2",
+      "eventId": "EV-PEAK-FEE",
+      "title": "亚马逊官宣旺季费上调！3.5%附加费全年叠加，卖家成本涨幅或达15%！",
+      "url": "https://www.amz123.com/t/Daf748UM",
+      "column": "跨境头条",
+      "author": "紫鸟浏览器",
+      "authorIntro": "跨境账号安全管理数字银行",
+      "published_at": "2026-07-15",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 3517,
+      "tags": [
+        "Amazon",
+        "FBA"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "平台费用",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "2026-10-15",
+      "effectiveDateBasis": "报道给出旺季窗口 2026-10-15 至 2027-01-14；平均每件 +$0.32；3.5% 燃油与物流附加费自 2026-04-17 起执行且无截止日",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "服务商自媒体（紫鸟浏览器）",
+      "contentType": "带商业推广的解读",
+      "sameEventAs": [
+        {
+          "title": "亚马逊公布2026年旺季履约费用，10月15日起执行",
+          "url": "https://www.amz123.com/t/YZUdy8Tw",
+          "author": "亚马逊资讯",
+          "published_at": "2026-07-15"
+        }
+      ],
+      "isRepostOrMarketing": true,
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialEvidence": "一则报道称“亚马逊公布”，另一则称“亚马逊在卖家论坛发布公告”；官方公开渠道（sell.amazon.com/blog 全量 77 篇 + sellingpartners 44 篇）检索“旺季/holiday + 履约费 + 10月15日”0 命中，“3.5% 燃油附加费”0 命中；sellingpartners 2026 费用页（已在 Radar）发布日期为 2025-10-15，是基础费率调整，非本旺季加价。官方正文不可公开核实。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 已有 2025-10-15《2026 年美国 Referral 与 FBA 费用更新》（基础费率），与本事件（旺季加价 + 燃油附加费）为不同事件，未覆盖",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "复述同一组数字并叠加自身选品/防关联营销；称公告发布在卖家论坛",
+      "bodyExcerpt": "7月中旬，亚马逊在卖家论坛发布了一则关于2026年假日旺季履约费的公告， 明确新标准将于10月15日正式生效。 官方数据显示，旺季期间FBA、远程配送、多渠道配送及Buy with Prime等主要物流服务的履约费将全面上调， 平均每件涨幅约0.32美元，与去年旺季的调价幅度基本持平。 从具体品类来看，小型标准品（如手机壳）从2.49美元涨至2.68美元，大号标准品（如T恤）从6.14美元涨至6.53美元，整体涨幅看似温和可控。 然而，细看之下会发现，真正需要警惕的变化并不在这0.32美元本身。 旺季加价+燃油附加费+年初基础费率上调——三重费用叠加， 才是2026年旺季真正的成本考题。 01 0.32美元只是“明账”，3.5%才是“暗扣” 先看官方数据 2026年旺季履约费适用时间为10月15日至2027年1月14日， 覆盖FBA、FBA远程配送、多渠道配送及Buy with Prime等所有主要物流服务。费用在商品离开履约中"
+    },
+    {
+      "reportId": "EV-AGED-R1",
+      "eventId": "EV-AGED",
+      "title": "亚马逊FBA仓储费炸了!库龄181天就收超龄库存附加费",
+      "url": "https://www.amz123.com/t/89KOeglV",
+      "column": "跨境头条",
+      "author": "Regan跨境",
+      "authorIntro": "推送行业新闻，分享行业干货。四年亚马逊跨境电商人，喜欢结交朋友，分享经验。持续关注，我相信会是你一笔很好的投资，也能收获一个真心朋友。",
+      "published_at": "2026-07-28",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 7248,
+      "tags": [
+        "FBA",
+        "Amazon",
+        "美国"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "平台费用",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "2026-01-16（366 天及以上分层调价）",
+      "effectiveDateBasis": "报道称核心门槛 181 天；2026-01-16 起 366-455 天 $6.90/立方英尺或 $0.30/件、456 天及以上 $7.90/立方英尺或 $0.35/件；按每月 15 日库存快照、18-22 日计费",
+      "citesAmazonOfficial": [
+        "见事件级 officialLinks（文章本身未给出可点击官方链接）"
+      ],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "自媒体的官方条款梳理（Regan跨境）",
+      "contentType": "经验梳理（自述依据为 Seller Central 官方条款）",
+      "sameEventAs": [],
+      "isRepostOrMarketing": true,
+      "officialConclusion": 2,
+      "officialConclusionText": "有官方链接但证据不足以支持报道中的全部主张",
+      "officialEvidence": "官方证据存在但不足以支持全部主张：sell.amazon.com/blog/ask/amazon-fba-beginners-guide-2026（2026-03-31）明确写有 aged inventory charge、适用于库龄 over 181 days 的库存 —— 核心门槛已核实；但各库龄段单价、15 日快照与 2026-01-16 调价未出现在该公开页，也未在官方公开渠道检索到。",
+      "officialLinks": [
+        "https://sell.amazon.com/blog/ask/amazon-fba-beginners-guide-2026"
+      ],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无超龄库存附加费记录；amazon-us-announcements 来源的 allowUrlPrefixes 不含 /blog/ask/ 路径",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "给出 181 天门槛、15 日快照、18-22 日计费、366 天以上分层价与服装类目例外；官方公开页仅支持 181 天门槛",
+      "bodyExcerpt": "先帮大家把全网信息捋一下。 截至目前，亚马逊美国站 FBA 的库存成本已经不是以前那种“卖不动就先放着”的逻辑了。官方 Seller Central 明确写到， 存放在亚马逊运营中心 181 天及以上的库存，会被收取超龄库存附加费 ，这个费用以前叫 long-term storage fee，也就是长期仓储费。现在它不只是 365 天之后才开始收，而是从 181 天就开始进入收费区间。 几个重点大家先记住 第一， 超龄库存附加费是 额外费用 ，不是替代月度仓储费。也就是说，你原本该交的 FBA 月度仓储费照交，库龄到了之后，还要再叠加一笔 aged inventory surcharge。 第二， 费用通常按照每月 15日的库存快照 来评估，通常在当月 18-22 日之间计费。所以你不是月底才处理就行，很多时候 15 日之前有没有清掉，决定你这个月要不要多交一笔钱。 第三， 2026年1月16日起，亚马逊对 366天及以上库存 "
+    },
+    {
+      "reportId": "EV-AI-TAG-R1",
+      "eventId": "EV-AI-TAG",
+      "title": "注意！亚马逊发布AI图片新规！使用AI模特图的卖家注意：上传前必须完成这一步（附操作步骤）",
+      "url": "https://www.amz123.com/t/dU0sJj3t",
+      "column": "跨境头条",
+      "author": "跨境电商优匠学堂",
+      "authorIntro": "跨境电商优匠学堂是一家专门针对亚马逊跨境电商平台的权威培训机构，深耕跨境电商行业18年，研究亚马逊A9算法和SEO优化10余年，以合规白帽打法、精细化数据化运营为核心，解决自然流量、自然订单占比，不依赖广告，实现精品爆款可复制，运营打法流程化。",
+      "published_at": "2026-07-24",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 3992,
+      "tags": [
+        "AI",
+        "Amazon",
+        "Instagram"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "Listing 创建及编辑",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "报道称 2026-07-23 发布；未给出明确生效日",
+      "effectiveDateBasis": "报道称 2026-07-23 亚马逊正式发布该要求；仅“高度逼真的 AI 生成真人”需打标；真人经 AI 修饰、影视/游戏虚构角色、无人物、非照片级逼真均不需打标",
+      "citesAmazonOfficial": [
+        "见事件级 officialLinks（文章本身未给出可点击官方链接）"
+      ],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "培训机构内容（跨境电商优匠学堂）",
+      "contentType": "教程/解读（含自身课程导流）",
+      "sameEventAs": [
+        {
+          "title": "亚马逊AI 人物图还能不能用？上传前先添加这个元数据标签（附流程）",
+          "url": "https://www.amz123.com/t/QrRPoVgM",
+          "author": "跨境电商MoonSees",
+          "published_at": "2026-07-26"
+        },
+        {
+          "title": "亚马逊要求商品信息和A+描述中由AI生成的人物添加标签，旧图片是否也需补充标注？",
+          "url": "https://www.amz123.com/t/AY5iFwmD",
+          "author": "WeAreSellers",
+          "published_at": "2026-07-28"
+        }
+      ],
+      "isRepostOrMarketing": true,
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialEvidence": "其中一则报道直接引用官方帮助页 sellercentral.amazon.com/help/hub/reference/G1881 的规则原文（“必须使用适当的元数据标记该图片”“contains-synthetic-performer 标签”）并附上何时提供/何时不需提供的完整条件，但该页 robots 为 Disallow: / 且需登录，公开官方渠道检索“AI 生成 + 标签/披露”0 命中。官方正文不可公开核实，但报道含官方原文引用。",
+      "officialLinks": [
+        "https://sellercentral.amazon.com/help/hub/reference/G1881（robots 禁止自动访问，仅作为报道中引用的官方出处记录）"
+      ],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无 AI 图片元数据标签相关记录",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "给出 contains-synthetic-performer 标签与适用范围，并给出操作步骤",
+      "bodyExcerpt": "最近使用AI模特制作主图、A+页面和品牌视频的亚马逊卖家，需要重点关注了。 7月23日，亚马逊正式发布了一项新的AI内容合规要求。 今后，如果卖家在全球站点的 Listing 或 A+ 中使用了 高度逼真的AI生成真人图片或视频 ， 在上传之前，需要在文件元数据中添加亚马逊指定的标签( contains-synthetic-performer) 。 这意味着，AI图片的合规要求再次升级。过去，平台更多审核的是图片本身是否符合规范；而现在，连图片文件内部的元数据也开始纳入审核范围。 为什么亚马逊要新增这项要求？实际上，这并不是亚马逊突然增加的新限制，而是全球AI监管持续加强后的平台响应。 近年来，美国及多个国家陆续出台针对AI生成内容的监管要求，尤其是在广告领域。 核心原则就是：如果广告中出现的是AI生成的逼真人物，应当向消费者进行适当披露，避免用户误认为是真实人物。因此，亚马逊也开始要求卖家，在上传相关素材时主动进行标记。 平台"
+    },
+    {
+      "reportId": "EV-AI-TAG-R2",
+      "eventId": "EV-AI-TAG",
+      "title": "亚马逊AI 人物图还能不能用？上传前先添加这个元数据标签（附流程）",
+      "url": "https://www.amz123.com/t/QrRPoVgM",
+      "column": "跨境头条",
+      "author": "跨境电商MoonSees",
+      "authorIntro": "MoonSees官方账号，亚马逊运营人聚集地，分享亚马逊跨境新闻及亚马逊运营干货技巧",
+      "published_at": "2026-07-26",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 4234,
+      "tags": [
+        "AI",
+        "关键词",
+        "Amazon"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "Listing 创建及编辑",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "报道称 2026-07-23 发布；未给出明确生效日",
+      "effectiveDateBasis": "报道称 2026-07-23 亚马逊正式发布该要求；仅“高度逼真的 AI 生成真人”需打标；真人经 AI 修饰、影视/游戏虚构角色、无人物、非照片级逼真均不需打标",
+      "citesAmazonOfficial": [
+        "见事件级 officialLinks（文章本身未给出可点击官方链接）"
+      ],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "自媒体的实操流程（跨境电商MoonSees）",
+      "contentType": "教程（含元数据标签操作流程）",
+      "sameEventAs": [
+        {
+          "title": "注意！亚马逊发布AI图片新规！使用AI模特图的卖家注意：上传前必须完成这一步（附操作步骤）",
+          "url": "https://www.amz123.com/t/dU0sJj3t",
+          "author": "跨境电商优匠学堂",
+          "published_at": "2026-07-24"
+        },
+        {
+          "title": "亚马逊要求商品信息和A+描述中由AI生成的人物添加标签，旧图片是否也需补充标注？",
+          "url": "https://www.amz123.com/t/AY5iFwmD",
+          "author": "WeAreSellers",
+          "published_at": "2026-07-28"
+        }
+      ],
+      "isRepostOrMarketing": false,
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialEvidence": "其中一则报道直接引用官方帮助页 sellercentral.amazon.com/help/hub/reference/G1881 的规则原文（“必须使用适当的元数据标记该图片”“contains-synthetic-performer 标签”）并附上何时提供/何时不需提供的完整条件，但该页 robots 为 Disallow: / 且需登录，公开官方渠道检索“AI 生成 + 标签/披露”0 命中。官方正文不可公开核实，但报道含官方原文引用。",
+      "officialLinks": [
+        "https://sellercentral.amazon.com/help/hub/reference/G1881（robots 禁止自动访问，仅作为报道中引用的官方出处记录）"
+      ],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无 AI 图片元数据标签相关记录",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "同一政策的第三种写法，强调“上传前先添加元数据标签”",
+      "bodyExcerpt": "最近亚马逊发布了一条和 AI 素材有关的新要求： 在全球任意商城中，如果卖家要把包含 AI 生成的逼真人物 的图片或视频，添加到商品信息和 A+ 商品描述中，上传前必须先给文件添加指定元数据 ［ contains-synthetic-performer ］ 。 添加后，亚马逊会在适用情况下向买家显示相应标识，说明该图片或视频中包含 AI 生成的人物。 一、什么样的素材需要打标签？ 先把适用范围讲清楚。 需 要添加 contains-synthetic-performer 标签的，是包含 AI 生成的逼真人物 的图片或视频。 这里有几个关键词要注意。 第一， AI-generated 。 人物必须是 AI 生成的，不是真人拍摄。 第二， photorealistic 。 人物要看起来像真实人类。卡通人物、插画人物、明显二次元风格，通常不属于这类。 第三， people 。 规则针对的是人物。如果只是 AI 生成的客厅、厨房、户外背"
+    },
+    {
+      "reportId": "EV-AI-TAG-R3",
+      "eventId": "EV-AI-TAG",
+      "title": "亚马逊要求商品信息和A+描述中由AI生成的人物添加标签，旧图片是否也需补充标注？",
+      "url": "https://www.amz123.com/t/AY5iFwmD",
+      "column": "跨境头条",
+      "author": "WeAreSellers",
+      "authorIntro": "跨境电商人的科学世界，真知、灼见，喜悦或快意的君子之争。见智慧，见性情。",
+      "published_at": "2026-07-28",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 4490,
+      "tags": [
+        "AI",
+        "深圳",
+        "Amazon"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "Listing 创建及编辑",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "报道称 2026-07-23 发布；未给出明确生效日",
+      "effectiveDateBasis": "报道称 2026-07-23 亚马逊正式发布该要求；仅“高度逼真的 AI 生成真人”需打标；真人经 AI 修饰、影视/游戏虚构角色、无人物、非照片级逼真均不需打标",
+      "citesAmazonOfficial": [
+        "见事件级 officialLinks（文章本身未给出可点击官方链接）"
+      ],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "自媒体的官方论坛摘录（WeAreSellers）",
+      "contentType": "转载/摘录官方帮助页原文",
+      "sameEventAs": [
+        {
+          "title": "注意！亚马逊发布AI图片新规！使用AI模特图的卖家注意：上传前必须完成这一步（附操作步骤）",
+          "url": "https://www.amz123.com/t/dU0sJj3t",
+          "author": "跨境电商优匠学堂",
+          "published_at": "2026-07-24"
+        },
+        {
+          "title": "亚马逊AI 人物图还能不能用？上传前先添加这个元数据标签（附流程）",
+          "url": "https://www.amz123.com/t/QrRPoVgM",
+          "author": "跨境电商MoonSees",
+          "published_at": "2026-07-26"
+        }
+      ],
+      "isRepostOrMarketing": false,
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialEvidence": "其中一则报道直接引用官方帮助页 sellercentral.amazon.com/help/hub/reference/G1881 的规则原文（“必须使用适当的元数据标记该图片”“contains-synthetic-performer 标签”）并附上何时提供/何时不需提供的完整条件，但该页 robots 为 Disallow: / 且需登录，公开官方渠道检索“AI 生成 + 标签/披露”0 命中。官方正文不可公开核实，但报道含官方原文引用。",
+      "officialLinks": [
+        "https://sellercentral.amazon.com/help/hub/reference/G1881（robots 禁止自动访问，仅作为报道中引用的官方出处记录）"
+      ],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无 AI 图片元数据标签相关记录",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "唯一给出官方帮助页地址 sellercentral.amazon.com/help/hub/reference/G1881 与官方规则原文及“何时不需提供”的完整条件",
+      "bodyExcerpt": "year123 我的C位 现在必须在商品信息和 A+ 商品描述中为由 AI 生成的人物添加标签，按亚马逊规则是不是这样操作，不太确定。而且是不是以前的老图片都需要加这个？ 「 精彩回帖 」 懒到让猪崩溃 商品图片指南（ https://sellercentral.amazon.com/help/hub/reference/G1881 ） 如果商品图片包含相片级逼真的 AI 生成人物，则某些司法管辖区可能要求进行相关披露。如果您的图片包含相片级逼真的 AI 生成人物，则在将其上传到亚马逊之前，必须使用适当的元数据标记该图片。 何时提供此元数据 如果您的图片包含 完全由 AI 生成的人物（并非基于真人） ，请提供 contains-synthetic-performer 标签。 何时不需要提供此元数据 如果满足以下任一条件，请勿提供此元数据： 您的图片仅展示真人（即使已使用 AI 工具进行了修改）或 您的图片仅包含电影、视频游戏或其"
+    },
+    {
+      "reportId": "EV-TITLE-R1",
+      "eventId": "EV-TITLE",
+      "title": "亚马逊标题新规别乱改！有人改完单量暴涨，有人直接掉排名",
+      "url": "https://www.amz123.com/t/l3gzKO4c",
+      "column": "跨境头条",
+      "author": "跨境者商学院",
+      "authorIntro": "千万金牌运营Alice老师的亚马逊经验和技巧的分享平台。第一时间获取平台动向和分析，亚马逊卖家凛冬将至的当下，让顶风前进的你不再孤单。",
+      "published_at": "2026-07-30",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 4550,
+      "tags": [
+        "AI",
+        "美国",
+        "Amazon"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "Listing 创建及编辑",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "未确认（仅见“生效几天了”的相对表述；14 天过渡期来自其他报道转述）",
+      "effectiveDateBasis": "报道提及原标题 72 字符上限、系统自动追加颜色词、Item Highlights 字段需模板或客服手工补齐",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "商学院社群复盘（跨境者商学院）",
+      "contentType": "经验分享（群内卖家反馈）",
+      "sameEventAs": [],
+      "isRepostOrMarketing": false,
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialEvidence": "官方公开渠道无对应公告（“title + 14 天/过渡/transition”0 命中）；报道本体为卖家社群经验复盘（引用群内截图与涨单/掉排名反馈），非官方转述。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 现有唯一带“规则线索”标签的公告为 2026-02-03 FBA Grade and Resell，非本事件",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "非官方转述；包含涨单/掉排名个案与字段 Bug 描述",
+      "bodyExcerpt": "亚马逊标题新规生效几天了。群里天天有人晒截图， 有人说改完单量涨了25%，有人说排名掉了，更多人还没动。 同样改标题， 为什么有人涨有人掉？有人想改改不动，有人等着AI帮改。 今天这篇把我们 【大卖 群】 里卖家这几天踩过的坑捋一遍 ，给还没动手的卖家省点试错时间。 改完标题之后，销量涨了还是跌了？ 先看真实反馈。 先说涨的。 有卖家反馈： “晚上改的，第二天单量上涨了25%” ， 做精铺的卖家说： “店铺只优化了70%的小站点链接，单量就已经翻倍。” 跌的也不少。 有人反映： “修改后销量明显下滑，测试了两个链接改完效果不一样，一个流量还没起来但销量开始往上走了，另一个没什么变化。” 有人观望。 群里有卖家说： “测试了两个链接改完后在搜索结果中的表现不如之前，所以决定暂缓对全店的修改，等到必须改的时候再动。” 涨的原因是什么？ 从反馈来看， 改得准的才有提升 ，旧标题里堆砌的词被精简，核心大词保留，卖点转移到Item Hig"
+    },
+    {
+      "reportId": "EV-VIDEO-R1",
+      "eventId": "EV-VIDEO",
+      "title": "2026视频验证新规！ 又有卖家错误操作被拒",
+      "url": "https://www.amz123.com/t/89H0SOzn",
+      "column": "跨境头条",
+      "author": "速推站外",
+      "authorIntro": "一天一个亚马逊小干货，擅长Facebook站外引流，有问必答，欢迎交流！",
+      "published_at": "2026-07-13",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 6669,
+      "tags": [
+        "Amazon",
+        "供应链",
+        "物流"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "卖家账号健康",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "未确认（报道称“2026 年风控全面升级”，无明确生效日）",
+      "effectiveDateBasis": "报道称触发邮件会引用《亚马逊服务商业解决方案协议》第 3 条；分法人增强型核验与涉嫌欺诈专项核验；只有一次机会",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "自媒体的审核经验整理（速推站外）",
+      "contentType": "经验分享（引用后台协议第 3 条）",
+      "sameEventAs": [],
+      "isRepostOrMarketing": false,
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialEvidence": "报道引用的是卖家后台协议第 3 条与后台邮件；官方公开渠道检索“视频 + 验证”0 命中；Seller Central 属 robots 禁止且需登录，不尝试访问。官方正文不可公开核实。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无账号健康/视频验证相关记录",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "称验证只有一次机会，失败后申诉难度指数级上升；未给生效日与官方链接",
+      "bodyExcerpt": "2026年亚马逊(Amazon)风控全面升级，视频验证已成为新账号注册、品牌授权以及异常申诉的常态。 \"视频验证到底会问什么问题？\" 这是最近卖家群里被问得最多的一个问题。 一、亚马逊最严苛的账号审核之一 近期大量卖家因 回答模糊、材料反光、无法核实经营细节 导致验证被拒甚至关店。 有卖家被问了七八十个问题，涵盖身份信息、办公环境、产品细节、供应链、广告投放、资金流向……几乎是对整个店铺运营的全面拆解。 更关键的是： 这类审核通常只有一次机会。准备不充分直接失败，后续申诉难度指数级上升，严重的直接永久封店。 什么是协议3欺诈型视频认证？ 协议3指《亚马逊服务商业解决方案协议》第3条，赋予平台一个权力：只要合理怀疑店铺存在欺诈、虚假经营或损害消费者权益，亚马逊可以直接暂停或终止账户，并临时冻结资金。 收到的触发邮件通常会明确写： \"根据《亚马逊服务商业解决方案协议》第3条，我们认为您的账户已被用于欺骗性、欺诈性或非法活动。\" 这类"
+    },
+    {
+      "reportId": "EV-ADS-PAY-R1",
+      "eventId": "EV-ADS-PAY",
+      "title": "8月1日起执行！亚马逊广告费用结算方式大改！",
+      "url": "https://www.amz123.com/t/ycRnoCvm",
+      "column": "跨境头条",
+      "author": "跨境风暴",
+      "authorIntro": "为亚马逊卖家提供专业的推广服务，助你成为亚马逊大卖！",
+      "published_at": "2026-07-28",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 5378,
+      "tags": [
+        "Amazon",
+        "钉钉",
+        "FBA"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "Amazon Ads 政策变化",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "2026-08-01",
+      "effectiveDateBasis": "报道称原定 2026-04-15 上线，经卖家集体抵制后延期 4 个月，2026-08-01 强制落地；覆盖商品/品牌/展示型三大广告；信用卡降级为余额不足时兜底；可选发票周期月结",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "自媒体的社群动员（跨境风暴）",
+      "contentType": "带导流的解读（MDS 社群抵制背景）",
+      "sameEventAs": [
+        {
+          "title": "8月1日前不点进这个页面，亚马逊替你做了选择",
+          "url": "https://www.amz123.com/t/E49Z8vab",
+          "author": "一汤说",
+          "published_at": "2026-07-31"
+        }
+      ],
+      "isRepostOrMarketing": true,
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialEvidence": "官方公开渠道（advertising.amazon.com sitemap 全量 + Radar 已收录的两条 Ads 帮助页）检索“Ads + 结算/扣费 + 8月1日”仅命中无关页面（个人 vs 专业销售计划、2026 开店指南中的“每两周结算一次”），0 条对应公告。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 的 ads-policy-pages 仅收录 2 条通用帮助页（General requirements / Prohibited products），不含扣费与结算方式；published_at 为空，无法按日期判定，结论按主题判定为未覆盖",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "给出延期史（4-15 延期 4 个月）与两种合规方案；带 $2500 广告补贴导流",
+      "bodyExcerpt": "月投 2 万刀广告的卖家注意！4 月几百个大卖集体停投才延期 4 个月的广告扣款新政，8 月 1 号再也不会推迟！以前靠信用卡白嫖 60 天资金缓冲，现在广告费直接划走店铺货款，回款还没到手就被扣空备货钱，没提前操作不仅现金流直接崩盘，连每月 2500 美金、连续 5 个月的广告补贴都彻底拿不到！ 所有亚马逊美国站卖家紧急预警！亚马逊广告扣款新规 8 月 1 日强制落地，无任何延期可能 ！ 一、政策前世：曾经被百万卖家逼停 这项规则原定 4 月 15 日上线，当时 MDS 百万卖家社群发起 24 小时广告全停投抵制，大量卖家集体抗议，亚马逊才临时叫停，给了 4 个月缓冲期。 划重点⚠️海外行业渠道全部实锤：本次政策不会再推迟，落地已成定局！ 距离生效只剩最后几天，两件事立刻做：核算店铺资金、抢平台 $2500 专属广告补贴！ 二、新规核心改动 覆盖商品 / 品牌 / 展示型三大广告，只改一件事： 广告费从信用卡扣款 → 店铺销售"
+    },
+    {
+      "reportId": "EV-ADS-PAY-R2",
+      "eventId": "EV-ADS-PAY",
+      "title": "8月1日前不点进这个页面，亚马逊替你做了选择",
+      "url": "https://www.amz123.com/t/E49Z8vab",
+      "column": "跨境头条",
+      "author": "一汤说",
+      "authorIntro": "日拱一卒，勤以修身",
+      "published_at": "2026-07-31",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 7220,
+      "tags": [
+        "Amazon",
+        "美国",
+        "FBA"
+      ],
+      "pointsToAmazonUS": null,
+      "policyDomain": "Amazon Ads 政策变化",
+      "hasConcreteNewRule": null,
+      "effectiveDate": "2026-08-01",
+      "effectiveDateBasis": "报道称原定 2026-04-15 上线，经卖家集体抵制后延期 4 个月，2026-08-01 强制落地；覆盖商品/品牌/展示型三大广告；信用卡降级为余额不足时兜底；可选发票周期月结",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": null,
+      "contentType": null,
+      "sameEventAs": [
+        {
+          "title": "8月1日起执行！亚马逊广告费用结算方式大改！",
+          "url": "https://www.amz123.com/t/ycRnoCvm",
+          "author": "跨境风暴",
+          "published_at": "2026-07-28"
+        }
+      ],
+      "isRepostOrMarketing": false,
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialEvidence": "官方公开渠道（advertising.amazon.com sitemap 全量 + Radar 已收录的两条 Ads 帮助页）检索“Ads + 结算/扣费 + 8月1日”仅命中无关页面（个人 vs 专业销售计划、2026 开店指南中的“每两周结算一次”），0 条对应公告。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 的 ads-policy-pages 仅收录 2 条通用帮助页（General requirements / Prohibited products），不含扣费与结算方式；published_at 为空，无法按日期判定，结论按主题判定为未覆盖",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": null,
+      "bodyExcerpt": "8月1日，还剩两天。 这几天我注意力全在标题那件事上。27号那道门开完，我天天在前台刷自己那几条listing，看亚马逊到底怎么呈现。结果一转头又撞上一件事，藏得比标题那事深多了。 一句话就能说完。8月1日之后，你的亚马逊广告费，不再优先刷信用卡了，改成从账户余额里直接扣走，信用卡降级成备用，余额不够才拿它兜底。 先把口径说清楚， 免得大家自己吓自己。 这件事亚马逊没发公开公告，只在Seller Central发了站内信。我看到的最完整的说法来自ppc.land的报道，受影响的是美国站、把信用卡设为主要付款方式的广告主，生效日8月1日。亚马逊官方口径是「只影响一小部分广告主」。这条我是转引，不是一手，我手里没有那张站内信的截图，也没法替你判断你在不在名单里。 唯一能确认的办法，是自己进Ads Console的Billing页面，看有没有那个通知横幅。 先记住这个横幅，后面还要回来找它。 我第一反应跟很多人一样，扣款顺序换换而已，"
+    },
+    {
+      "reportId": "EV-ADS-REVIEW-R1",
+      "eventId": "EV-ADS-REVIEW",
+      "title": "亚马逊上线新功能，卖家可以付费“买评论”了？",
+      "url": "https://www.amz123.com/t/zDrc37rW",
+      "column": "跨境头条",
+      "author": "AMZ123跨境电商",
+      "authorIntro": "专注跨境行业热点事件报道，每日坚持推送原创深度热文",
+      "published_at": "2026-10-21",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 9099,
+      "tags": [
+        "测评",
+        "Amazon"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "Amazon Ads 政策变化 / 评论政策",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "美国站 2026 年 10 月下旬公测（灰度测试中）",
+      "effectiveDateBasis": "报道给出准入门槛：ASIN 评论少于 1000 条（满 1000 自动暂停）、仅美国站开放、店铺无评价操纵违规记录且 Listing 状态健康；CPC 点击扣费",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "AMZ123 自有资讯号",
+      "contentType": "资讯报道（第三方分析师视角解读）",
+      "sameEventAs": [],
+      "isRepostOrMarketing": false,
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialEvidence": "报道称该功能由“亚马逊大会”公布；官方公开渠道检索 0 命中（advertising.amazon.com 公开 news 目录中无对应条目）。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无邀评广告相关记录",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "以“亚马逊大会公布”起头；结论部分带真人测评服务导流；给出可核验的准入阈值",
+      "bodyExcerpt": "长期以来， 操纵评论都是 亚马逊 红线。 站外索评、包裹卡片、私信催评，全部属于违规操作，轻则 Listing 掉权重，重则下架封店。 新品起评难、老品稳评难，一直是 跨境卖家 的核心痛点。前段时间亚马逊大会公布重磅新功能： Review Requests Ads 付费邀评广告 ，带来一条官方合规邀评新渠道。 官方付费邀评是什么？ 简单说，卖家投放广告，亚马逊主动向近期下单买家推送官方邀评卡片。 美国站将于10月下旬公测 ，属于付费广告邀评，和后台免费 Request a Review 邮件邀评不是同一功能。 买家浏览首页、商品页时会弹出邀评卡片，一键点星级即可评价，还能上传图文视频。采用 CPC 点击扣费，点开卡片就计费，无论最终是否留评。 该功能目前灰度测试，有严格准入门槛： 1、ASIN 评论少于 1000 条，满 1000 条广告自动暂停； 2、 仅美国站开放 ，其他站点暂未上线； 3、店铺无评价操纵违规记录，Listi"
+    },
+    {
+      "reportId": "EV-CARRIER-R1",
+      "eventId": "EV-CARRIER",
+      "title": "9月30日起不达标就停售？！亚马逊教你三招激活保护机制，优化承运商守住达标线",
+      "url": "https://www.amz123.com/t/PfMKfcWU",
+      "column": "跨境头条",
+      "author": "亚马逊全球开店",
+      "authorIntro": "亚马逊全球开店官方公众号，致力于为中国跨境卖家提供最新，最全亚马逊全球开店资讯，运营干货分享及开店支持。",
+      "published_at": "2026-07-29",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 2703,
+      "tags": [
+        "Amazon",
+        "B2B",
+        "物流"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "FBA 仓储与配送",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "2026-09-30",
+      "effectiveDateBasis": "报道称平台对承运商设置达标线，不达标即触发停售机制，并给出“优化承运商守住达标线”的三条建议",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "亚马逊全球开店官方专栏",
+      "contentType": "官方专栏文章（平台方口径，但属营销型内容）",
+      "sameEventAs": [],
+      "isRepostOrMarketing": false,
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialEvidence": "官方公开渠道检索“承运商/carrier performance + 停售/9月30”0 命中。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无承运商绩效相关记录",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "文章本身由平台方账号发布，是本批样本中唯一带官方身份的报道",
+      "bodyExcerpt": "亚马逊为符合条件的卖家留了一个 安全气囊 ——从2026年9月30日起， 同时开启以下三项功能，可自动获得BHDR保护 （即使平均BHDR暂时低于90%，也不会触发处罚）： 1 “购买配送”服务 通过卖家平台的购买配送服务（Amazon Buy Shipping）购买适合商业地址配送的运输标签，提升配送质量。 开启方式 1️⃣ 完成初始设置： 登录卖家平台，请选择 “购买配送” 偏好设置。 2️⃣ 选择卖家自配送（MFN）订单： 在未发货订单中，选择所要使用 “购买配送” 服务（Buy Shipping）的卖家自配送（MFN）订单。 3️⃣ 选择物流承运商： 确认包装尺寸、包裹重量后，选择物流承运人和物流方式。 2 配送设置自动化（SSA） 开启配送设置自动化（Shipping Setting Automation）功能，系统会根据仓库位置、承运商实际时效、历史数据， 自动为您生成更精准的预计配送时间！ 开启方式 1️⃣ 卖家平"
+    },
+    {
+      "reportId": "EV-UL-R1",
+      "eventId": "EV-UL",
+      "title": "90%跨境卖家踩坑！UL认证和UL检测报告，亚马逊只认这一个",
+      "url": "https://www.amz123.com/t/QvB9ic6P",
+      "column": "跨境头条",
+      "author": "跨信通跨境说",
+      "authorIntro": "店小秘旗下唯一税务品牌。 主营业务：全球VAT、欧洲EPR、商标专利、检测认证、海外工商",
+      "published_at": "2026-07-18",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 3202,
+      "tags": [
+        "认证",
+        "Amazon",
+        "家用电器"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "商品安全与资质",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "报道提及 8 月 30 日批量下架（2026-08-30）",
+      "effectiveDateBasis": "报道称亚马逊美国站发布针对可充电锂电池供电家用电器的合规新政策并批量下架产品；核心是区分 UL 认证（ULSolutions 体系，含验厂与跟踪检查）与 UL 标准检测报告（ISO17025 实验室一次性报告）",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "合规服务商内容（跨信通跨境说）",
+      "contentType": "服务商业推广",
+      "sameEventAs": [],
+      "isRepostOrMarketing": true,
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialEvidence": "官方公开渠道检索“UL + 认证”0 命中；报道本身为合规服务商（跨信通）内容，末尾带自身服务导流。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无 UL/锂电池合规相关记录",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "以“亚马逊美国站发布合规新政策”起头，主体是 UL 认证与检测报告科普与自身导流",
+      "bodyExcerpt": "近期， 亚马逊美国站发布了一项针对可充电锂电池供电家用电器的合规新政策，详情可点击查看事关锂电小家电卖家！亚马逊8月30日批量下架产品名录，快自查你的商品是否在列 小K收到了大量卖家反馈，出现频率最高的一个问题是： \"工厂说产品已经做了UL认证了，是不是就不用再做了？\" 不少卖家混淆UL检测报告与UL认证，要么白花高额费用做平台无需的UL认证，要么仅凭检测报告私贴UL标识遭UL追责，面临账户冻结、库存被扣的风险。 01 UL认证与UL检测报告有什么区别？ ▌ UL认证 是由ULSolutions（美国保险商实验室）运营的 自愿性 产品安全认证体系。企业申请后，UL不仅对产品样品进行测试，还会对工厂进行实地审查，且每年进行四次跟踪检查。 认证通过后，企业获得在产品、包装及宣传材料上使用UL认证标志的授权。整个流程周期通常为6个月至1年，费用从数万到数十万人民币不等。 ▌ UL标准检测报告 是依据UL发布的公开技术标准，由具备ISO"
+    },
+    {
+      "reportId": "EV-TOY-R1",
+      "eventId": "EV-TOY",
+      "title": "本期亚马逊避坑产品盘点：捏捏乐（Stress Ball ）--大面积被下架",
+      "url": "https://www.amz123.com/t/ecZR8dmb",
+      "column": "跨境头条",
+      "author": "跨境商品指南",
+      "authorIntro": "每周分析一类跨境商品并分享一波避坑产品，主营清库存服务及美区货盘业务 ",
+      "published_at": "2026-07-18",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 7525,
+      "tags": [
+        "Amazon",
+        "玩具",
+        "Temu"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "商品安全与危险品合规",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "未确认（报道称“这周开始”“这两天”，两篇跨度 2026-07-18 至 07-21）",
+      "effectiveDateBasis": "报道称平台定性填充凝胶/PU 发泡材质持续释放甲醛、甲酰胺、TVOC；被停用 ASIN 永久无法恢复、取消未履约订单、FBA 库存须 60 天内提交移除订单否则平台销毁且费用自担；该篇还称上半年玩具类目已启动 TIC 直接验证新规",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "选品/避坑类自媒体的盘点（跨境商品指南）",
+      "contentType": "经验分享（带库存清仓导流）",
+      "sameEventAs": [
+        {
+          "title": "无预警封杀！亚马逊这个爆款一夜全灭",
+          "url": "https://www.amz123.com/t/9JunXzj3",
+          "author": "跨境电商跨境屋",
+          "published_at": "2026-07-21"
+        }
+      ],
+      "isRepostOrMarketing": true,
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialEvidence": "官方公开渠道检索“Stress Ball/捏捏乐 + 下架”0 命中；两篇均描述卖家收到的后台通知（无可公开访问的官方公告）。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 虽有 CPSC 召回 15 条，但均针对具体召回个案，与平台侧类目下架事件不同，未覆盖",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "描述全站点下架与强制移仓，声明自己已收到 N 批需处理库存",
+      "bodyExcerpt": "捏捏乐（ Squeeze Toy ） : 今年当之无愧最流行的解压玩具，从国内火爆至整个欧美市场，无论是亚马逊， Tiktok还是Temu这些跨境平台都是供不应求。几块钱成本的东西在亚马逊平台上可以卖到十几二十美金。捏捏乐不仅造型Q弹可爱，手感柔和，而且款式也是应有尽有，这就给了商家们很大的创作空间，卖家们可提供不同的造型来满足不同的客户需求，有喜欢萌宠动物类的，有喜欢卡通及周边的，也有喜欢趣味搞怪的，当然最受欢迎的还要数图上这类美食造型的——包子捏捏乐（也叫饺子捏捏乐），这款造型具有很强的中华元素和解压属性，外国人对此毫无抵抗力。 然而大热之下必有大坑： 这周开始以亚马逊为代表的跨境电商平台开始大面积下架捏捏乐链接，先是北美站点然后再到欧洲站点再到全球站点，其核心理由是该类产品存在严重的化学与安全隐患，触发平台及各个国家儿童产品安全法规。这些平台不仅下架了这类产品，而且还要求商家们必须在限定时间内强制移仓，否则会受到更严厉的处"
+    },
+    {
+      "reportId": "EV-TOY-R2",
+      "eventId": "EV-TOY",
+      "title": "无预警封杀！亚马逊这个爆款一夜全灭",
+      "url": "https://www.amz123.com/t/9JunXzj3",
+      "column": "跨境头条",
+      "author": "跨境电商跨境屋",
+      "authorIntro": "跨境电商跨境屋 跨境电商新媒体 跨境电商行业新闻 跨境电商亚马逊认证服务商 跨境电商亚马逊培训 跨境社交电商 跨境电商出口平台 跨境电商独立站 官方网站：www.amazonf2c.com",
+      "published_at": "2026-07-21",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 2594,
+      "tags": [
+        "Amazon",
+        "玩具",
+        "美国"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "商品安全与危险品合规",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "未确认（报道称“这周开始”“这两天”，两篇跨度 2026-07-18 至 07-21）",
+      "effectiveDateBasis": "报道称平台定性填充凝胶/PU 发泡材质持续释放甲醛、甲酰胺、TVOC；被停用 ASIN 永久无法恢复、取消未履约订单、FBA 库存须 60 天内提交移除订单否则平台销毁且费用自担；该篇还称上半年玩具类目已启动 TIC 直接验证新规",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "自媒体的卖家群信息整理（跨境电商跨境屋）",
+      "contentType": "经验分享（转述后台通知邮件）",
+      "sameEventAs": [
+        {
+          "title": "本期亚马逊避坑产品盘点：捏捏乐（Stress Ball ）--大面积被下架",
+          "url": "https://www.amz123.com/t/ecZR8dmb",
+          "author": "跨境商品指南",
+          "published_at": "2026-07-18"
+        }
+      ],
+      "isRepostOrMarketing": false,
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialEvidence": "官方公开渠道检索“Stress Ball/捏捏乐 + 下架”0 命中；两篇均描述卖家收到的后台通知（无可公开访问的官方公告）。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 虽有 CPSC 召回 15 条，但均针对具体召回个案，与平台侧类目下架事件不同，未覆盖",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "给出 ASIN 永久不可恢复、60 天移仓期限、销毁费用自担，并称今年审核逻辑改为线下抽检",
+      "bodyExcerpt": "一夜之间全线阵亡：卖爆的\"包子捏捏乐\"，正在被亚马逊连根拔起 这两天跨境卖家群彻底炸开，几乎所有做解压软胶玩具的人都收到了亚马逊下架通知，核心爆款包子捏捏乐一夜之间集体阵亡，事态远比普通链接下架严重得多。 跨哥梳理了各大站点卖家的后台通知，这次平台直接定性产品存在重大安全隐患，处理方案没有任何缓冲余地。官方邮件明确标注：产品填充凝胶、PU发泡材质会持续释放甲醛、甲酰胺、TVOC等有害化学物质，低龄儿童把玩时，皮肤长期接触、近距离吸入挥发气体，存在明确健康风险。 配套处罚措施堪称赶尽杀绝：被停用的ASIN永久无法恢复上架，平台自动取消所有未履约订单；FBA库存必须在60天内提交移除订单，超期未处理商品将由平台统一销毁，全部销毁成本由卖家自行承担，无任何库存补偿。 本次清查覆盖美国、欧洲五国、加拿大全站点，不存在区域豁免。不少卖家疑惑，搜索页面还有少量同款产品在售，但点进商品页就能发现，所有评价被全部清空、流量断崖式下跌。这是亚马逊"
+    },
+    {
+      "reportId": "EV-TRO-R1",
+      "eventId": "EV-TRO",
+      "title": "别再卖了！这三款产品正在通过版权/专利发起TRO",
+      "url": "https://www.amz123.com/t/CW7nGOcq",
+      "column": "跨境头条",
+      "author": "SellerGuard",
+      "authorIntro": "跨境平台最新侵权案件播报+跟踪预测国外流氓律所最新动向+品牌知识分享+一站式侵权解决方案，做跨境卖家们最贴心的安全卫士！\r\n",
+      "published_at": "2026-07-21",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 2326,
+      "tags": [
+        "专利",
+        "专利申请",
+        "商标"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "知识产权与禁限售",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "案件立案时间 2026-07-15 / 07-17 / 07-24 等",
+      "effectiveDateBasis": "报道给出美国联邦地区法院案件编号：26-cv-01521（外观专利，淋浴水阀）、26-cv-00318（版权，便携零食收纳盒）、26-cv-01610、2026-cv-25038（外观专利 US D1,073,837S，泳池浮床）",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "知识产权代理机构的案件监控（SellerGuard）",
+      "contentType": "案件通报（引用美国法院官网）",
+      "sameEventAs": [
+        {
+          "title": "跨境行业避雷预警｜亚马逊泳池浮床外观专利维权案爆发！警惕 “在后专利≠侵权豁免” 重大误区",
+          "url": "https://www.amz123.com/t/Zf7gPTOY",
+          "author": "恒大知识产权",
+          "published_at": "2026-07-29"
+        }
+      ],
+      "isRepostOrMarketing": true,
+      "officialConclusion": 4,
+      "officialConclusionText": "内容并非政策变化",
+      "officialEvidence": "内容并非 Amazon 平台政策变化，而是第三方知识产权发起的司法程序；案件编号本身可在美国法院公开档案核对，但不属于本主线的平台政策事件，也不应计入 platform_policy 统计口径。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无 TRO/专利维权记录（属另一类情报，本轮不纳入）",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "给出 3 起案件编号与原告、律所、维权类型；属司法程序非平台政策",
+      "bodyExcerpt": "据 美 国法 院官网 的最新 资料，我们关注到近期曝光的三起 涉专利&版权的 TRO案件【 26-cv-01521， 26-cv-00318， 26-cv-01610】，案件分别涉及三款产品的专利或相关版权， 三起 案件详情如下： 淋浴水阀 立案 时间：2026-07-17 案件编号：26-cv-01521 原告人：FOSHAN HUAYUN TECHNOLOGY CO., LTD 代理律所：Aptum 维权类型：外观专利 原 告FOSHAN HUAYUN TECHNOLOGY CO.,LTD坐落于佛山，主营卫浴淋浴成套产品，线上布局亚马逊店铺。旗下按键式预埋淋浴套装造型简约，配备多规格顶喷与手持花洒，出水模式丰富，适配现代家装。 目前本案涉案店铺数量暂未公开，卖家需及时下架外观近似的产品，规避专利侵权，防止后续TRO冻结店铺资金。 涉案专利： 该外观专利申请日2024年10月21日，2025年1月7日授权下证，保护淋浴阀体整体"
+    },
+    {
+      "reportId": "EV-TRO-R2",
+      "eventId": "EV-TRO",
+      "title": "跨境行业避雷预警｜亚马逊泳池浮床外观专利维权案爆发！警惕 “在后专利≠侵权豁免” 重大误区",
+      "url": "https://www.amz123.com/t/Zf7gPTOY",
+      "column": "跨境头条",
+      "author": "恒大知识产权",
+      "authorIntro": "深圳恒大知识产权机构，是为国内千家同行合作的涉外知识产权合作单位，是主要办理商标、专利，版权和维权的知识产权机构，在香港，台湾，德国，美国有分支机构。",
+      "published_at": "2026-07-29",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 2566,
+      "tags": [
+        "专利",
+        "侵权",
+        "知识产权"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "知识产权与禁限售",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "案件立案时间 2026-07-15 / 07-17 / 07-24 等",
+      "effectiveDateBasis": "报道给出美国联邦地区法院案件编号：26-cv-01521（外观专利，淋浴水阀）、26-cv-00318（版权，便携零食收纳盒）、26-cv-01610、2026-cv-25038（外观专利 US D1,073,837S，泳池浮床）",
+      "citesAmazonOfficial": [],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "知识产权代理机构（恒大知识产权）",
+      "contentType": "案件通报 + 普法解读",
+      "sameEventAs": [
+        {
+          "title": "别再卖了！这三款产品正在通过版权/专利发起TRO",
+          "url": "https://www.amz123.com/t/CW7nGOcq",
+          "author": "SellerGuard",
+          "published_at": "2026-07-21"
+        }
+      ],
+      "isRepostOrMarketing": true,
+      "officialConclusion": 4,
+      "officialConclusionText": "内容并非政策变化",
+      "officialEvidence": "内容并非 Amazon 平台政策变化，而是第三方知识产权发起的司法程序；案件编号本身可在美国法院公开档案核对，但不属于本主线的平台政策事件，也不应计入 platform_policy 统计口径。",
+      "officialLinks": [],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 无 TRO/专利维权记录（属另一类情报，本轮不纳入）",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "给出 US D1,073,837S 与案件号 2026-cv-25038；重点在后申请专利≠侵权豁免",
+      "bodyExcerpt": "行业避雷预警 案件编号：2026-cv-25038 夏季水上用品进入销售旺季，泳池浮床、充气躺椅在亚马逊热销，相关知识产权维权也持续升温。2026 年7月24日，深圳嘉信科技有限公司于美国佛罗里达州南区联邦地区法院迈阿密分院提起外观专利侵权诉讼，针对亚马逊大量售卖泳池充气浮床的卖家。 佛罗里达州南区法院是跨境维权常用法院，原告极易申请 TRO 临时限制令。卖家一旦被判定涉嫌侵权，将面临商品下架、资金冻结、账号限制，重创旺季经营。 本案极具参考意义，折射出众多亚马逊卖家的专利认知短板。 一、涉案专利核心信息，卖家立刻自查比对 涉案专利 ：US D1,073,837S； 专利名称 ：泳池浮床躺椅； 专利保护范围 ：带靠背、中间镂空坐区、两侧杯槽、上方方形软垫的充气浮床整体外观。 详情如下： 实物图如下： 该专利保护的是产品整体视觉造型，并非单一局部结构。亚马逊平台目前存在大量外观高度近似的浮床链接， 正在销售同类产品的卖家，优先核对"
+    },
+    {
+      "reportId": "EV-IOR-R1",
+      "eventId": "EV-IOR",
+      "title": "美国IOR监管趋严，亚马逊提醒卖家自查进口主体",
+      "url": "https://www.amz123.com/t/5Z6bFgNc",
+      "column": "跨境头条",
+      "author": "北美电商资讯",
+      "authorIntro": "AMZ123旗下北美跨境电商新闻栏目，专注北美跨境电商热点资讯，为广大卖家提供北美跨境电商最新动态、最热新闻。",
+      "published_at": "2026-10-21",
+      "sourceUpdated_at": "2026-10-23",
+      "readCount": 6979,
+      "tags": [
+        "美国",
+        "Amazon",
+        "跨境卖家"
+      ],
+      "pointsToAmazonUS": true,
+      "policyDomain": "外部监管 / 清关合规",
+      "hasConcreteNewRule": true,
+      "effectiveDate": "行政令 2026-06-03 签署、2026-06-10 刊登（91 FR 35125）；CBP 实施通知 2026-08-19（91 FR 53627）；报道称 180 天内即 2026-11-30 前完成条款修订",
+      "effectiveDateBasis": "报道称要求申报预估进口货量、主体成立时间、股权架构、实际受益所有人及美国境内有形资产；上调海关保证金与美国境内资产门槛；长期无业务 IOR 批量清理；境外 IOR 需 CTPAT 认证或委托有资质报关行",
+      "citesAmazonOfficial": [
+        "见事件级 officialLinks（文章本身未给出可点击官方链接）"
+      ],
+      "articleContainsOfficialLink": [],
+      "articleExternalDomains": [],
+      "contentNature": "资讯号（北美电商资讯）",
+      "contentType": "资讯报道（转述行政令与亚马逊邮件）",
+      "sameEventAs": [],
+      "isRepostOrMarketing": false,
+      "officialConclusion": 1,
+      "officialConclusionText": "官方证据已核实",
+      "officialEvidence": "官方证据已核实（主体成立与 IOR 数据核验部分）：Federal Register Notice 2026-16911（2026-08-19，91 FR 53627）标题即“Accuracy of Importer of Record Data Submitted to CBP”，摘要明确“CBP is taking initial steps to implement Executive Order 14411 ‘Strengthening Customs Enforcement’”，正文涉及 CBP Form 5106 与 beneficial ownership、business structure；另有 FR Rule 2026-17354（2026-08-25，91 FR 54800）引用“Executive Order 14411, Strengthening Customs Enforcement, 91 FR 35125 (published June 10, 2026)”。未在已读公开文本中逐字核实的是“180 天/2026-11-30 修订截止”与“保证金/境内资产门槛”两项具体数值（位于行政令正文，未通过公开接口取到）。",
+      "officialLinks": [
+        "https://www.federalregister.gov/documents/2026/08/19/2026-16911/accuracy-of-importer-of-record-data-submitted-to-cbp",
+        "https://www.federalregister.gov/documents/2026/08/25/2026-17354/establishment-of-four-customs-enforcement-areas"
+      ],
+      "radarAlreadyCovered": false,
+      "radarCoverageNote": "Radar 的 external_regulation 来源只有 CPSC 召回与联邦公报 CPSC/FTC 三条，无 CBP/海关来源；开发库检索无 IOR/Customs 相关记录 → 未覆盖",
+      "collectionMethod": "robots.txt 允许路径下的公开文章页 SSR（Nuxt __NUXT_DATA__ payload + JSON-LD），无浏览器渲染、无登录、无验证码；未保存整站正文，仅保留必要元数据与证据链接",
+      "permissionBasis": "robots.txt 对 User-agent:* 显式 Allow:/t、Allow:/b 并声明 Sitemap；文章级路径未被 Disallow 覆盖；用户服务协议允许非商业转载但要求标注作者、原始链接并注明发表于厦门品牌方舟科技有限公司，且不得修改演绎",
+      "notes": "唯一给出可公开核对的行政令号（14411）与联邦公报公示日期（2026-08-19）的样本",
+      "bodyExcerpt": "AMZ123获悉， 亚马逊 近期向美国站卖家批量发送风险提示邮件，提醒卖家提前应对美国进口监管政策调整，核实发货使用的IOR（进口备案人/进口商）属于美国本土实体还是境外实体。 这次政策变动，源于2026年6月3日签署的第14411号行政令《加强海关执法》。针对境外IOR的新规现已进入政府内部审核，落地节奏可能偏快。不过亚马逊在邮件中说明，现阶段业务不受影响，现有进口流程可正常开展，但卖家要尽早自查筹备。 这份由 美国 总统在2026年6月3日签署的行政令，要求美国国土安全部与海关边境保护局（CBP）在180天内，也就是2026年11月30日前，完成进口商资质相关条款修订。政策核心是强化进口商身份核验，完善责任追溯机制，抬高海关保证金（Bond）和美国境内有形资产门槛，清理长期未使用、信息失真的IOR备案记录。 政策的主要调整方向有几项。 IOR需要申报预估进口货量、主体成立时间、股权架构、实际受益所有人以及在美国境内所持资产等"
+    }
+  ],
+  "events": [
+    {
+      "eventId": "EV-AWD",
+      "title": "AWD 自 2026-07-31 起仅接收 sortable 小件商品",
+      "domain": "FBA 仓储与配送",
+      "platform": "Amazon",
+      "market": "美国站",
+      "effectiveDate": "2026-07-31",
+      "effectiveDateBasis": "报道一致给出 2026-07-31 生效；阈值：长度≥18 英寸 / 宽度≥14 英寸 / 高度≥8 英寸 / 重量≥20 磅 任一即超限",
+      "reportCount": 2,
+      "reports": [
+        {
+          "reportId": "EV-AWD-R1",
+          "title": "7月31日起生效！亚马逊AWD停止接收大件商品",
+          "url": "https://www.amz123.com/t/mhH3rWoo",
+          "author": "至美通海外仓",
+          "published_at": "2026-07-11"
+        },
+        {
+          "reportId": "EV-AWD-R2",
+          "title": "7/31起，美国 AWD 不再接受大件商品入仓",
+          "url": "https://www.amz123.com/t/S1dmELe3",
+          "author": "Regan跨境",
+          "published_at": "2026-07-31"
+        }
+      ],
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialNote": "报道自述依据为 Seller Central 官方帮助页与 Seller Forums 官方回复；sellercentral.amazon.com 的 robots.txt 为 Disallow: / 且需登录，公开官方渠道无对应公告；官方 ASCS 产品页仅说明 AWD 用途，不含“停止大件”条款。官方正文不可公开核实。",
+      "officialLinks": [],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 无 AWD 相关政策记录（开发库检索无命中）"
+    },
+    {
+      "eventId": "EV-PEAK-FEE",
+      "title": "2026 假日旺季履约费 2026-10-15 起执行，叠加 3.5% 燃油物流附加费",
+      "domain": "平台费用",
+      "platform": "Amazon",
+      "market": "美国站",
+      "effectiveDate": "2026-10-15",
+      "effectiveDateBasis": "报道给出旺季窗口 2026-10-15 至 2027-01-14；平均每件 +$0.32；3.5% 燃油与物流附加费自 2026-04-17 起执行且无截止日",
+      "reportCount": 2,
+      "reports": [
+        {
+          "reportId": "EV-PEAK-FEE-R1",
+          "title": "亚马逊公布2026年旺季履约费用，10月15日起执行",
+          "url": "https://www.amz123.com/t/YZUdy8Tw",
+          "author": "亚马逊资讯",
+          "published_at": "2026-07-15"
+        },
+        {
+          "reportId": "EV-PEAK-FEE-R2",
+          "title": "亚马逊官宣旺季费上调！3.5%附加费全年叠加，卖家成本涨幅或达15%！",
+          "url": "https://www.amz123.com/t/Daf748UM",
+          "author": "紫鸟浏览器",
+          "published_at": "2026-07-15"
+        }
+      ],
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialNote": "一则报道称“亚马逊公布”，另一则称“亚马逊在卖家论坛发布公告”；官方公开渠道（sell.amazon.com/blog 全量 77 篇 + sellingpartners 44 篇）检索“旺季/holiday + 履约费 + 10月15日”0 命中，“3.5% 燃油附加费”0 命中；sellingpartners 2026 费用页（已在 Radar）发布日期为 2025-10-15，是基础费率调整，非本旺季加价。官方正文不可公开核实。",
+      "officialLinks": [],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 已有 2025-10-15《2026 年美国 Referral 与 FBA 费用更新》（基础费率），与本事件（旺季加价 + 燃油附加费）为不同事件，未覆盖"
+    },
+    {
+      "eventId": "EV-AGED",
+      "title": "FBA 超龄库存附加费自库龄 181 天起计收，366 天以上分层调价",
+      "domain": "平台费用",
+      "platform": "Amazon",
+      "market": "美国站",
+      "effectiveDate": "2026-01-16（366 天及以上分层调价）",
+      "effectiveDateBasis": "报道称核心门槛 181 天；2026-01-16 起 366-455 天 $6.90/立方英尺或 $0.30/件、456 天及以上 $7.90/立方英尺或 $0.35/件；按每月 15 日库存快照、18-22 日计费",
+      "reportCount": 1,
+      "reports": [
+        {
+          "reportId": "EV-AGED-R1",
+          "title": "亚马逊FBA仓储费炸了!库龄181天就收超龄库存附加费",
+          "url": "https://www.amz123.com/t/89KOeglV",
+          "author": "Regan跨境",
+          "published_at": "2026-07-28"
+        }
+      ],
+      "officialConclusion": 2,
+      "officialConclusionText": "有官方链接但证据不足以支持报道中的全部主张",
+      "officialNote": "官方证据存在但不足以支持全部主张：sell.amazon.com/blog/ask/amazon-fba-beginners-guide-2026（2026-03-31）明确写有 aged inventory charge、适用于库龄 over 181 days 的库存 —— 核心门槛已核实；但各库龄段单价、15 日快照与 2026-01-16 调价未出现在该公开页，也未在官方公开渠道检索到。",
+      "officialLinks": [
+        "https://sell.amazon.com/blog/ask/amazon-fba-beginners-guide-2026"
+      ],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 无超龄库存附加费记录；amazon-us-announcements 来源的 allowUrlPrefixes 不含 /blog/ask/ 路径"
+    },
+    {
+      "eventId": "EV-AI-TAG",
+      "title": "AI 生成真人图片/视频需预置 contains-synthetic-performer 元数据标签",
+      "domain": "Listing 创建及编辑",
+      "platform": "Amazon",
+      "market": "全球站点（含美国站）",
+      "effectiveDate": "报道称 2026-07-23 发布；未给出明确生效日",
+      "effectiveDateBasis": "报道称 2026-07-23 亚马逊正式发布该要求；仅“高度逼真的 AI 生成真人”需打标；真人经 AI 修饰、影视/游戏虚构角色、无人物、非照片级逼真均不需打标",
+      "reportCount": 3,
+      "reports": [
+        {
+          "reportId": "EV-AI-TAG-R1",
+          "title": "注意！亚马逊发布AI图片新规！使用AI模特图的卖家注意：上传前必须完成这一步（附操作步骤）",
+          "url": "https://www.amz123.com/t/dU0sJj3t",
+          "author": "跨境电商优匠学堂",
+          "published_at": "2026-07-24"
+        },
+        {
+          "reportId": "EV-AI-TAG-R2",
+          "title": "亚马逊AI 人物图还能不能用？上传前先添加这个元数据标签（附流程）",
+          "url": "https://www.amz123.com/t/QrRPoVgM",
+          "author": "跨境电商MoonSees",
+          "published_at": "2026-07-26"
+        },
+        {
+          "reportId": "EV-AI-TAG-R3",
+          "title": "亚马逊要求商品信息和A+描述中由AI生成的人物添加标签，旧图片是否也需补充标注？",
+          "url": "https://www.amz123.com/t/AY5iFwmD",
+          "author": "WeAreSellers",
+          "published_at": "2026-07-28"
+        }
+      ],
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialNote": "其中一则报道直接引用官方帮助页 sellercentral.amazon.com/help/hub/reference/G1881 的规则原文（“必须使用适当的元数据标记该图片”“contains-synthetic-performer 标签”）并附上何时提供/何时不需提供的完整条件，但该页 robots 为 Disallow: / 且需登录，公开官方渠道检索“AI 生成 + 标签/披露”0 命中。官方正文不可公开核实，但报道含官方原文引用。",
+      "officialLinks": [
+        "https://sellercentral.amazon.com/help/hub/reference/G1881（robots 禁止自动访问，仅作为报道中引用的官方出处记录）"
+      ],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 无 AI 图片元数据标签相关记录"
+    },
+    {
+      "eventId": "EV-TITLE",
+      "title": "商品标题字符上限与 Item Highlights 改版（配合 14 天过渡期）",
+      "domain": "Listing 创建及编辑",
+      "platform": "Amazon",
+      "market": "美国站",
+      "effectiveDate": "未确认（仅见“生效几天了”的相对表述；14 天过渡期来自其他报道转述）",
+      "effectiveDateBasis": "报道提及原标题 72 字符上限、系统自动追加颜色词、Item Highlights 字段需模板或客服手工补齐",
+      "reportCount": 1,
+      "reports": [
+        {
+          "reportId": "EV-TITLE-R1",
+          "title": "亚马逊标题新规别乱改！有人改完单量暴涨，有人直接掉排名",
+          "url": "https://www.amz123.com/t/l3gzKO4c",
+          "author": "跨境者商学院",
+          "published_at": "2026-07-30"
+        }
+      ],
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialNote": "官方公开渠道无对应公告（“title + 14 天/过渡/transition”0 命中）；报道本体为卖家社群经验复盘（引用群内截图与涨单/掉排名反馈），非官方转述。",
+      "officialLinks": [],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 现有唯一带“规则线索”标签的公告为 2026-02-03 FBA Grade and Resell，非本事件"
+    },
+    {
+      "eventId": "EV-VIDEO",
+      "title": "视频验证成为账号注册/品牌授权/异常申诉的常态审核手段（协议 3 风控）",
+      "domain": "卖家账号健康",
+      "platform": "Amazon",
+      "market": "美国站（报道未逐条区分站点）",
+      "effectiveDate": "未确认（报道称“2026 年风控全面升级”，无明确生效日）",
+      "effectiveDateBasis": "报道称触发邮件会引用《亚马逊服务商业解决方案协议》第 3 条；分法人增强型核验与涉嫌欺诈专项核验；只有一次机会",
+      "reportCount": 1,
+      "reports": [
+        {
+          "reportId": "EV-VIDEO-R1",
+          "title": "2026视频验证新规！ 又有卖家错误操作被拒",
+          "url": "https://www.amz123.com/t/89H0SOzn",
+          "author": "速推站外",
+          "published_at": "2026-07-13"
+        }
+      ],
+      "officialConclusion": 6,
+      "officialConclusionText": "因访问限制无法核实",
+      "officialNote": "报道引用的是卖家后台协议第 3 条与后台邮件；官方公开渠道检索“视频 + 验证”0 命中；Seller Central 属 robots 禁止且需登录，不尝试访问。官方正文不可公开核实。",
+      "officialLinks": [],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 无账号健康/视频验证相关记录"
+    },
+    {
+      "eventId": "EV-ADS-PAY",
+      "title": "Amazon Ads 扣费方式改为店铺销售货款实时抵扣，2026-08-01 生效",
+      "domain": "Amazon Ads 政策变化",
+      "platform": "Amazon Ads",
+      "market": "美国站",
+      "effectiveDate": "2026-08-01",
+      "effectiveDateBasis": "报道称原定 2026-04-15 上线，经卖家集体抵制后延期 4 个月，2026-08-01 强制落地；覆盖商品/品牌/展示型三大广告；信用卡降级为余额不足时兜底；可选发票周期月结",
+      "reportCount": 2,
+      "reports": [
+        {
+          "reportId": "EV-ADS-PAY-R1",
+          "title": "8月1日起执行！亚马逊广告费用结算方式大改！",
+          "url": "https://www.amz123.com/t/ycRnoCvm",
+          "author": "跨境风暴",
+          "published_at": "2026-07-28"
+        },
+        {
+          "reportId": "EV-ADS-PAY-R2",
+          "title": "8月1日前不点进这个页面，亚马逊替你做了选择",
+          "url": "https://www.amz123.com/t/E49Z8vab",
+          "author": "一汤说",
+          "published_at": "2026-07-31"
+        }
+      ],
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialNote": "官方公开渠道（advertising.amazon.com sitemap 全量 + Radar 已收录的两条 Ads 帮助页）检索“Ads + 结算/扣费 + 8月1日”仅命中无关页面（个人 vs 专业销售计划、2026 开店指南中的“每两周结算一次”），0 条对应公告。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 的 ads-policy-pages 仅收录 2 条通用帮助页（General requirements / Prohibited products），不含扣费与结算方式；published_at 为空，无法按日期判定，结论按主题判定为未覆盖"
+    },
+    {
+      "eventId": "EV-ADS-REVIEW",
+      "title": "Review Requests Ads 付费邀评广告，美国站 10 月下旬公测",
+      "domain": "Amazon Ads 政策变化 / 评论政策",
+      "platform": "Amazon Ads",
+      "market": "美国站",
+      "effectiveDate": "美国站 2026 年 10 月下旬公测（灰度测试中）",
+      "effectiveDateBasis": "报道给出准入门槛：ASIN 评论少于 1000 条（满 1000 自动暂停）、仅美国站开放、店铺无评价操纵违规记录且 Listing 状态健康；CPC 点击扣费",
+      "reportCount": 1,
+      "reports": [
+        {
+          "reportId": "EV-ADS-REVIEW-R1",
+          "title": "亚马逊上线新功能，卖家可以付费“买评论”了？",
+          "url": "https://www.amz123.com/t/zDrc37rW",
+          "author": "AMZ123跨境电商",
+          "published_at": "2026-10-21"
+        }
+      ],
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialNote": "报道称该功能由“亚马逊大会”公布；官方公开渠道检索 0 命中（advertising.amazon.com 公开 news 目录中无对应条目）。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 无邀评广告相关记录"
+    },
+    {
+      "eventId": "EV-CARRIER",
+      "title": "承运商绩效不达标 2026-09-30 起停售",
+      "domain": "FBA 仓储与配送",
+      "platform": "Amazon",
+      "market": "美国站",
+      "effectiveDate": "2026-09-30",
+      "effectiveDateBasis": "报道称平台对承运商设置达标线，不达标即触发停售机制，并给出“优化承运商守住达标线”的三条建议",
+      "reportCount": 1,
+      "reports": [
+        {
+          "reportId": "EV-CARRIER-R1",
+          "title": "9月30日起不达标就停售？！亚马逊教你三招激活保护机制，优化承运商守住达标线",
+          "url": "https://www.amz123.com/t/PfMKfcWU",
+          "author": "亚马逊全球开店",
+          "published_at": "2026-07-29"
+        }
+      ],
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialNote": "官方公开渠道检索“承运商/carrier performance + 停售/9月30”0 命中。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 无承运商绩效相关记录"
+    },
+    {
+      "eventId": "EV-UL",
+      "title": "可充电锂电池供电家用电器的 UL 认证/检测报告口径，与 8 月 30 日批量下架",
+      "domain": "商品安全与资质",
+      "platform": "Amazon",
+      "market": "美国站",
+      "effectiveDate": "报道提及 8 月 30 日批量下架（2026-08-30）",
+      "effectiveDateBasis": "报道称亚马逊美国站发布针对可充电锂电池供电家用电器的合规新政策并批量下架产品；核心是区分 UL 认证（ULSolutions 体系，含验厂与跟踪检查）与 UL 标准检测报告（ISO17025 实验室一次性报告）",
+      "reportCount": 1,
+      "reports": [
+        {
+          "reportId": "EV-UL-R1",
+          "title": "90%跨境卖家踩坑！UL认证和UL检测报告，亚马逊只认这一个",
+          "url": "https://www.amz123.com/t/QvB9ic6P",
+          "author": "跨信通跨境说",
+          "published_at": "2026-07-18"
+        }
+      ],
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialNote": "官方公开渠道检索“UL + 认证”0 命中；报道本身为合规服务商（跨信通）内容，末尾带自身服务导流。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 无 UL/锂电池合规相关记录"
+    },
+    {
+      "eventId": "EV-TOY",
+      "title": "解压玩具（捏捏乐/Squeeze Toy）因化学安全风险全站点下架并强制移仓",
+      "domain": "商品安全与危险品合规",
+      "platform": "Amazon",
+      "market": "美国、欧洲五国、加拿大全站点",
+      "effectiveDate": "未确认（报道称“这周开始”“这两天”，两篇跨度 2026-07-18 至 07-21）",
+      "effectiveDateBasis": "报道称平台定性填充凝胶/PU 发泡材质持续释放甲醛、甲酰胺、TVOC；被停用 ASIN 永久无法恢复、取消未履约订单、FBA 库存须 60 天内提交移除订单否则平台销毁且费用自担；该篇还称上半年玩具类目已启动 TIC 直接验证新规",
+      "reportCount": 2,
+      "reports": [
+        {
+          "reportId": "EV-TOY-R1",
+          "title": "本期亚马逊避坑产品盘点：捏捏乐（Stress Ball ）--大面积被下架",
+          "url": "https://www.amz123.com/t/ecZR8dmb",
+          "author": "跨境商品指南",
+          "published_at": "2026-07-18"
+        },
+        {
+          "reportId": "EV-TOY-R2",
+          "title": "无预警封杀！亚马逊这个爆款一夜全灭",
+          "url": "https://www.amz123.com/t/9JunXzj3",
+          "author": "跨境电商跨境屋",
+          "published_at": "2026-07-21"
+        }
+      ],
+      "officialConclusion": 3,
+      "officialConclusionText": "只找到第三方报道",
+      "officialNote": "官方公开渠道检索“Stress Ball/捏捏乐 + 下架”0 命中；两篇均描述卖家收到的后台通知（无可公开访问的官方公告）。仅找到第三方报道。",
+      "officialLinks": [],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 虽有 CPSC 召回 15 条，但均针对具体召回个案，与平台侧类目下架事件不同，未覆盖"
+    },
+    {
+      "eventId": "EV-TRO",
+      "title": "针对亚马逊卖家的美国外观专利/版权 TRO 维权案件（多起）",
+      "domain": "知识产权与禁限售",
+      "platform": "Amazon（被告平台）",
+      "market": "美国站",
+      "effectiveDate": "案件立案时间 2026-07-15 / 07-17 / 07-24 等",
+      "effectiveDateBasis": "报道给出美国联邦地区法院案件编号：26-cv-01521（外观专利，淋浴水阀）、26-cv-00318（版权，便携零食收纳盒）、26-cv-01610、2026-cv-25038（外观专利 US D1,073,837S，泳池浮床）",
+      "reportCount": 2,
+      "reports": [
+        {
+          "reportId": "EV-TRO-R1",
+          "title": "别再卖了！这三款产品正在通过版权/专利发起TRO",
+          "url": "https://www.amz123.com/t/CW7nGOcq",
+          "author": "SellerGuard",
+          "published_at": "2026-07-21"
+        },
+        {
+          "reportId": "EV-TRO-R2",
+          "title": "跨境行业避雷预警｜亚马逊泳池浮床外观专利维权案爆发！警惕 “在后专利≠侵权豁免” 重大误区",
+          "url": "https://www.amz123.com/t/Zf7gPTOY",
+          "author": "恒大知识产权",
+          "published_at": "2026-07-29"
+        }
+      ],
+      "officialConclusion": 4,
+      "officialConclusionText": "内容并非政策变化",
+      "officialNote": "内容并非 Amazon 平台政策变化，而是第三方知识产权发起的司法程序；案件编号本身可在美国法院公开档案核对，但不属于本主线的平台政策事件，也不应计入 platform_policy 统计口径。",
+      "officialLinks": [],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 无 TRO/专利维权记录（属另一类情报，本轮不纳入）"
+    },
+    {
+      "eventId": "EV-IOR",
+      "title": "美国 IOR（进口备案人）资质核验收紧（EO 14411 执行）",
+      "domain": "外部监管 / 清关合规",
+      "platform": "Amazon（提示卖家自查）",
+      "market": "美国站",
+      "effectiveDate": "行政令 2026-06-03 签署、2026-06-10 刊登（91 FR 35125）；CBP 实施通知 2026-08-19（91 FR 53627）；报道称 180 天内即 2026-11-30 前完成条款修订",
+      "effectiveDateBasis": "报道称要求申报预估进口货量、主体成立时间、股权架构、实际受益所有人及美国境内有形资产；上调海关保证金与美国境内资产门槛；长期无业务 IOR 批量清理；境外 IOR 需 CTPAT 认证或委托有资质报关行",
+      "reportCount": 1,
+      "reports": [
+        {
+          "reportId": "EV-IOR-R1",
+          "title": "美国IOR监管趋严，亚马逊提醒卖家自查进口主体",
+          "url": "https://www.amz123.com/t/5Z6bFgNc",
+          "author": "北美电商资讯",
+          "published_at": "2026-10-21"
+        }
+      ],
+      "officialConclusion": 1,
+      "officialConclusionText": "官方证据已核实",
+      "officialNote": "官方证据已核实（主体成立与 IOR 数据核验部分）：Federal Register Notice 2026-16911（2026-08-19，91 FR 53627）标题即“Accuracy of Importer of Record Data Submitted to CBP”，摘要明确“CBP is taking initial steps to implement Executive Order 14411 ‘Strengthening Customs Enforcement’”，正文涉及 CBP Form 5106 与 beneficial ownership、business structure；另有 FR Rule 2026-17354（2026-08-25，91 FR 54800）引用“Executive Order 14411, Strengthening Customs Enforcement, 91 FR 35125 (published June 10, 2026)”。未在已读公开文本中逐字核实的是“180 天/2026-11-30 修订截止”与“保证金/境内资产门槛”两项具体数值（位于行政令正文，未通过公开接口取到）。",
+      "officialLinks": [
+        "https://www.federalregister.gov/documents/2026/08/19/2026-16911/accuracy-of-importer-of-record-data-submitted-to-cbp",
+        "https://www.federalregister.gov/documents/2026/08/25/2026-17354/establishment-of-four-customs-enforcement-areas"
+      ],
+      "radarCovered": false,
+      "radarCoverageNote": "Radar 的 external_regulation 来源只有 CPSC 召回与联邦公报 CPSC/FTC 三条，无 CBP/海关来源；开发库检索无 IOR/Customs 相关记录 → 未覆盖"
+    }
+  ],
+  "value": {
+    "reportsInvestigated": 20,
+    "reportsWithMachineVerifiedDate": 20,
+    "distinctAuthors": 19,
+    "distinctDates": 12,
+    "amazonUSPolicyReports": 19,
+    "nonPolicyOrMarketingInPool": 27,
+    "poolSizeScanned": 47,
+    "duplicateReports": 7,
+    "independentPolicyEvents": 13,
+    "eventsWithOfficialEvidenceVerified": 1,
+    "eventsWithOfficialLinkPartial": 1,
+    "eventsThirdPartyOnly": 6,
+    "eventsNotPolicy": 1,
+    "eventsUnverifiableDueToAccess": 4,
+    "eventsAlreadyInRadar": 0,
+    "eventsNotInRadar": 13,
+    "newAndOfficiallyVerifiable": [
+      "EV-AGED",
+      "EV-IOR"
+    ],
+    "denominators": {
+      "poolScanned": 47,
+      "candidatePoolScanned": 260,
+      "discoveryUrlsAvailable": 4198,
+      "officialPagesCorpus": 321
+    }
+  },
+  "automationExperiment": {
+    "discoveredAt": "2026-10-23T05:48:03.104Z",
+    "legalEntry": [
+      "https://www.amz123.com/robots.txt",
+      "https://www.amz123.com/sitemap_index.xml",
+      "https://www.amz123.com/sitemap_index1.xml",
+      "https://www.amz123.com/sitemap_index2.xml",
+      "/t 与 /b 路径下的文章页"
+    ],
+    "discoveryRuns": [
+      {
+        "sitemapIndex": 2,
+        "sitemap2": 14802,
+        "listT": 19,
+        "listKx": 93,
+        "errors": []
+      },
+      {
+        "sitemapIndex": 2,
+        "sitemap2": 14802,
+        "listT": 19,
+        "listKx": 93,
+        "errors": []
+      },
+      {
+        "sitemapIndex": 2,
+        "sitemap2": 14802,
+        "listT": 19,
+        "listKx": 93,
+        "errors": []
+      }
+    ],
+    "discoveryStable": {
+      "sitemapIndex": true,
+      "sitemap2": true,
+      "listT": true,
+      "listKx": true
+    },
+    "metadataStability": {
+      "total": 12,
+      "stable": 12,
+      "detail": [
+        {
+          "url": "https://www.amz123.com/kx/4kWv4QkU",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/7gr7DUIo",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/7n0cXqcz",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/81QwyZ9D",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/EDCJXhk8",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/InbCm3uv",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/MrKI38Rb",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/Sr7xeq0j",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/VWHcWhgt",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/YFzK6b2X",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/Z1DnRkK4",
+          "stable": true
+        },
+        {
+          "url": "https://www.amz123.com/kx/mxTB1WBO",
+          "stable": true
+        }
+      ]
+    },
+    "failureDiagnostics": [
+      {
+        "name": "正常文章",
+        "url": "https://www.amz123.com/t/zDrc37rW",
+        "status": 200,
+        "len": 376822,
+        "kind": "ok"
+      },
+      {
+        "name": "不存在的路径",
+        "url": "https://www.amz123.com/t/ZZZZNOTEXIST",
+        "status": 404,
+        "len": 103,
+        "kind": "not_found"
+      },
+      {
+        "name": "robots 禁止的搜索入口",
+        "url": "https://www.amz123.com/search?keyword=test",
+        "status": 200,
+        "len": 673213,
+        "kind": "ok"
+      },
+      {
+        "name": "需要登录的 Seller Central 帮助页",
+        "url": "https://sellercentral.amazon.com/help/hub/reference/G1881",
+        "status": 200,
+        "len": 139382,
+        "kind": "ok"
+      },
+      {
+        "name": "被 robots 禁止的 /api",
+        "url": "https://www.amz123.com/api/anything",
+        "status": 200,
+        "len": 44,
+        "kind": "ok"
+      }
+    ]
+  },
+  "conclusion": {
+    "recommendation": "有条件接入（仅作为线索发现入口，不作为政策事实源）",
+    "reasons": [
+      "合规可实现：robots 显式 Allow /t、/b 并提供 sitemap；文章页 SSR 即可取得标题/日期/作者/正文，无需浏览器、无需登录、无验证码、无付费。",
+      "补漏能力真实：13 个去重后的政策事件全部不在 Radar 现有 3 条平台政策 / 2 条 Ads 政策覆盖范围内，其中 EV-IOR 已被 Federal Register 官方原文核实，且 Radar 目前没有 CBP/海关来源。",
+      "但官方可核实率低：13 个事件中仅 1 个结论为“官方证据已核实”、1 个为“有官方链接但证据不足”，其余 4 个因官方正文在 Seller Central（robots 禁止 + 需登录）而无法核实、6 个仅有第三方报道、1 个并非平台政策。",
+      "AMZ123 正文不携带官方证据链接：47 篇样本正文内站外链接仅有 mp.weixin.qq.com，官方链接数为 0；每条线索都必须另做一次独立的官方核实，人工/规则成本不能忽略。",
+      "重复报道显著：20 篇报道归并为 13 个事件，重复 7 篇；仅靠标题完全相同去重会漏掉（AI 标签 3 篇、AWD 2 篇、旺季费 2 篇、玩具下架 2 篇、广告扣费 2 篇、TRO 2 篇），仅靠关键词实体去重又会误合并（广告、禁售两类），必须用「政策主体 + 生效时间 + 官方政策链接/编号」的组合指纹。",
+      "授权边界清楚但有未确认项：可安全保存标题/URL/作者/时间/摘要并按协议署名引用；正文复制、商业性再发布、批量正文入库均属“授权未确认”。"
+    ],
+    "minimalIntegration": [
+      "第一步（新增只读来源）：以 sitemap + /t 列表页为发现入口，新增一个 web_list 类来源，仅落元数据（标题/URL/作者/发布时间/摘要/标签），不落正文。",
+      "第二步（规则筛选）：以 Amazon + 美国站 + 政策领域关键词 + 生效时间抽取做确定性筛选；沿用现有 radar-rules 与来源白名单门禁，不新增数据库表。",
+      "第三步（事件归并）：用「政策主体 + 生效日期 + 官方政策链接/编号」组合指纹聚类，避免标题相同去重与泛关键词误合并。",
+      "第四步（官方证据查找）：对每个候选事件按 sell.amazon.com/blog 月度 sitemap、sellingpartners 月度 sitemap、advertising.amazon.com sitemap、federalregister.gov 公开 API 顺序检索；命中即生成官方证据链接，未命中标记「官方正文不可核实」。",
+      "第五步（事实链路）：第三方报道只进线索层，不写 platform_policy 正式来源；不改变现有三类统计口径，不新增人工录入或审核队列。"
+    ],
+    "ongoingCost": {
+      "runtimeDependencies": "无新增依赖：仅需 HTTP 客户端（项目已有）+ JSON/XML 解析（项目已有）+ 可选浏览器（仅当需要读客户端渲染的列表分页时）；不需要付费 API、不需要付费模型、不需要登录态。",
+      "requestVolume": "本轮实测：发现层 4 次请求 / 轮；取 20 篇样本元数据约 20-50 次请求；官方证据检索按事件逐条 3-4 次请求。稳态按每 6 小时一轮、单轮 60 次请求估算，约 240 次/天。",
+      "latency": "发现层 <3s；单篇元数据约 0.4-1.5s；一轮（发现 + 20 篇 + 官方核实）约 40-90s。",
+      "maintenance": [
+        "AMZ123 是 Nuxt SPA，文章页 SSR 字段（JSON-LD / __NUXT_DATA__）一旦改版即失效，需要版本探针",
+        "列表页客户端渲染，分页需浏览器或改用 sitemap 归档",
+        "每月需复核一次官方渠道（sell.amazon.com/blog 月度 sitemap 已有，可作为变更探针）",
+        "作者/来源结构（author 对象、tags 数组）属站点内部结构，改版会破坏解析"
+      ],
+      "extraCost": "零付费；仅本地算力与磁盘。"
+    }
+  }
+}

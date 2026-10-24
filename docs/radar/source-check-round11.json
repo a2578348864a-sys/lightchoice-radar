@@ -1,0 +1,56 @@
+{
+  "checkedAt": "2026-10-23T05:20:00+08:00",
+  "purpose": "第十一轮：为 Amazon 美国站卖家平台政策寻找合法、免费、可自动采集的官方入口。只记录实际访问过的候选，不把搜索结果标题当作可采集证据。",
+  "method": "项目自身 HTTP 层 / curl（UA 与 Accept-Language 同采集器）+ robots.txt + 真实 Chrome 渲染（仅 Ads 页面）；正文证据用现有规则门禁判定。",
+  "candidates": [
+    {
+      "id": "sell.amazon.com/blog/announcements",
+      "url": "https://sell.amazon.com/blog/announcements?p=1&mons_sel_locale=en_US",
+      "robots": "允许（仅 /search、/feedback、/404 等路径禁止）",
+      "http": 200,
+      "pages": "4 页，共 23 条；第 1 页 13 条（2025-09-24 至 2026-09-23），第 2–4 页为同一列表的延续（2022-11 至 2025-09）",
+      "verdict": "已在使用；本轮修正后第 1 页有 2 条通过正文门禁（2026-05-22、2026-02-03），第 2–4 页条目均早于 13 个月窗口或为营销/活动内容",
+      "action": "不新增来源；修好「首次导入漏读的条目之后永远进不来」的缺口"
+    },
+    {
+      "id": "sellingpartners.aboutamazon.com/data-insights",
+      "url": "https://sellingpartners.aboutamazon.com/data-insights",
+      "robots": "允许（仅 /testing-overlay 禁止）",
+      "http": 200,
+      "entries": 9,
+      "verdict": "9 条里 7 条是卖家故事/营销，1 条是 2026 费用更新（已采集），1 条是 2025-09-17 工具宣传；政策占比低",
+      "action": "保持现有单篇文章前缀，不扩宽为整站（扩宽会把营销文章带进来，且现有门禁未对该来源启用）"
+    },
+    {
+      "id": "advertising.amazon.com/help/G8X8M375UPCN4UUC",
+      "url": "https://advertising.amazon.com/help/G8X8M375UPCN4UUC",
+      "robots": "允许（Ads help 路径已在已验证主机列表内）",
+      "http": "200（浏览器渲染 7113 字符正文）",
+      "verdict": "Ads 政策变更日志：正文 0 条条款级规则证据，未通过现有 Ads 门禁；它是索引不是政策文档，且属于 ads_policy，不计入卖家平台政策",
+      "action": "不纳入"
+    },
+    {
+      "id": "sellercentral.amazon.com",
+      "url": "https://sellercentral.amazon.com/help/hub/reference",
+      "robots": "User-agent: * / Disallow: /",
+      "http": "未请求正文（robots 禁止）",
+      "verdict": "登录 + robots 双重限制，不可自动采集",
+      "action": "拒绝；不得以任何方式绕过"
+    },
+    {
+      "id": "www.amazon.com/gp/help",
+      "url": "https://www.amazon.com/gp/help/customer/display.html",
+      "robots": "允许大部分路径（仅账户/登录相关禁止）",
+      "verdict": "面向买家的条款与帮助（退货、使用条件等），不是卖家平台政策",
+      "action": "拒绝：分类不符"
+    },
+    {
+      "id": "developer-docs.amazon.com/sp-api/changelog",
+      "url": "https://developer-docs.amazon.com/sp-api/changelog",
+      "robots": "无限制声明",
+      "verdict": "SP-API 接口变更日志，不是卖家平台政策",
+      "action": "拒绝：分类不符"
+    }
+  ],
+  "conclusion": "Amazon 公开的卖家政策供给仍只有两条真实入口（公告博客 + sellingpartners）；本轮没有新增可合法自动采集的来源，覆盖提升来自修好公告来源的漏读取缺口（+1 条真实政策）。不通过放宽分类或人工录入凑数。"
+}

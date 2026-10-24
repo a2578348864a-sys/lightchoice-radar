@@ -1,5 +1,6 @@
 // Failure cases for online migrations: table scans under strong locks, unsafe retries, and hidden SQL.
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { migrationPlan } from "../scripts/migration-safety.ts";
 
@@ -136,4 +137,93 @@ test("statistics maintenance names one table and its columns without skipping wo
     "ANALYZE publications (selected); SET statement_timeout = 0;",
     "VACUUM ANALYZE publications (selected);",
   ]) assert.throws(() => migrationPlan(statement), statement);
+});
+
+// `-- atomic` exists for exactly one reviewed migration. These cases keep it from becoming a general
+// "run any SQL" switch: the declaration must be the first line, and the body must be the 0090 pair.
+const ATOMIC_0090 = `-- atomic
+-- Keep the source excerpt attached to each exact material version for history and provenance.
+ALTER TABLE article_revisions ADD COLUMN excerpt text;
+
+-- Recover the current version only when its stored content hash proves it is the same snapshot.
+UPDATE article_revisions r SET excerpt = a.excerpt
+FROM articles a
+WHERE r.article_id = a.id AND r.revision = a.revision
+  AND r.content_hash = a.content_hash AND r.excerpt IS NULL AND a.excerpt IS NOT NULL;
+`;
+
+test("the reviewed atomic migration (0090) is accepted as one transaction", () => {
+  assert.deepEqual(migrationPlan(ATOMIC_0090), { kind: "transaction" });
+});
+
+test("the shipped 0090 file is exactly the reviewed migration", () => {
+  const file = readFileSync(new URL("../database/migrations/0090_article_revision_excerpt.sql", import.meta.url), "utf8");
+  assert.deepEqual(migrationPlan(file), { kind: "transaction" });
+  assert.equal(file.split(/\r?\n/)[0], "-- atomic", "the declaration stays on the first line, alone");
+});
+
+test("an atomic declaration only works on the first line", () => {
+  // Same two statements, declaration moved down: the normal one-statement rule applies and refuses it.
+  const moved = ATOMIC_0090.replace("-- atomic\n", "");
+  assert.throws(() => migrationPlan(`-- note first\n${moved}`), /one statement per online migration/);
+  // The words between statements are not a declaration either: two statements stay refused.
+  assert.throws(
+    () => migrationPlan(`ALTER TABLE article_revisions ADD COLUMN note text;\n-- atomic\nUPDATE articles SET selected = true;`),
+    /one statement per online migration/,
+  );
+});
+
+// The declaration is a line, not a pattern: only horizontal whitespace may sit between the marker
+// and its word, so a newline can never be part of the declaration.
+test("the atomic declaration tolerates only horizontal whitespace on the very first line", () => {
+  const body = ATOMIC_0090.replace("-- atomic\n", "");
+  // Line endings the repository may carry: LF and CRLF both declare the same first line.
+  assert.deepEqual(migrationPlan(`-- atomic\n${body}`), { kind: "transaction" });
+  assert.deepEqual(migrationPlan(`-- atomic\r\n${body.replace(/\n/g, "\r\n")}`), { kind: "transaction" });
+  assert.deepEqual(migrationPlan(`--   atomic \t\n${body}`), { kind: "transaction" }, "extra spaces and trailing tabs stay one declaration");
+  // Anything that puts the word on another line, or before it another line, is not a declaration:
+  // the whole file then has two statements and the ordinary one-statement rule refuses it.
+  for (const broken of [
+    `\n-- atomic\n${body}`,
+    ` \n-- atomic\n${body}`,
+    `\t\r\n-- atomic\n${body}`,
+    `--\natomic\n${body}`,
+    `--\r\natomic\n${body}`,
+    `-- note\n-- atomic\n${body}`,
+    `--atomic\n${body}`,
+  ]) {
+    assert.throws(() => migrationPlan(broken), /one statement per online migration/, JSON.stringify(broken.slice(0, 24)));
+  }
+});
+
+test("the atomic word inside the file never declares an atomic migration", () => {
+  // A comment between the statements is just a comment: the file is still two statements.
+  assert.throws(() => migrationPlan(`ALTER TABLE article_revisions ADD COLUMN excerpt text;\n-- atomic\n${ATOMIC_0090.replace("-- atomic\n", "")}`), /one statement per online migration/);
+  // A trailing word on the first line is not the declaration either.
+  assert.throws(() => migrationPlan(`-- atomic!\n${ATOMIC_0090.replace("-- atomic\n", "")}`), /one statement per online migration/);
+  // Nor does a blank first line let a later declaration in.
+  assert.throws(() => migrationPlan(`\r\n${ATOMIC_0090}`), /one statement per online migration/);
+});
+
+test("an atomic migration refuses anything but the reviewed 0090 statements", () => {
+  const withHeader = (body: string) => `-- atomic\n${body}`;
+  const cases: Array<[string, RegExp]> = [
+    ["UPDATE articles SET selected = true;", /limited to the reviewed 0090 statements/],
+    ["DELETE FROM articles WHERE id = 'one';", /limited to the reviewed 0090 statements/],
+    ["TRUNCATE articles;", /limited to the reviewed 0090 statements/],
+    ["SELECT count(*) FROM articles;", /limited to the reviewed 0090 statements/],
+    ["ALTER TABLE article_revisions ADD COLUMN excerpt text; DELETE FROM articles;", /limited to the reviewed 0090 statements/],
+    ["ALTER TABLE article_revisions ADD COLUMN excerpt text;", /limited to the reviewed 0090 statements/],
+    // A third statement, even a harmless one, is not the reviewed pair.
+    [`${ATOMIC_0090.replace("-- atomic\n", "")}ALTER TABLE articles ADD COLUMN note text;`, /limited to the reviewed 0090 statements/],
+    // The right statements with a different target column are a different migration.
+    [ATOMIC_0090.replace("ADD COLUMN excerpt text", "ADD COLUMN body text"), /limited to the reviewed 0090 statements/],
+    // The backfill must keep its guards; dropping the hash check would rewrite unrelated revisions.
+    [ATOMIC_0090.replace("AND r.content_hash = a.content_hash ", ""), /limited to the reviewed 0090 statements/],
+  ];
+  for (const [body, expected] of cases) {
+    assert.throws(() => migrationPlan(body.startsWith("-- atomic") ? body : withHeader(body)), expected, body.slice(0, 60));
+  }
+  // Function bodies stay refused before the atomic check ever runs.
+  assert.throws(() => migrationPlan(withHeader("DO $$ BEGIN DELETE FROM articles; END $$;")), /SQL bodies are not online migrations/);
 });

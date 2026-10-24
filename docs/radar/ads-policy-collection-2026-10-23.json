@@ -1,0 +1,71 @@
+{
+  "ranAt": "2026-10-22T19:01:53.463Z",
+  "source": {
+    "id": "ads-policy-pages",
+    "hub": "https://advertising.amazon.com/help/G29MAQ3YTK5LQ7VC",
+    "allowedPages": [
+      "https://advertising.amazon.com/help/G4U9JBZH3664JWX2",
+      "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N"
+    ]
+  },
+  "elapsedMs": 55825,
+  "candidates": [
+    {
+      "url": "https://advertising.amazon.com/help/G4U9JBZH3664JWX2",
+      "title": "General requirements",
+      "updatedOnEvidence": "Updated on Jul 22, 2026",
+      "sourceUpdatedAt": "2026-07-22T00:00:00.000Z",
+      "publishedAt": null,
+      "publicationTime": null,
+      "bodyChars": 2401,
+      "identityKey": "url:https://advertising.amazon.com/help/G4U9JBZH3664JWX2",
+      "contentHash": "504d16fa3d7943b75772b8df43d27dbadd80fc08d6ea542eac85d27264fdbab4",
+      "adsEvidence": [
+        "requirements for all ads",
+        "Advertisers are required to",
+        "Failure to comply may result in ads being paused, removed, or restricted",
+        "Advertisers must not"
+      ],
+      "otherTags": [],
+      "qualifies": true
+    },
+    {
+      "url": "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N",
+      "title": "Prohibited products and services across all supply",
+      "updatedOnEvidence": "Updated on Jun 25, 2026",
+      "sourceUpdatedAt": "2026-06-25T00:00:00.000Z",
+      "publishedAt": null,
+      "publicationTime": null,
+      "bodyChars": 3465,
+      "identityKey": "url:https://advertising.amazon.com/help/GZS8A5XCFQJTS88N",
+      "contentHash": "f86d211860f6a594293dc65a667e03995d49638c2cc730a5548b3215190885a5",
+      "adsEvidence": [
+        "requirements for all ads",
+        "prohibited globally",
+        "advertising of such products is prohibited"
+      ],
+      "otherTags": [
+        "类目合规线索"
+      ],
+      "qualifies": true
+    }
+  ],
+  "stability": [
+    {
+      "url": "https://advertising.amazon.com/help/G4U9JBZH3664JWX2",
+      "sameIdentity": true,
+      "sameHash": true
+    },
+    {
+      "url": "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N",
+      "sameIdentity": true,
+      "sameHash": true
+    }
+  ],
+  "revision": {
+    "url": "https://advertising.amazon.com/help/G4U9JBZH3664JWX2",
+    "hashBefore": "504d16fa3d7943b75772b8df43d27dbadd80fc08d6ea542eac85d27264fdbab4",
+    "hashAfter": "a6dd5d86146e0baf08d9fb02313838837f68f0e3277dce90d4dcd60c8d4cb228"
+  },
+  "note": "只读运行：没有写数据库，也没有注册来源行。入库、去重、修订复用现有 store/upsertMaterial，本轮未执行。"
+}

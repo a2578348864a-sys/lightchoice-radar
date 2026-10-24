@@ -1,0 +1,499 @@
+{
+  "title": "Amazon 美国站平台政策来源候选实测记录（2026-10-23）",
+  "scope": "只回答一个问题：除了已接入的 sell.amazon.com 公告列表与 sellingpartners 年度费用文章，是否还有公开、免费、可稳定读取的 Amazon 官方卖家政策来源可以接入。",
+  "method": "全部用项目自身的 guardedFetch / fetchRss / fromHtml 读取，不依赖搜索引擎；每个候选探测一次，仅瞬时错误重试一次。",
+  "verdict": "不通过：本轮没有新的 Amazon 官方政策来源通过验收；现有公告来源已覆盖其 13 个月窗口，缺口在 Amazon 的公开供给，不在采集器。",
+  "candidates": [
+    {
+      "id": "seller-forums-news",
+      "identity": "Amazon Seller Forums 官方公告板块",
+      "url": "https://sellercentral.amazon.com/forums/forum/amazon-news",
+      "robots": "https://sellercentral.amazon.com/robots.txt 首条即 `User-agent: * / Disallow: /`（全站禁止抓取），后续 Allow 行不覆盖根 Disallow",
+      "http": "200，170204 B，396 ms，但正文只有 1861 字符的通用 Amazon 落地页，不是论坛内容",
+      "body": "未取得论坛正文；页面是登录/地区选择壳",
+      "verdict": "拒绝",
+      "reason": "robots 全站 Disallow + 需登录；按合规边界保持人工导入，不自动采集"
+    },
+    {
+      "id": "help-hub-policy",
+      "identity": "Seller Central 帮助中心政策页（Changes to program policies 同域）",
+      "url": "https://sellercentral.amazon.com/help/hub/reference/G201411300",
+      "robots": "同上，`Disallow: /`",
+      "http": "200，139585 B，2422 ms，正文 746 字符，标题 `Amazon Sign-In`",
+      "body": "只得到登录页，没有任何政策正文",
+      "verdict": "拒绝",
+      "reason": "登录墙 + robots 全站禁止；不得把外部搜索结果当作采集器已能读取的证据"
+    },
+    {
+      "id": "announcements-pagination",
+      "identity": "Selling Partner Blog Announcements（现有来源）",
+      "url": "https://sell.amazon.com/blog/announcements?p=N&mons_sel_locale=en_US",
+      "robots": "sell.amazon.com/robots.txt 只禁止 /404$、/search、/feedback、/autocomplete、/rum 等，公告路径允许",
+      "http": "p=1 200/11 条，p=4 200/3 条，p=5 起回落第 1 页（同样是 11 条、首条 2026-09-23）",
+      "body": "4 页共 23 条；第 1 页最新 2026-09-23、最旧 2025-09-02，已覆盖来源配置的 13 个月窗口",
+      "verdict": "已接入，无需扩页",
+      "reason": "扩页只能拿到更早的历史；非首次导入的准入下限是 initializedAt-2 天，历史条目仍会被拒绝，因此扩页没有收益"
+    },
+    {
+      "id": "sellingpartners-rss",
+      "identity": "Amazon Selling Partners RSS（data-insights / perspectives）",
+      "url": "https://sellingpartners.aboutamazon.com/data-insights.rss",
+      "robots": "sellingpartners.aboutamazon.com/robots.txt 只禁止 /testing-overlay",
+      "http": "200，2781 B，4 条；`?tag=fba`、`?category=fba` 返回同一份 4 条；`perspectives.rss` 200/505 B 空 feed；`/rss` 404",
+      "body": "4 条全是洞察/宣传（sellers to solution providers、innovation principles、fake reviews、new tools），无卖家规则、无生效日期",
+      "verdict": "拒绝",
+      "reason": "内容为营销/洞察，不是政策；标签过滤参数无效"
+    },
+    {
+      "id": "amazon-ads-policy",
+      "identity": "Amazon Ads 官方政策页",
+      "url": "https://advertising.amazon.com/resources/ad-policy（及 /amazon-ads-policy、/creative-acceptance、/help/GVZ7PMBSF7DZ8N2S）",
+      "robots": "advertising.amazon.com/robots.txt 只禁止联系表单类路径",
+      "http": "ad-policy 404；其余 200 但正文 340–1496 字符，标题退化为 `Amazon`，是 JS 壳",
+      "body": "没有取得任何广告政策正文",
+      "verdict": "拒绝",
+      "reason": "JS 壳，无法解析标题/日期/规则证据"
+    },
+    {
+      "id": "brand-registry-policies",
+      "identity": "Amazon Brand Registry 政策页",
+      "url": "https://brandservices.amazon.com/policies",
+      "robots": "brandservices.amazon.com/robots.txt 无 Disallow",
+      "http": "200，452988 B，24306 字符正文，标题 `Amazon Brand Registry | Sell on Amazon`",
+      "body": "是 Brand Registry 介绍/营销页，没有政策条目、没有发布日期",
+      "verdict": "拒绝",
+      "reason": "静态营销页，无条目结构与日期，不能作为政策记录"
+    },
+    {
+      "id": "sell-pricing",
+      "identity": "官方费用页（How much does it cost to sell on Amazon）",
+      "url": "https://sell.amazon.com/pricing",
+      "robots": "允许",
+      "http": "200，402175 B，14865 字符正文，31 处费用/政策词",
+      "body": "费率表与说明，但没有逐条发布日期或生效日期，且含营销横幅",
+      "verdict": "本期不接入",
+      "reason": "需要新增「整页变更监控」能力才能用；直接入库会把横幅改动当成政策修订，属于本轮不该扩的架构"
+    },
+    {
+      "id": "nonexistent-paths",
+      "identity": "其余猜测入口",
+      "url": "sell.amazon.com/policies、/announcements、/blog/policy、/help、/blog/rss.xml、/blog/feed、/rss、/blog/announcements.rss",
+      "robots": "允许",
+      "http": "全部 404（或返回 HTML 而非 feed）",
+      "body": "不存在",
+      "verdict": "拒绝",
+      "reason": "入口不存在"
+    }
+  ],
+  "raw": {
+    "robots": [
+      {
+        "url": "https://sell.amazon.com/robots.txt",
+        "status": 200,
+        "bytes": 243,
+        "disallow": [
+          "Disallow: /404$",
+          "Disallow: /events/accelerate-sandbox-2026",
+          "Disallow: /feedback",
+          "Disallow: /autocomplete",
+          "Disallow: /search",
+          "Disallow: /rum"
+        ],
+        "agentBlocks": 1
+      },
+      {
+        "url": "https://sellingpartners.aboutamazon.com/robots.txt",
+        "status": 200,
+        "bytes": 101,
+        "disallow": [
+          "Disallow: /testing-overlay"
+        ],
+        "agentBlocks": 1
+      },
+      {
+        "url": "https://advertising.amazon.com/robots.txt",
+        "status": 200,
+        "bytes": 2222,
+        "disallow": [
+          "Disallow: /contact/sponsored-products-60-day-vendors/ae",
+          "Disallow: /contact/sponsored-products-60-day-sellers/ae",
+          "Disallow: /contact/sponsored-display-creation-support-vendors",
+          "Disallow: /contact/sponsored-display-creation-support-vendors/es",
+          "Disallow: /contact/sponsored-display-creation-support-vendors/it",
+          "Disallow: /contact/sponsored-display-creation-support-vendors/fr",
+          "Disallow: /contact/sponsored-display-creation-support-vendors/de",
+          "Disallow: /contact/sponsored-display-creation-support-vendors/uk"
+        ],
+        "agentBlocks": 1
+      },
+      {
+        "url": "https://sellercentral.amazon.com/robots.txt",
+        "status": 200,
+        "bytes": 646,
+        "disallow": [
+          "Disallow: /",
+          "Disallow: /forums/search.jspa",
+          "Disallow: /spec/api",
+          "Disallow: /forums/search"
+        ],
+        "agentBlocks": 1
+      },
+      {
+        "url": "https://brandservices.amazon.com/robots.txt",
+        "status": 200,
+        "bytes": 438110,
+        "disallow": [],
+        "agentBlocks": 0
+      }
+    ],
+    "pages": [
+      {
+        "id": "announcements-p5",
+        "url": "https://sell.amazon.com/blog/announcements?p=5&mons_sel_locale=en_US",
+        "note": "公告列表分页深度",
+        "status": 200,
+        "finalUrl": "https://sell.amazon.com/blog/announcements?p=5&mons_sel_locale=en_US",
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 359019,
+        "ms": 2221,
+        "title": "Announcements - Sell on Amazon",
+        "textChars": 10060,
+        "jsShell": false,
+        "dates": [
+          "May 22, 2026",
+          "May 19, 2026"
+        ],
+        "policyHits": 12,
+        "sample": "Announcements - Sell on Amazon Unlock $50K in new seller credits, bonuses, and exclusive benefits. Learn how Search Quick links: Selling on Amazon Fulfillment by Amazon English Select your preferred language English - US Español - US 中文 - CN Start Start sellin"
+      },
+      {
+        "id": "sellingpartners-home",
+        "url": "https://sellingpartners.aboutamazon.com/",
+        "note": "Selling Partners 首页/信息流入口",
+        "status": 200,
+        "finalUrl": "https://sellingpartners.aboutamazon.com/",
+        "contentType": "text/html;charset=UTF-8",
+        "bytes": 399907,
+        "ms": 208,
+        "title": "Small Businesses, Thriving Communities - Amazon Selling Partners",
+        "textChars": 15370,
+        "jsShell": false,
+        "dates": [],
+        "policyHits": 3,
+        "sample": "Small Businesses, Thriving Communities - Amazon Selling Partners Perspectives Videos Impact Programs Map Menu Perspectives Videos Impact Programs Map Small businesses. Thriving communities. From small towns to major cities across all 50 states, Washington, DC,"
+      },
+      {
+        "id": "ad-policy",
+        "url": "https://advertising.amazon.com/resources/ad-policy",
+        "note": "Amazon Ads 政策页",
+        "status": 404,
+        "finalUrl": "https://advertising.amazon.com/resources/ad-policy",
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 182126,
+        "ms": 1295,
+        "title": "404 Not Found | Amazon Ads",
+        "textChars": 340,
+        "jsShell": true,
+        "dates": [],
+        "policyHits": 0,
+        "sample": "404 Not Found | Amazon Ads 404 - Sorry we can't find that page Please check the URL again or visit our homepage Get started Answer a few questions to get tailored advertising recommendations. Ad products Explore our solutions, designed for businesses of any si"
+      },
+      {
+        "id": "help-hub-policy",
+        "url": "https://sellercentral.amazon.com/help/hub/reference/G201411300",
+        "note": "Seller Central 政策帮助页",
+        "status": 200,
+        "finalUrl": "https://sellercentral.amazon.com/ap/signin?openid.pape.preferred_auth_policies=Policy15&openid.pape.max_auth_age=300&openid.return_to=https%3A%2F%2Fsellercentral.amazon.com%2Fhelp%2Fhub%2Freference%2FG201411300&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=sc_na_amazon_v2&openid.mode=checkid_setup&intercept=false&language=en_US&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&pageId=sc_amazon_v3_unified&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0&ssoResponse=eyJ6aXAiOiJERUYiLCJlbmMiOiJBMjU2R0NNIiwiYWxnIjoiQTI1NktXIn0.aK-hkx1fbUO9o4z7wKj1LYpiPWEyJWKtm43-S2C_zdkr21kyHWo4Mw.uVwEGEXoMKfgi7SG.Nn27k1NOIjTFqitWECojo0ly-ze_mBXbXl84WbbkmVREOJk-qpS2uzMddemLrWOqiK9gKhObAN1WwjJWj842VBZli-GpmhMx-JKgAquoDK8i3oPMGEaVnvb6cw9fI9x_Eudt63UygpOWv2bWyDDbh_KDvOetNLizEL8WI0-f4mud7f0I99426zzRJDx-Ab9bqi0ESvne.wNLhMCC7UVtGZzl-YB7GKQ",
+        "contentType": "text/html;charset=UTF-8",
+        "bytes": 139585,
+        "ms": 2422,
+        "title": "Amazon Sign-In",
+        "textChars": 746,
+        "jsShell": false,
+        "dates": [],
+        "policyHits": 0,
+        "sample": "Amazon Sign-In Please Enable Cookies to Continue Passkey error Something went wrong, please sign-in another way or follow any instructions provided by your device. Sorry, your passkey isn&#x27;t working. There might be a problem with the server. Sign in with y"
+      },
+      {
+        "id": "forums-news",
+        "url": "https://sellercentral.amazon.com/forums/forum/amazon-news",
+        "note": "Seller Forums 官方公告板块",
+        "status": 200,
+        "finalUrl": "https://sellercentral.amazon.com/forums/forum/amazon-news",
+        "contentType": "text/html; charset=utf-8",
+        "bytes": 170204,
+        "ms": 396,
+        "title": "Amazon",
+        "textChars": 1861,
+        "jsShell": false,
+        "dates": [],
+        "policyHits": 1,
+        "sample": "Amazon Get over $50K in potential incentives when you start selling with Amazon. Learn how English Select your preferred language English - US 中文 - CN 한국어 - KR Français - FR Italiano - IT हिंदी - IN ไทย - TH தமிழ் - IN Tiếng Việt - VN Deutsch - DE Português - "
+      },
+      {
+        "id": "sell-pricing",
+        "url": "https://sell.amazon.com/pricing",
+        "note": "官方费用页",
+        "status": 200,
+        "finalUrl": "https://sell.amazon.com/pricing",
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 402175,
+        "ms": 2261,
+        "title": "How much does it cost to sell on Amazon? | Sell on Amazon",
+        "textChars": 14865,
+        "jsShell": false,
+        "dates": [],
+        "policyHits": 31,
+        "sample": "How much does it cost to sell on Amazon? | Sell on Amazon Unlock $50K in new seller credits, bonuses, and exclusive benefits. Learn how Search Quick links: Selling on Amazon Fulfillment by Amazon English Select your preferred language English - US Español - US"
+      },
+      {
+        "id": "sell-blog",
+        "url": "https://sell.amazon.com/blog",
+        "note": "官方博客索引",
+        "status": 200,
+        "finalUrl": "https://sell.amazon.com/blog",
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 368215,
+        "ms": 1553,
+        "title": "Amazon Selling Partner Blog | Sell on Amazon",
+        "textChars": 9833,
+        "jsShell": false,
+        "dates": [],
+        "policyHits": 12,
+        "sample": "Amazon Selling Partner Blog | Sell on Amazon Unlock $50K in new seller credits, bonuses, and exclusive benefits. Learn how Search Quick links: Selling on Amazon Fulfillment by Amazon English Select your preferred language English - US Español - US 中文 - CN Star"
+      },
+      {
+        "id": "brand-policies",
+        "url": "https://brandservices.amazon.com/policies",
+        "note": "Brand Registry 政策",
+        "status": 200,
+        "finalUrl": "https://sell.amazon.com/brand-registry",
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 452988,
+        "ms": 1391,
+        "title": "Amazon Brand Registry | Sell on Amazon",
+        "textChars": 24306,
+        "jsShell": false,
+        "dates": [],
+        "policyHits": 25,
+        "sample": "Amazon Brand Registry | Sell on Amazon Unlock $50K in new seller credits, bonuses, and exclusive benefits. Learn how Search Quick links: Selling on Amazon Fulfillment by Amazon English Select your preferred language English - US Español - US 中文 - CN Start Star"
+      },
+      {
+        "id": "ad-policy-2",
+        "url": "https://advertising.amazon.com/resources/ad-policy/amazon-ads-policy",
+        "status": 404,
+        "bytes": 182120,
+        "title": "404 Not Found | Amazon Ads",
+        "textChars": 340,
+        "dates": [],
+        "policyHits": 0
+      },
+      {
+        "id": "ad-whats-new",
+        "url": "https://advertising.amazon.com/resources/whats-new",
+        "status": 200,
+        "bytes": 207549,
+        "title": "Discover new releases from Amazon Ads | Amazon Ads",
+        "textChars": 1496,
+        "dates": [],
+        "policyHits": 0
+      },
+      {
+        "id": "announcements-p8",
+        "url": "https://sell.amazon.com/blog/announcements?p=8&mons_sel_locale=en_US",
+        "status": 200,
+        "bytes": 359043,
+        "title": "Announcements - Sell on Amazon",
+        "textChars": 10060,
+        "dates": [
+          "May 22, 2026",
+          "May 19, 2026"
+        ],
+        "policyHits": 12
+      },
+      {
+        "id": "announcements-p12",
+        "url": "https://sell.amazon.com/blog/announcements?p=12&mons_sel_locale=en_US",
+        "status": 200,
+        "bytes": 358997,
+        "title": "Announcements - Sell on Amazon",
+        "textChars": 10060,
+        "dates": [
+          "May 22, 2026",
+          "May 19, 2026"
+        ],
+        "policyHits": 12
+      }
+    ],
+    "feeds": [
+      {
+        "url": "https://sellingpartners.aboutamazon.com/data-insights.rss",
+        "status": 200,
+        "contentType": "application/xml;charset=UTF-8",
+        "bytes": 2781,
+        "isXml": true,
+        "items": [
+          {
+            "title": "From sellers to solution providers: fueling business expansion",
+            "date": "2025-11-04"
+          },
+          {
+            "title": "The principles powering Amazon's innovation for sellers",
+            "date": "2024-09-19"
+          },
+          {
+            "title": "A blueprint for private and public sector partnership to stop fake reviews",
+            "date": "2023-06-12"
+          },
+          {
+            "title": "Amazon announces new tools to help sellers save time and money",
+            "date": "2025-09-17"
+          }
+        ]
+      },
+      {
+        "url": "https://sellingpartners.aboutamazon.com/perspectives.rss",
+        "status": 200,
+        "contentType": "application/xml;charset=UTF-8",
+        "bytes": 505,
+        "isXml": true,
+        "items": []
+      },
+      {
+        "url": "https://sellingpartners.aboutamazon.com/rss",
+        "status": 404,
+        "contentType": "text/html;charset=UTF-8",
+        "bytes": 24317,
+        "isXml": false,
+        "items": null
+      },
+      {
+        "url": "https://sell.amazon.com/blog/announcements.rss",
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 247065,
+        "isXml": false,
+        "items": null
+      },
+      {
+        "url": "https://sell.amazon.com/rss",
+        "status": 404,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 254692,
+        "isXml": false,
+        "items": null
+      },
+      {
+        "url": "https://advertising.amazon.com/resources/whats-new/rss",
+        "status": 404,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 186800,
+        "isXml": false,
+        "items": null
+      }
+    ],
+    "pagination": [
+      {
+        "p": 1,
+        "status": 200,
+        "items": 11,
+        "first": {
+          "t": "Create exclusive deals for Amazon Business cus",
+          "d": "2026-09-23"
+        }
+      },
+      {
+        "p": 4,
+        "status": 200,
+        "items": 3,
+        "first": {
+          "t": "Amazon announces new streamlined FBA capacity ",
+          "d": "2023-01-17"
+        }
+      },
+      {
+        "p": 5,
+        "status": 200,
+        "items": 11,
+        "first": {
+          "t": "Create exclusive deals for Amazon Business cus",
+          "d": "2026-09-23"
+        }
+      },
+      {
+        "p": 6,
+        "status": 200,
+        "items": 11,
+        "first": {
+          "t": "Create exclusive deals for Amazon Business cus",
+          "d": "2026-09-23"
+        }
+      },
+      {
+        "p": 8,
+        "status": 200,
+        "items": 11,
+        "first": {
+          "t": "Create exclusive deals for Amazon Business cus",
+          "d": "2026-09-23"
+        }
+      }
+    ],
+    "urls": [
+      {
+        "url": "https://sell.amazon.com/blog/rss.xml",
+        "status": 404,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 254638,
+        "isXml": false,
+        "title": "Sell.amazon.com： 未找到页面"
+      },
+      {
+        "url": "https://sell.amazon.com/blog/feed",
+        "status": 404,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 254645,
+        "isXml": false,
+        "title": "Sell.amazon.com： 未找到页面"
+      },
+      {
+        "url": "https://sell.amazon.com/blog/announcements?category=policies&mons_sel_locale=en_US",
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 359328,
+        "isXml": false,
+        "title": "Announcements - Sell on Amazon"
+      },
+      {
+        "url": "https://advertising.amazon.com/help",
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 178312,
+        "isXml": false,
+        "title": "Amazon"
+      },
+      {
+        "url": "https://advertising.amazon.com/resources/ad-policy/creative-acceptance",
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 176211,
+        "isXml": false,
+        "title": "Amazon"
+      },
+      {
+        "url": "https://advertising.amazon.com/help/GVZ7PMBSF7DZ8N2S",
+        "status": 200,
+        "contentType": "text/html; charset=UTF-8",
+        "bytes": 167135,
+        "isXml": false,
+        "title": "Amazon"
+      }
+    ]
+  },
+  "implications": [
+    "Amazon 公开卖家政策渠道只有 sell.amazon.com/blog/announcements 一条；其余被 robots 全站禁止（sellercentral）、登录墙或 JS 壳挡住。",
+    "该博客约一年一条政策（2026-05-22 客服规则、2026-02-03 FBA Grade and Resell、2023-01-17 库容），因此平台政策记录少是供给问题，不是采集器问题。",
+    "在现有 13 个月窗口内，公告列表第 1 页只有 S02 是政策且已入库；S03 在窗口内但在第 2 页，非首次导入的准入下限会拒绝它——这是设计取舍，不是漏采。",
+    "要继续提高平台政策覆盖，需要新的官方渠道（例如 Amazon 主动提供的 RSS/邮件归档）或放宽准入窗口，后者会把陈旧条目当新闻，本轮不做。"
+  ]
+}
