@@ -4,7 +4,11 @@
   "type": "module",
   "scripts": {
     "dev": "node --watch --env-file-if-exists=../../.env src/main.ts",
-    "start": "node src/main.ts"
+    "start": "node src/main.ts",
+    "monitor:amazon-announcements": "node --env-file-if-exists=../../.env src/radar-announcements.ts",
+    "monitor:amz123-leads": "node --env-file-if-exists=../../.env src/radar-amz123-leads.ts",
+    "monitor:ads-policy": "node --env-file-if-exists=../../.env src/ads-policy.ts",
+    "daemon:ads-policy": "node --env-file-if-exists=../../.env src/ads-policy-daemon.ts"
   },
   "dependencies": {
     "@aihot/backend": "*",

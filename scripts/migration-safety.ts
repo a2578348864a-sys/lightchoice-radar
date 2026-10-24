@@ -65,8 +65,42 @@ function singleAction(tokens: string[]) {
   return depth === 0;
 }
 
+/**
+ * The declaration has to be the file's first line: a comment further down, or the same words inside
+ * a statement, must not reach this path. Only spaces and tabs may separate the marker from its words:
+ * `\s` would also match the newline that ends a bare `--` comment, so `--\natomic` would read as a
+ * declaration and let a blank first line or a split comment reach the atomic path.
+ */
+const ATOMIC_HEADER = /^--[ \t]+atomic[ \t]*\r?\n/;
+
+/**
+ * Atomic migrations exist for one reviewed shape only: 0090 adds the column, then backfills it from
+ * `articles` in the same transaction. The allowed statements are compared token for token against the
+ * text below, so `-- atomic` cannot be used as a general "run any SQL" switch. Anything else — another
+ * UPDATE, a DELETE or TRUNCATE, a SELECT, a third statement, a function body — is refused.
+ */
+const ATOMIC_SQL = [
+  "ALTER TABLE article_revisions ADD COLUMN excerpt text;",
+  `UPDATE article_revisions r SET excerpt = a.excerpt
+     FROM articles a
+    WHERE r.article_id = a.id AND r.revision = a.revision
+      AND r.content_hash = a.content_hash AND r.excerpt IS NULL AND a.excerpt IS NOT NULL;`,
+];
+const ATOMIC_STATEMENTS = ATOMIC_SQL.flatMap((sql) => statements(sql));
+
+function isReviewedAtomic(all: string[][]): boolean {
+  return all.length === ATOMIC_STATEMENTS.length
+    && all.every((tokens, i) => tokens.join(" ") === ATOMIC_STATEMENTS[i]!.join(" "));
+}
+
 export function migrationPlan(text: string): MigrationPlan {
   const all = statements(text);
+  if (ATOMIC_HEADER.test(text)) {
+    if (!isReviewedAtomic(all)) {
+      throw new Error("an atomic migration is limited to the reviewed 0090 statements; split anything else into single-statement migrations");
+    }
+    return { kind: "transaction" };
+  }
   if (all.length !== 1) throw new Error("use one statement per online migration so strong table locks cannot accumulate");
   const tokens = all[0];
   const sql = tokens.join(" ");

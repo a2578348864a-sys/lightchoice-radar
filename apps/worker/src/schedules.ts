@@ -4,8 +4,9 @@ import type { PgBoss } from "pg-boss";
 import { config } from "@aihot/backend/config";
 import { ensureQueue, recordRun } from "@aihot/backend/jobs/queue";
 import { serverModules, type Scheduled } from "@aihot/backend/modules";
-import { sweepUnprocessed } from "@aihot/backend/jobs/content";
+import { sweepUnprocessed, type SweepScope } from "@aihot/backend/jobs/content";
 import { translatePending } from "@aihot/backend/editorial/translate";
+import { translateTextPending } from "@aihot/backend/editorial/translate-text";
 import { adaptIntervals, scheduleDueSources } from "@aihot/backend/sources/collect";
 import { scheduleMpReconcile } from "@aihot/backend/sources/mp";
 import { followXRenames } from "@aihot/backend/sources/x-renames";
@@ -26,8 +27,14 @@ const collecting = process.env.COLLECT_ENABLED === "true";
 
 const ENGINE_SCHEDULES: Scheduled[] = [
   { name: "content.sweep", cron: "*/5 * * * *", run: sweepUnprocessed },
-  // Full-text translations of newly selected items (model calls; off with MODEL_CALLS_ENABLED=false).
-  ...(!config.ruleOnlyMode ? [{ name: "content.translate", cron: "*/5 * * * *", run: () => translatePending() }] : []),
+  // Translations of newly selected items (model calls). In this deployment only the dedicated
+  // translation gate opens it, and only the title/source-summary path runs; the body translator keeps
+  // its own switches for sites that show full text.
+  ...(config.translateEnabled
+    ? [{ name: "content.translate", cron: "*/5 * * * *", run: () => translateTextPending() }]
+    : !config.ruleOnlyMode
+      ? [{ name: "content.translate", cron: "*/5 * * * *", run: () => translatePending() }]
+      : []),
   { name: "hot.rank", cron: "*/5 * * * *", run: () => computeHotRanking() },
   { name: "hot.snapshot", cron: "2 * * * *", run: () => snapshotHeat() },
   { name: "stories.links", cron: "12 * * * *", run: linkRelatedStories },
@@ -63,15 +70,24 @@ const ENGINE_SCHEDULES: Scheduled[] = [
   ...(collecting && !config.ruleOnlyMode && dajialaConfigured() ? [{ name: "sources.mp-reconcile", cron: "*/15 * * * *", run: () => scheduleMpReconcile() }] : []),
 ];
 
-export async function registerSchedules(boss: PgBoss) {
-  const schedules = [...ENGINE_SCHEDULES, ...serverModules().flatMap((m) => m.schedules ?? [])].filter((s) => s.when?.() ?? true);
+/**
+ * `only` registers just the named timers and leaves every other queue untouched (no pruning): the
+ * content-only worker scope uses it so a translation trial cannot pick up the engine's other periodic
+ * work. Without it every schedule is registered and retired cron queues are pruned, as always.
+ */
+export async function registerSchedules(boss: PgBoss, opts: { only?: readonly string[]; scope?: SweepScope } = {}) {
+  const all = [...ENGINE_SCHEDULES, ...serverModules().flatMap((m) => m.schedules ?? [])].filter((s) => s.when?.() ?? true);
+  const schedules = opts.only ? all.filter((s) => opts.only!.includes(s.name)) : all;
   for (const s of schedules) {
     const queue = `cron.${s.name}`;
+    // A scoped run follows new arrivals in the named sources only; discovery keeps its own guard.
+    const run = s.name === "content.sweep" && opts.scope ? () => sweepUnprocessed(opts.scope!) : s.run;
     await ensureQueue(queue, { policy: "singleton", retryLimit: 1, expireInSeconds: 3600 });
     await boss.schedule(queue, s.cron, {}, { tz: "Asia/Shanghai", missed: s.missed ?? "skip" });
     // Schedules fire at minute boundaries; a 15 s pickup keeps them on time with a third of the polling.
-    await boss.work(queue, { pollingIntervalSeconds: 15 }, async () => recordRun(s.name, s.run));
+    await boss.work(queue, { pollingIntervalSeconds: 15 }, async () => recordRun(s.name, run));
   }
+  if (opts.only) return;
   // Retired or disabled timers must leave no queued work behind, including queues an earlier release
   // already unscheduled. pg-boss deletes the queue's jobs and schedules; job_runs retains its audit.
   const current = new Set(schedules.map((s) => `cron.${s.name}`));
