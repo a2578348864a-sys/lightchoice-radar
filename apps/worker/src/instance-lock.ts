@@ -17,6 +17,8 @@ const LOCK_KEYS = {
   "amz123-leads": 7_204_229_003,
   // The first-lane content/translation worker (scoped main worker): one process, no second consumer.
   "radar-translate": 7_204_229_004,
+  // The second lane's industry worker: one process, its own queues, never the first lane's.
+  "radar-industry": 7_204_229_005,
 } as const;
 
 export type WorkerRole = keyof typeof LOCK_KEYS;

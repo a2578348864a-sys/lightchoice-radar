@@ -35,6 +35,7 @@ const EXPECTED_COMMAND: Record<WorkerRole, string> = {
   "amz123-leads": "radar-amz123-leads.ts",
   // The scoped first-lane worker is the main entry with RADAR_WORKER_SCOPE=content.
   "radar-translate": "apps/worker/src/main.ts",
+  "radar-industry": "radar-industry.ts",
 };
 
 export function expectedCommandFragment(role: WorkerRole): string {

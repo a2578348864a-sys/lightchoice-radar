@@ -18,6 +18,7 @@ import { fetchJsonList } from "./json-list.ts";
 import { AMAZON_US_ANNOUNCEMENTS_SOURCE_ID, RADAR_POLICY_SOURCE_ID, archiveWindowFloor, isApprovedRadarLeadSource, isApprovedRadarLeadSourceId, isApprovedRadarPolicyWebList, isApprovedRadarRegulatorySource, isQualifyingAmazonPolicyAnnouncement, nextPolicyGateMemory, policyGateRejections, RADAR_LEAD_SOURCE_IDS, RADAR_POLICY_SOURCE_IDS, type PolicyGateMemory, type RadarLeadSourceId, type RadarRegulatorySourceId } from "./radar-policy-source.ts";
 import { fetchAdsPolicyPages, isApprovedAdsPolicySource } from "./ads-policy.ts";
 import { fetchAmz123Leads } from "./amz123.ts";
+import { INDUSTRY_SOURCE_IDS, isApprovedIndustrySourceId } from "./industry-lane.ts";
 import { fetchXSearch, planXShards, readXSearch, shardHandle, shardQuery, selfThreadHandle, SHARDABLE_SQL, tweetToCandidate, type XBacklog } from "./x.ts";
 import { FetchError, type Candidate, type SourceRow } from "./types.ts";
 import { BrowserUnavailableError } from "./browser-render.ts";
@@ -261,8 +262,12 @@ export async function enrichDetails(candidates: CollectionCandidate[], source: S
 async function store(sourceId: string, runId: number, candidates: CollectionCandidate[], backfill: string | null) {
   let created = 0;
   let revised = 0;
+  const [sourceRow] = await sql<{ config: Record<string, unknown> }[]>`SELECT config FROM sources WHERE id = ${sourceId}`;
+  // A source whose permission profile closes excerpt storage keeps only factual metadata: the feed's
+  // own summary text is dropped before anything is written, for every revision, every time.
+  const excerptAllowed = sourceRow?.config?.saveExcerpt !== false;
   for (const c of candidates) {
-    const material = { ...c, sourceId, via: "fetch" as const, backfill };
+    const material = { ...c, sourceId, via: "fetch" as const, backfill, ...(excerptAllowed ? {} : { excerpt: null }) };
     let res;
     try { res = await upsertMaterial(material); }
     catch (error) {
@@ -552,31 +557,34 @@ async function scheduleXShards(): Promise<number> {
  * An explicit Radar policy source scope is available for safe one-source operations and never schedules
  * a different source or an X shard. The normal worker calls this with no argument and keeps its existing behavior.
  */
-export async function scheduleDueSources(onlyPolicySourceId?: (typeof RADAR_POLICY_SOURCE_IDS)[number] | RadarRegulatorySourceId | RadarLeadSourceId): Promise<{ enqueued: number; shards: number }> {
-  if (onlyPolicySourceId && !(RADAR_POLICY_SOURCE_IDS as readonly string[]).includes(onlyPolicySourceId) && !isApprovedRadarRegulatorySource(onlyPolicySourceId) && !isApprovedRadarLeadSourceId(onlyPolicySourceId)) {
+export async function scheduleDueSources(onlyPolicySourceId?: (typeof RADAR_POLICY_SOURCE_IDS)[number] | RadarRegulatorySourceId | RadarLeadSourceId | (typeof INDUSTRY_SOURCE_IDS)[number]): Promise<{ enqueued: number; shards: number }> {
+  if (onlyPolicySourceId && !(RADAR_POLICY_SOURCE_IDS as readonly string[]).includes(onlyPolicySourceId) && !isApprovedRadarRegulatorySource(onlyPolicySourceId) && !isApprovedRadarLeadSourceId(onlyPolicySourceId) && !isApprovedIndustrySourceId(onlyPolicySourceId)) {
     throw new Error(`Source is not in a Radar schedule allowlist: ${onlyPolicySourceId}`);
   }
   const radarPolicySourceIds: string[] = [...RADAR_POLICY_SOURCE_IDS];
   // The lead source is a Radar source of its own: it is scheduled by the isolated worker, never by
-  // the general worker, so it keeps its own queue and its own cadence.
+  // the general worker, so it keeps its own queue and its own cadence. The industry sources are the
+  // same: the second lane's worker schedules them, so the general schedule never sees them.
   const radarWebListIds: string[] = [...radarPolicySourceIds, ...RADAR_LEAD_SOURCE_IDS];
   const rows = await sql<Pick<SourceRow, "id" | "kind" | "config">[]>`
     SELECT id, kind, config FROM sources
     WHERE enabled AND ${config.ruleOnlyMode
-      ? sql`(kind = 'rss' OR (kind = 'web_list' AND id = ANY(${radarWebListIds}::text[])))`
+      ? (onlyPolicySourceId
+          ? sql`id = ${onlyPolicySourceId}`
+          : sql`((kind = 'rss' AND id <> ALL(${INDUSTRY_SOURCE_IDS}::text[])) OR (kind = 'web_list' AND id = ANY(${radarWebListIds}::text[])))`)
       : sql`kind IN ('rss', 'web_list', 'json_list', 'x_search') AND id <> ALL(${RADAR_LEAD_SOURCE_IDS}::text[])`}
-      AND ${onlyPolicySourceId ? sql`id = ${onlyPolicySourceId}` : sql`true`}
       AND (next_fetch_at IS NULL OR next_fetch_at <= now()) AND NOT (${sharded()})
     ORDER BY next_fetch_at NULLS FIRST LIMIT 40`;
   let enqueued = 0;
   const eligible = config.ruleOnlyMode
-    ? rows.filter((r) => r.kind === "rss" || isApprovedRadarPolicyWebList(r) || isApprovedRadarLeadSource(r))
+    ? rows.filter((r) => (r.kind === "rss" && (onlyPolicySourceId !== undefined || !isApprovedIndustrySourceId(r.id))) || isApprovedRadarPolicyWebList(r) || isApprovedRadarLeadSource(r))
     : rows;
   for (const r of eligible) {
     // Each private source family keeps its own queue so the isolated worker never reads `sources.fetch`
     // and therefore never takes a job that belongs to another source. The fee-updates routing only
     // applies when its own isolated schedule calls with that id; the general schedule (no argument)
-    // keeps the historic `sources.fetch` routing unchanged.
+    // keeps the historic `sources.fetch` routing unchanged. Industry sources route to their own queue
+    // the same way; without their own schedule call they are never enqueued at all.
     const queue = onlyPolicySourceId === AMAZON_US_ANNOUNCEMENTS_SOURCE_ID
       ? QUEUES.fetchAmazonAnnouncements
       : onlyPolicySourceId === RADAR_POLICY_SOURCE_ID
@@ -585,7 +593,9 @@ export async function scheduleDueSources(onlyPolicySourceId?: (typeof RADAR_POLI
           ? QUEUES.fetchRegulatory
           : isApprovedRadarLeadSourceId(r.id)
             ? QUEUES.fetchAmz123Leads
-            : QUEUES.fetchSource;
+            : isApprovedIndustrySourceId(r.id)
+              ? QUEUES.fetchIndustry
+              : QUEUES.fetchSource;
     if (await enqueue(queue, { sourceId: r.id }, { singletonKey: r.id })) enqueued += 1;
     await sql`UPDATE sources SET next_fetch_at = now() + interval '10 minutes' WHERE id = ${r.id}`;
   }

@@ -10,7 +10,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { REPO_ROOT } from "@aihot/backend/config";
 
-export type WorkerRole = "ads-policy" | "radar-announcements" | "ads-policy-supervisor" | "amz123-leads" | "radar-translate";
+export type WorkerRole = "ads-policy" | "radar-announcements" | "ads-policy-supervisor" | "amz123-leads" | "radar-translate" | "radar-industry";
 
 // One directory per checkout (default), overridable so tests and a second checkout never share requests.
 const RUN_DIR = process.env.RADAR_RUN_DIR ? path.resolve(process.env.RADAR_RUN_DIR) : path.join(REPO_ROOT, ".data", "run");

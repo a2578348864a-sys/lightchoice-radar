@@ -644,34 +644,46 @@ async function stop(target?: string): Promise<number> {
 
   const annHeld = await lockHeld(LOCK_ANNOUNCEMENTS);
   if (annHeld === true) {
-    console.log("[2/5] 公告/监管 Worker 发送停止请求（当前采集会先收尾）…");
+    const industryHeld = await lockHeld(7_204_229_005);
+  if (industryHeld === true) {
+    console.log("[2/6] 行业 Worker 发送停止请求（第二主线，当前轮先收尾）…");
+    const r = await runAsync(nodeBin(), ["--env-file-if-exists=.env", RADAR_OPS, "stop", "industry", "--timeout=120"], 150_000);
+    process.stdout.write(r.out);
+    if (r.code !== 0) { ok = false; console.log("      没有完全停止，可稍后重试。"); }
+  } else if (industryHeld === null) {
+    console.log("[2/6] 行业 Worker 无法确认（数据库未运行），跳过");
+  } else {
+    console.log("[2/6] 行业 Worker 未运行，跳过");
+  }
+
+  console.log("[3/6] 公告/监管 Worker 发送停止请求（当前采集会先收尾）…");
     const r = await runAsync(nodeBin(), ["--env-file-if-exists=.env", RADAR_OPS, "stop", "announcements", "--timeout=120"], 150_000);
     process.stdout.write(r.out);
     if (r.code !== 0) { ok = false; console.log("      没有完全停止，可稍后重试。"); }
   } else if (annHeld === null) {
-    console.log("[2/5] 公告/监管 Worker 无法确认（数据库未运行），跳过");
+    console.log("[3/6] 公告/监管 Worker 无法确认（数据库未运行），跳过");
   } else {
-    console.log("[2/5] 公告/监管 Worker 未运行，跳过");
+    console.log("[3/6] 公告/监管 Worker 未运行，跳过");
   }
 
   const held = await lockHeld(LEADS_LOCK);
   if (held === true) {
-    console.log("[3/5] AMZ123 Worker    发送停止请求（当前采集会先收尾）…");
+    console.log("[4/6] AMZ123 Worker    发送停止请求（当前采集会先收尾）…");
     const r = await runAsync(nodeBin(), ["--env-file-if-exists=.env", RADAR_OPS, "stop", "leads", "--timeout=120"], 150_000);
     process.stdout.write(r.out);
     if (r.code !== 0) { ok = false; console.log("      没有完全停止，可稍后重试；不要用 taskkill /IM node.exe。"); }
   } else if (held === null) {
-    console.log("[3/5] AMZ123 Worker    无法确认（数据库未运行），跳过");
+    console.log("[4/6] AMZ123 Worker    无法确认（数据库未运行），跳过");
   } else {
-    console.log("[3/5] AMZ123 Worker    未运行，跳过");
+    console.log("[4/6] AMZ123 Worker    未运行，跳过");
   }
 
-  console.log("[4/5] Web / API");
+  console.log("[5/6] Web / API");
   ok = (await killVerified(WEB_PORT, WEB_ENTRY, "Web 3000")) && ok;
   ok = (await killVerified(API_PORT, API_ENTRY, "API 3001")) && ok;
 
   if (target === "all") {
-    console.log("[5/5] 数据库 5544      按 fast 模式关闭…");
+    console.log("[6/6] 数据库 5544      按 fast 模式关闭…");
     if (!(await pgReady())) console.log("      未运行，跳过");
     else {
       const r = await runAsync(pgCtlExe, ["stop", "-D", PG_DATA, "-m", "fast", "-w"], 60_000);
@@ -680,7 +692,7 @@ async function stop(target?: string): Promise<number> {
       ok = ok && stopped;
     }
   } else {
-    console.log("[5/5] 数据库 5544      保留运行（要一起关：stop-radar.cmd all）");
+    console.log("[6/6] 数据库 5544      保留运行（要一起关：stop-radar.cmd all）");
   }
 
   console.log(ok ? "\n完成。" : "\n有项目没有停干净，见上面的提示。");

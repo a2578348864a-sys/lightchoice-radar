@@ -28,6 +28,8 @@ import {
 } from "../apps/worker/src/control.ts";
 import { queryWindowsProcess, verifyAndTerminateByHandle, verifyWorkerIdentity } from "../apps/worker/src/process-identity.ts";
 import { startDetached, startOnHiddenConsole } from "./process-start.ts";
+// The industry lane's role key, read from the lane's own registry (one source of truth).
+const INDUSTRY_LOCK_KEY = 7_204_229_005;
 import {
   TRANSLATE_LOCK_KEY,
   TRANSLATE_SOURCES,
@@ -42,7 +44,7 @@ import {
 
 const RUN_DIR = path.join(REPO_ROOT, ".data", "_diag");
 /** Must match the keys in apps/worker/src/instance-lock.ts. */
-const LOCK_KEYS: Record<string, number> = { "ads-policy": 7_204_229_002, "radar-announcements": 7_204_229_001, "amz123-leads": 7_204_229_003, "radar-translate": TRANSLATE_LOCK_KEY };
+const LOCK_KEYS: Record<string, number> = { "ads-policy": 7_204_229_002, "radar-announcements": 7_204_229_001, "amz123-leads": 7_204_229_003, "radar-translate": TRANSLATE_LOCK_KEY, "radar-industry": INDUSTRY_LOCK_KEY };
 const WEB_PORT = 3000;
 const API_PORT = 3001;
 const RADAR_SOURCES = ["amazon-us-announcements", "amazon-us-fee-updates", "ads-policy-pages", "rss-cpsc-recalls", "us-federal-register-cpsc", "us-federal-register-ftc", "amz123-policy-leads"];
@@ -55,6 +57,7 @@ const TARGETS: Record<string, { worker: WorkerRole; supervisor?: WorkerRole }> =
   leads: { worker: "amz123-leads" },
   // The scoped content/translation worker: its own role, its own lock, its own stop request file.
   translate: { worker: "radar-translate" },
+  industry: { worker: "radar-industry" },
 };
 
 const truthy = (value: string | undefined) => /^(1|true|yes|on)$/i.test(String(value ?? "").trim());
@@ -346,6 +349,20 @@ async function start(target: string | undefined, ports: { web: number; api: numb
     return 0;
   }
 
+  if (target === "industry") {
+    if (await lockHeld(LOCK_KEYS["radar-industry"]!) || heartbeatAlive("radar-industry")) {
+      console.log("行业 Worker 已在运行，不重复启动。");
+      return 1;
+    }
+    const pid = startDetached({
+      entry: path.join(REPO_ROOT, "apps/worker/src/radar-industry.ts"),
+      nodeArgs: ["--env-file-if-exists=.env"],
+      logName: "worker-industry.log",
+      env: { ...process.env, RADAR_INDUSTRY_ENABLED: process.env.RADAR_INDUSTRY_ENABLED ?? "true" },
+    });
+    console.log(`行业 Worker pid=${pid ?? "?"} 日志 .data/_diag/worker-industry.log`);
+    return 0;
+  }
   if (target === "announcements") {
     if (await lockHeld(LOCK_KEYS["radar-announcements"]!) || heartbeatAlive("radar-announcements")) {
       console.log("公告 Worker 已在运行（实例锁被占用或进程仍在写心跳），不重复启动。");

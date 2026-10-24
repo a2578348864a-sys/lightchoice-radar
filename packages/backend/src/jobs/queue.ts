@@ -23,6 +23,7 @@ export interface JobData {
   "sources.fetch-amazon-fee-updates": { sourceId: string; force?: boolean };
   "sources.fetch-regulatory": { sourceId: string; force?: boolean };
   "sources.fetch-amz123-leads": { sourceId: string; force?: boolean };
+  "sources.fetch-industry": { sourceId: string; force?: boolean };
   "sources.fetch-x": { key: string; sourceIds: string[] };
   "sources.mp": { sourceId: string; reason?: "schedule" | "manual" };
   "notify.selected": { articleId: string; attempt?: number };
@@ -41,6 +42,7 @@ export const QUEUES = {
   fetchAmazonFeeUpdates: "sources.fetch-amazon-fee-updates",
   fetchRegulatory: "sources.fetch-regulatory",
   fetchAmz123Leads: "sources.fetch-amz123-leads",
+  fetchIndustry: "sources.fetch-industry",
   fetchXShard: "sources.fetch-x",
   mpCheck: "sources.mp",
   notifySelected: "notify.selected",
@@ -61,6 +63,7 @@ const QUEUE_OPTIONS: Record<QueueName, QueueOptions> = {
   [QUEUES.fetchAmazonFeeUpdates]: { policy: "short", retryLimit: 0, expireInSeconds: 600 },
   [QUEUES.fetchRegulatory]: { policy: "short", retryLimit: 0, expireInSeconds: 600 },
   [QUEUES.fetchAmz123Leads]: { policy: "short", retryLimit: 0, expireInSeconds: 900 },
+  [QUEUES.fetchIndustry]: { policy: "short", retryLimit: 0, expireInSeconds: 900 },
   [QUEUES.fetchXShard]: { policy: "short", retryLimit: 0, expireInSeconds: 900 },
   [QUEUES.mpCheck]: { policy: "short", retryLimit: 3, retryDelay: 60, retryBackoff: true, expireInSeconds: 600 },
   [QUEUES.notifySelected]: { policy: "short", retryLimit: 0, expireInSeconds: 300 },

@@ -45,6 +45,9 @@ function num(name: string, fallback: number): number {
  */
 export const TRANSLATION_PURPOSES = ["translate_title", "translate_excerpt", "translate_body", "translate_quoted"] as const;
 export type TranslationPurpose = (typeof TRANSLATION_PURPOSES)[number];
+/** The industry lane's own paid purposes (second lane): Chinese processing and evidence-checked events. */
+export const INDUSTRY_PURPOSES = ["industry_title", "industry_excerpt", "industry_event", "industry_merge"] as const;
+export type IndustryPurpose = (typeof INDUSTRY_PURPOSES)[number];
 
 export const isProduction = env.NODE_ENV === "production";
 // Radar is a no-model product: paid-provider calls stay blocked even if an inherited AIHOT .env
@@ -82,6 +85,12 @@ export const config = {
    * refusal, and MODEL_CALLS_ENABLED stays false (editorial/translate-budget.ts holds the caps).
    */
   translateEnabled: bool("RADAR_TRANSLATE_ENABLED", false),
+  /**
+   * The second lane's paid capability (US consumer & e-commerce industry dynamics): DeepSeek only, its
+   * own budget window (editorial/industry-budget.ts) and only INDUSTRY_PURPOSES. Independent of the
+   * translation switch: turning either off never touches the other lane's spend or window.
+   */
+  industryEnabled: bool("RADAR_INDUSTRY_ENABLED", false),
   translate: {
     /**
      * Identifier of the paid window now running (e.g. "r47"). Every window keeps its own caps and its
@@ -99,6 +108,18 @@ export const config = {
     budgetCny: num("RADAR_TRANSLATE_BUDGET_CNY", 3),
     priceInPerMTokens: num("RADAR_TRANSLATE_PRICE_IN", 2),
     priceOutPerMTokens: num("RADAR_TRANSLATE_PRICE_OUT", 8),
+  },
+  /** The second lane's caps: its own environment valves, its own window, never the translation's. */
+  industry: {
+    round: env.RADAR_INDUSTRY_ROUND?.trim() || "",
+    maxRequests: int("RADAR_INDUSTRY_MAX_REQUESTS", 120),
+    maxArticles: int("RADAR_INDUSTRY_MAX_ARTICLES", 50),
+    runArticles: int("RADAR_INDUSTRY_RUN_ARTICLES", 3),
+    dayArticles: int("RADAR_INDUSTRY_DAY_ARTICLES", 15),
+    budgetCny: num("RADAR_INDUSTRY_BUDGET_CNY", 3),
+    priceInPerMTokens: num("RADAR_INDUSTRY_PRICE_IN", 2),
+    priceOutPerMTokens: num("RADAR_INDUSTRY_PRICE_OUT", 8),
+    purposes: [...INDUSTRY_PURPOSES],
   },
   /** Keep original RSS copy visible without model scoring, rewriting or event grouping. */
   ruleOnlyMode,
@@ -118,6 +139,18 @@ export type CredentialGroup = "models" | "collectors" | "integrations" | "auth";
  */
 export function translationPurposeAllowed(purpose: string): boolean {
   return config.translateEnabled && (TRANSLATION_PURPOSES as readonly string[]).includes(purpose);
+}
+
+/** The industry lane's own valve: independent of the translation switch, its own purposes only. */
+export function industryPurposeAllowed(purpose: string): boolean {
+  return config.industryEnabled && (INDUSTRY_PURPOSES as readonly string[]).includes(purpose);
+}
+
+/** Which lane a purpose belongs to; null when no switch opens it (rule mode keeps refusing it). */
+export function paidLaneOf(purpose: string): "translate" | "industry" | null {
+  if (translationPurposeAllowed(purpose)) return "translate";
+  if (industryPurposeAllowed(purpose)) return "industry";
+  return null;
 }
 
 const groupCache = new Map<CredentialGroup, Record<string, string>>();

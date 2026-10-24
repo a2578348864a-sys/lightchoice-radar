@@ -716,3 +716,98 @@ export interface LeadSourceStatus {
   /** next_fetch_at is a plan, not a promise: nothing runs while the worker is down. */
   nextFetchIsPlanOnly: boolean;
 }
+
+/* ------------------------------------------------------------- */
+/* The second lane: US consumer & e-commerce industry dynamics.   */
+/* ------------------------------------------------------------- */
+
+export type IndustryThemeId =
+  | "consumer-demand"
+  | "ecommerce-competition"
+  | "category-trends"
+  | "supply-chain-cost"
+  | "economic-data";
+
+export type IndustryKind =
+  | "news" | "official-data" | "opinion" | "corporate-personnel" | "earnings"
+  | "sponsored" | "research-promo" | "irrelevant";
+
+export interface IndustryStoryRef {
+  id: number;
+  publicId: string;
+  title: string;
+  latest: string | null;
+  firstReportAt: string | null;
+  articleCount: number;
+  digestVersion: number | null;
+}
+
+/** One admitted industry item. Restricted sources expose factual metadata only. */
+export interface IndustryItem {
+  id: string;
+  title: string;
+  originalTitle: string | null;
+  url: string;
+  sourceId: string;
+  sourceName: string;
+  publishedAt: string | null;
+  discoveredAt: string;
+  excerpt: string | null;
+  zhTitle: string | null;
+  kind: IndustryKind;
+  themes: IndustryThemeId[];
+  story: IndustryStoryRef | null;
+  modelProcessing: boolean;
+}
+
+export interface IndustryListResponse {
+  items: IndustryItem[];
+  counts: { admitted: number; rejected: number; stories: number; zh: number };
+  themes: Array<{ id: IndustryThemeId; label: string }>;
+  sources: Array<{ id: string; name: string; publisher: string; modelProcessing: boolean; saveExcerpt: boolean }>;
+  filters: { theme: string | null; source: string | null; kind: string | null; q: string | null; days: number };
+}
+
+export interface IndustryDigestVersion {
+  version: number;
+  digest: string;
+  latest: string | null;
+  receiptId: number | null;
+  articleIds: string[];
+  createdAt: string;
+}
+
+export interface IndustryDetail extends IndustryItem {
+  siblings: IndustryItem[];
+  digestVersions: IndustryDigestVersion[];
+}
+
+export interface IndustryPick {
+  storyId: number;
+  storyPublicId: string;
+  title: string;
+  quick: string | null;
+  reason: string;
+  theme: IndustryThemeId;
+  articleIds: string[];
+  digestVersion: number | null;
+  generatedAt: string;
+}
+
+export interface IndustryPicksResponse {
+  days: Array<{ day: string; picks: IndustryPick[] }>;
+  note?: string;
+  generatedFor: number;
+}
+
+export interface IndustrySourceStatus {
+  sources: Array<{ id: string; enabled: boolean; health: string; intervalMinutes: number; lastError: string | null; nextFetchAt: string | null; lastOkAt: string | null }>;
+  lastRun: { id: number; status: string; startedAt: string; found: number; created: number } | null;
+  budget: {
+    round: string;
+    requests: number;
+    spentCny: number;
+    limits: { maxRequests?: number; maxArticles?: number; budgetCny?: number; expiresAt?: string; purposes?: string[] } | null;
+    observationStartedAt: string | null;
+  };
+}

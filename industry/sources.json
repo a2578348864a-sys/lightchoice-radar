@@ -13,18 +13,31 @@
         "titleSelector": ".PagePromo-title",
         "publishedAtSelector": ".PagePromo-date",
         "publishedAtUtcOffset": "+00:00",
-        "allowUrlPrefixes": ["https://sellingpartners.aboutamazon.com/update-to-u-s-referral-and-fulfillment-by-amazon-fees-for-"],
+        "allowUrlPrefixes": [
+          "https://sellingpartners.aboutamazon.com/update-to-u-s-referral-and-fulfillment-by-amazon-fees-for-"
+        ],
         "publisherRole": "organization",
-        "publisherUrlPrefixes": ["https://sellingpartners.aboutamazon.com/update-to-u-s-referral-and-fulfillment-by-amazon-fees-for-"],
+        "publisherUrlPrefixes": [
+          "https://sellingpartners.aboutamazon.com/update-to-u-s-referral-and-fulfillment-by-amazon-fees-for-"
+        ],
         "publisherRequiresDiscovery": true,
         "acceptLanguage": "en-US,en;q=0.9",
-        "_aihot": { "initialBackfillLimit": 10, "initialBackfillMonths": 13 }
+        "_aihot": {
+          "initialBackfillLimit": 10,
+          "initialBackfillMonths": 13
+        }
       },
       "tier": "T1",
       "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 60,
-      "tags": ["platform_policy", "亚马逊官方", "美国站", "销售费用", "FBA"],
+      "tags": [
+        "platform_policy",
+        "亚马逊官方",
+        "美国站",
+        "销售费用",
+        "FBA"
+      ],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
@@ -35,13 +48,20 @@
       "config": {
         "feedUrl": "https://www.cpsc.gov/Newsroom/CPSC-RSS-Feed/Recalls-RSS",
         "acceptLanguage": "en-US,en;q=0.9",
-        "_aihot": { "initialBackfillLimit": 15 }
+        "_aihot": {
+          "initialBackfillLimit": 15
+        }
       },
       "tier": "T1",
       "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 60,
-      "tags": ["external_regulation", "美国监管机构", "消费品安全", "产品召回"],
+      "tags": [
+        "external_regulation",
+        "美国监管机构",
+        "消费品安全",
+        "产品召回"
+      ],
       "site_fulltext": false,
       "syndicate_fulltext": false
     },
@@ -57,9 +77,13 @@
         "titleSelector": ".PagePromo-title",
         "publishedAtSelector": ".PagePromo-date",
         "publishedAtUtcOffset": "+00:00",
-        "allowUrlPrefixes": ["https://sellingpartners.aboutamazon.com/accelerate-"],
+        "allowUrlPrefixes": [
+          "https://sellingpartners.aboutamazon.com/accelerate-"
+        ],
         "publisherRole": "organization",
-        "publisherUrlPrefixes": ["https://sellingpartners.aboutamazon.com/accelerate-"],
+        "publisherUrlPrefixes": [
+          "https://sellingpartners.aboutamazon.com/accelerate-"
+        ],
         "publisherRequiresDiscovery": true,
         "acceptLanguage": "en-US,en;q=0.9",
         "detail": {
@@ -70,13 +94,19 @@
           "titleSelector": "h1",
           "summarySelector": "meta[property=\"og:description\"]"
         },
-        "_aihot": { "initialBackfillLimit": 10, "initialBackfillMonths": 13 }
+        "_aihot": {
+          "initialBackfillLimit": 10,
+          "initialBackfillMonths": 13
+        }
       },
       "tier": "T1",
       "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 60,
-      "tags": ["亚马逊官方", "卖家活动与功能宣传"],
+      "tags": [
+        "亚马逊官方",
+        "卖家活动与功能宣传"
+      ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false
@@ -93,9 +123,13 @@
         "titleSelector": ".PagePromo-title",
         "publishedAtSelector": ".PagePromo-date",
         "publishedAtUtcOffset": "+00:00",
-        "allowUrlPrefixes": ["https://sell.amazon.com/blog/announcements/"],
+        "allowUrlPrefixes": [
+          "https://sell.amazon.com/blog/announcements/"
+        ],
         "publisherRole": "organization",
-        "publisherUrlPrefixes": ["https://sell.amazon.com/blog/announcements/"],
+        "publisherUrlPrefixes": [
+          "https://sell.amazon.com/blog/announcements/"
+        ],
         "publisherRequiresDiscovery": true,
         "acceptLanguage": "en-US,en;q=0.9",
         "detail": {
@@ -106,13 +140,22 @@
           "titleSelector": "h1",
           "summarySelector": "meta[property=\"og:description\"]"
         },
-        "_aihot": { "initialBackfillLimit": 15, "initialBackfillMonths": 13 }
+        "_aihot": {
+          "initialBackfillLimit": 15,
+          "initialBackfillMonths": 13
+        }
       },
       "tier": "T1",
       "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 360,
-      "tags": ["platform_policy", "亚马逊官方", "美国站", "卖家公告", "正文规则筛选"],
+      "tags": [
+        "platform_policy",
+        "亚马逊官方",
+        "美国站",
+        "卖家公告",
+        "正文规则筛选"
+      ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": true
@@ -125,15 +168,28 @@
         "feedUrl": "https://www.federalregister.gov/api/v1/documents.rss?conditions%5Bagencies%5D%5B%5D=consumer-product-safety-commission&conditions%5Btype%5D%5B%5D=RULE&conditions%5Btype%5D%5B%5D=PRORULE&conditions%5Bpublication_date%5D%5Bgte%5D=2026-01-01&per_page=50",
         "acceptLanguage": "en-US,en;q=0.9",
         "ingestNoiseFilter": {
-          "dropMarkers": ["sunshine act", "information collection", "advisory committee", "petition for rulemaking", "meeting"]
+          "dropMarkers": [
+            "sunshine act",
+            "information collection",
+            "advisory committee",
+            "petition for rulemaking",
+            "meeting"
+          ]
         },
-        "_aihot": { "initialBackfillLimit": 20 }
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
       },
       "tier": "T1",
       "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 120,
-      "tags": ["美国监管机构", "external_regulation", "消费品安全", "联邦公报"],
+      "tags": [
+        "美国监管机构",
+        "external_regulation",
+        "消费品安全",
+        "联邦公报"
+      ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": true
@@ -146,15 +202,28 @@
         "feedUrl": "https://www.federalregister.gov/api/v1/documents.rss?conditions%5Bagencies%5D%5B%5D=federal-trade-commission&conditions%5Btype%5D%5B%5D=RULE&conditions%5Btype%5D%5B%5D=PRORULE&conditions%5Bpublication_date%5D%5Bgte%5D=2026-01-01&per_page=50",
         "acceptLanguage": "en-US,en;q=0.9",
         "ingestNoiseFilter": {
-          "dropMarkers": ["sunshine act", "information collection", "advisory committee", "petition for rulemaking", "meeting"]
+          "dropMarkers": [
+            "sunshine act",
+            "information collection",
+            "advisory committee",
+            "petition for rulemaking",
+            "meeting"
+          ]
         },
-        "_aihot": { "initialBackfillLimit": 20 }
+        "_aihot": {
+          "initialBackfillLimit": 20
+        }
       },
       "tier": "T1",
       "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 120,
-      "tags": ["美国监管机构", "external_regulation", "消费者保护", "联邦公报"],
+      "tags": [
+        "美国监管机构",
+        "external_regulation",
+        "消费者保护",
+        "联邦公报"
+      ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": true
@@ -172,15 +241,23 @@
           "https://advertising.amazon.com/help/GZS8A5XCFQJTS88N"
         ],
         "publisherRole": "organization",
-        "publisherUrlPrefixes": ["https://advertising.amazon.com/help/"],
+        "publisherUrlPrefixes": [
+          "https://advertising.amazon.com/help/"
+        ],
         "publisherRequiresDiscovery": true,
-        "_aihot": { "initialBackfillLimit": 3 }
+        "_aihot": {
+          "initialBackfillLimit": 3
+        }
       },
       "tier": "T1",
       "owner_entity_id": null,
       "participation_mode": "editorial",
       "interval_minutes": 1440,
-      "tags": ["ads_policy", "亚马逊官方", "广告政策"],
+      "tags": [
+        "ads_policy",
+        "亚马逊官方",
+        "广告政策"
+      ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": false
@@ -196,16 +273,125 @@
           "https://www.amz123.com/t/",
           "https://www.amz123.com/kx/"
         ],
-        "_aihot": { "initialBackfillLimit": 25, "initialBackfillMonths": 1 }
+        "_aihot": {
+          "initialBackfillLimit": 25,
+          "initialBackfillMonths": 1
+        }
       },
       "tier": "T2",
       "owner_entity_id": null,
       "participation_mode": "isolated",
       "interval_minutes": 360,
-      "tags": ["第三方线索", "amz123", "美国站", "政策线索"],
+      "tags": [
+        "第三方线索",
+        "amz123",
+        "美国站",
+        "政策线索"
+      ],
       "site_fulltext": false,
       "syndicate_fulltext": false,
       "enabled": true
+    },
+    {
+      "id": "industry-bea-news",
+      "name": "美国经济分析局 BEA 新闻",
+      "kind": "rss",
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "enabled": true,
+      "tags": [
+        "industry_lane",
+        "行业动态",
+        "经济数据",
+        "美国官方"
+      ],
+      "config": {
+        "feedUrl": "https://apps.bea.gov/rss/rss.xml",
+        "acceptLanguage": "en-US,en;q=0.9",
+        "saveExcerpt": true,
+        "publishedAfter": "2026-01-01T00:00:00Z",
+        "_aihot": {
+          "initialBackfillLimit": 48,
+          "initialBackfillMonths": 6
+        }
+      },
+      "$comment": "BEA 新闻发布（美国政府公有领域作品）。四种权限均开放：发现/保存/模型处理/展示。核实依据 bea.gov + 17 USC 105，2026-10-25。第二主线主题5（美国经济数据）。"
+    },
+    {
+      "id": "industry-retail-dive",
+      "name": "Retail Dive 行业动态",
+      "kind": "rss",
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "enabled": true,
+      "tags": [
+        "industry_lane",
+        "行业动态",
+        "零售",
+        "电商渠道"
+      ],
+      "config": {
+        "feedUrl": "https://www.retaildive.com/feeds/news/",
+        "acceptLanguage": "en-US,en;q=0.9",
+        "saveExcerpt": false,
+        "_aihot": {
+          "initialBackfillLimit": 10,
+          "initialBackfillMonths": 1
+        }
+      },
+      "$comment": "限制准入：仅元数据（标题/链接/日期/来源）。Informa TechTarget 条款无 RSS 复用授权（2026-10-25 核实），不存摘要、不送模型、不展示内容正文；页内署名外链。主题2/3。"
+    },
+    {
+      "id": "industry-supply-chain-dive",
+      "name": "Supply Chain Dive 供应链动态",
+      "kind": "rss",
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "enabled": true,
+      "tags": [
+        "industry_lane",
+        "行业动态",
+        "供应链",
+        "物流成本"
+      ],
+      "config": {
+        "feedUrl": "https://www.supplychaindive.com/feeds/news/",
+        "acceptLanguage": "en-US,en;q=0.9",
+        "saveExcerpt": false,
+        "_aihot": {
+          "initialBackfillLimit": 10,
+          "initialBackfillMonths": 1
+        }
+      },
+      "$comment": "限制准入（同 Retail Dive，同一出版主体条款）。主题4。"
+    },
+    {
+      "id": "industry-modern-retail",
+      "name": "Modern Retail 行业动态",
+      "kind": "rss",
+      "tier": "T2",
+      "participation_mode": "editorial",
+      "interval_minutes": 180,
+      "enabled": true,
+      "tags": [
+        "industry_lane",
+        "行业动态",
+        "电商",
+        "消费品牌"
+      ],
+      "config": {
+        "feedUrl": "https://www.modernretail.co/feed/",
+        "acceptLanguage": "en-US,en;q=0.9",
+        "saveExcerpt": false,
+        "_aihot": {
+          "initialBackfillLimit": 10,
+          "initialBackfillMonths": 1
+        }
+      },
+      "$comment": "限制准入：Breaking Media 条款未见 RSS 复用授权（2026-10-25 核实），仅元数据。主题2/3。Sponsored/Research 类别由门禁识别。"
     }
   ]
 }
