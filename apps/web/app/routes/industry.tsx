@@ -1,8 +1,8 @@
 import { Link, useLoaderData, useSearchParams } from "react-router";
-import type { IndustryListResponse } from "@aihot/contracts/site";
+import type { IndustryListResponse, IndustrySourceStatus } from "@aihot/contracts/site";
 import { apiGet } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
-import { monthDayTime } from "../lib/format";
+import { monthDayTime, relativeTime } from "../lib/format";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/Page";
 import type { Screen } from "../components/shell/screens";
@@ -33,8 +33,13 @@ export async function loader({ request }: { request: Request }) {
   const qs = url.searchParams;
   const params = new URLSearchParams();
   for (const key of ["theme", "source", "kind", "q", "days"]) if (qs.get(key)) params.set(key, qs.get(key)!);
-  const items = await apiGet<IndustryListResponse>(`/api/site/industry?${params.toString()}`, { signal: request.signal });
-  return { items, filters: Object.fromEntries(params) };
+  // The status block on the page: run state and content gaps, read like every other page state —
+  // facts only (sources, last run, budget window), never a claim the worker is running when it isn't.
+  const [items, status] = await Promise.all([
+    apiGet<IndustryListResponse>(`/api/site/industry?${params.toString()}`, { signal: request.signal }),
+    apiGet<IndustrySourceStatus>("/api/site/industry/status", { signal: request.signal }),
+  ]);
+  return { items, status, filters: Object.fromEntries(params) };
 }
 
 export function meta() {
@@ -56,17 +61,27 @@ function themeHref(params: URLSearchParams, themeId: string | null): string {
 }
 
 export default function IndustryIndex() {
-  const { items } = useLoaderData<typeof loader>();
+  const { items, status } = useLoaderData<typeof loader>();
   const [params] = useSearchParams();
   const theme = params.get("theme");
   const source = params.get("source") ?? "";
   const q = params.get("q") ?? "";
   const days = params.get("days") ?? "30";
+  const unhealthy = status.sources.filter((s) => s.health !== "ok").length;
+  const pendingZh = Math.max(0, items.counts.admitted - items.counts.zh);
+  const expiresAt = status.budget.limits?.expiresAt ?? null;
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16">
       <header className="mt-6">
         <h1 className="text-xl font-semibold text-ink">行业动态</h1>
         <p className="mt-1 text-[13px] text-ink-2">美国消费与电商行业的变化信号：{items.counts.admitted} 条准入 · {items.counts.rejected} 条被规则排除 · {items.counts.stories} 个事件 · {items.counts.zh} 条已有中文。限制准入来源仅展示标题与链接（不存储其摘要文本）。</p>
+        {/* 任务 I 第 15 项：运行状态与内容缺项提示 —— 只报事实（来源健康/最近一轮/预算窗口），不假装 Worker 在跑 */}
+        <p className="mt-1 text-[12px] text-ink-2">
+          运行：{status.sources.filter((s) => s.enabled).length}/{status.sources.length} 个来源启用{unhealthy > 0 ? `（${unhealthy} 个健康异常）` : ""}
+          {" · "}最近一轮{status.lastRun ? (status.lastRun.status === "ok" ? "正常" : "失败") : "尚无记录"}
+          {expiresAt ? ` · 付费处理窗口${relativeTime(expiresAt)}到期` : " · 付费处理窗口未启用"}
+          {" · "}{pendingZh > 0 ? `${pendingZh} 条待中文（限制准入来源不生成中文）` : "中文覆盖无缺项"}
+        </p>
       </header>
 
       <nav className="mt-4 flex flex-wrap gap-1.5 text-[12px]" aria-label="主题筛选">
