@@ -18,6 +18,10 @@ export default [
   // Third-party policy leads: a read-only view of the isolated lead source, not a policy record.
   route("leads", "routes/leads.tsx"),
   route("leads/:id", "routes/lead.tsx"),
+  // The second lane: US consumer & e-commerce industry dynamics.
+  route("industry", "routes/industry.tsx"),
+  route("industry/daily", "routes/industry-daily.tsx"),
+  route("industry/:id", "routes/industry-detail.tsx"),
   route("today", "routes/today.tsx"),
   route("all/search-busy", "routes/search-busy.tsx", { id: "all-search-busy" }),
   route("search-busy", "routes/search-busy.tsx", { id: "search-busy" }),

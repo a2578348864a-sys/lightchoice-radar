@@ -24,6 +24,7 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
       { to: "/", label: "情报", icon: IconBolt, end: true },
       { to: "/all", label: SITE.name === "LightChoice Radar" ? "平台政策情报" : subjectAfter("全部", "动态"), icon: IconList },
       { to: "/leads", label: "政策线索", icon: IconRadar },
+      { to: "/industry", label: "行业动态", icon: IconRadar },
       { to: "/hot", label: "热点榜", icon: IconFlame },
       { to: "/daily", label: withSubject("日报"), icon: IconDoc },
       { to: "/topics", label: "主题", icon: IconGrid },

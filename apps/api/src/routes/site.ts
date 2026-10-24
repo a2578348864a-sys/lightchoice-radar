@@ -11,6 +11,7 @@ import { loadRadarExport, radarExportMarkdown } from "@aihot/backend/publication
 import { loadTimeline } from "@aihot/backend/publication/timeline";
 import { loadStoryFollowups } from "@aihot/backend/publication/followups";
 import { loadLeadDetail, loadLeads, loadLeadStatus } from "@aihot/backend/publication/leads";
+import { exportIndustryMarkdown, loadIndustryDetail, loadIndustryItems, loadIndustryPicks, loadIndustryStatus } from "@aihot/backend/publication/industry";
 import { loadGroupReports } from "@aihot/backend/publication/groups";
 import { hotSearchLinks, loadHotStrip } from "@aihot/backend/publication/hot";
 import { loadChangelog, siteMeta } from "@aihot/backend/site/meta";
@@ -279,6 +280,41 @@ export function registerSite(app: FastifyInstance) {
     const q = looseQuery(req);
     return reply.header("Cache-Control", "no-store")
       .send(await loadLeads({ state: q.state, verification: q.verification ?? null, processing: q.processing ?? null }));
+  }));
+
+  // The second lane: US consumer & e-commerce industry dynamics. Read-only like everything else on
+  // /api/site; the export endpoint answers markdown with the same evidence the pages show.
+  app.get("/api/site/industry", siteHandler(async (req, reply) => {
+    const q = looseQuery(req);
+    return reply.header("Cache-Control", "no-store")
+      .send(await loadIndustryItems({ theme: q.theme ?? null, source: q.source ?? null, kind: q.kind ?? null, q: q.q ?? null, days: Number(q.days) || 30 }));
+  }));
+
+  app.get("/api/site/industry/status", siteHandler(async (req, reply) => {
+    return reply.header("Cache-Control", "no-store").send(await loadIndustryStatus());
+  }));
+
+  app.get("/api/site/industry/daily", siteHandler(async (req, reply) => {
+    const q = looseQuery(req);
+    return reply.header("Cache-Control", "no-store").send(await loadIndustryPicks(Number(q.days) || 14));
+  }));
+
+  app.get("/api/site/industry/export", siteHandler(async (req, reply) => {
+    const q = looseQuery(req);
+    const md = await exportIndustryMarkdown({ theme: q.theme ?? null, source: q.source ?? null, kind: q.kind ?? null, q: q.q ?? null, days: Number(q.days) || 30 });
+    const date = new Date().toISOString().slice(0, 10);
+    return reply.header("Cache-Control", "no-store")
+      .header("Content-Disposition", `attachment; filename=industry-leads-${date}.md`)
+      .type("text/markdown; charset=utf-8")
+      .send(md);
+  }));
+
+  app.get("/api/site/industry/:id", siteHandler(async (req, reply) => {
+    const id = (req.params as { id: string }).id;
+    if (!/^[a-zA-Z0-9_-]{1,80}$/.test(id)) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "industry item not found" });
+    const item = await loadIndustryDetail(id);
+    if (!item) return sendProblem(req, reply, { status: 404, code: "not_found", detail: "industry item not found" });
+    return reply.header("Cache-Control", "no-store").send(item);
   }));
 
   app.get("/api/site/leads/status", siteHandler(async (req, reply) => {
