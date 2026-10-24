@@ -13,7 +13,7 @@ import { BudgetExceededError, completeReceipt } from "../providers/receipts.ts";
 import { fetchRss } from "./rss.ts";
 import { fetchDetail, fetchWebList, isCallToActionTitle, needsTitle, sitemapLastmodAdvanced, type DetailNeed } from "./web-list.ts";
 import { unsupportedConfig } from "./config-keys.ts";
-import { admitListing, filterPublicationWindow } from "./filters.ts";
+import { admitListing, filterPublicationWindow, stripUnlicensedContent } from "./filters.ts";
 import { fetchJsonList } from "./json-list.ts";
 import { AMAZON_US_ANNOUNCEMENTS_SOURCE_ID, RADAR_POLICY_SOURCE_ID, archiveWindowFloor, isApprovedRadarLeadSource, isApprovedRadarLeadSourceId, isApprovedRadarPolicyWebList, isApprovedRadarRegulatorySource, isQualifyingAmazonPolicyAnnouncement, nextPolicyGateMemory, policyGateRejections, RADAR_LEAD_SOURCE_IDS, RADAR_POLICY_SOURCE_IDS, type PolicyGateMemory, type RadarLeadSourceId, type RadarRegulatorySourceId } from "./radar-policy-source.ts";
 import { fetchAdsPolicyPages, isApprovedAdsPolicySource } from "./ads-policy.ts";
@@ -264,10 +264,11 @@ async function store(sourceId: string, runId: number, candidates: CollectionCand
   let revised = 0;
   const [sourceRow] = await sql<{ config: Record<string, unknown> }[]>`SELECT config FROM sources WHERE id = ${sourceId}`;
   // A source whose permission profile closes excerpt storage keeps only factual metadata: the feed's
-  // own summary text is dropped before anything is written, for every revision, every time.
+  // own summary text AND any embedded full text (content:encoded) are dropped before anything is
+  // written, for every revision, every time (filters.ts stripUnlicensedContent).
   const excerptAllowed = sourceRow?.config?.saveExcerpt !== false;
   for (const c of candidates) {
-    const material = { ...c, sourceId, via: "fetch" as const, backfill, ...(excerptAllowed ? {} : { excerpt: null }) };
+    const material = stripUnlicensedContent({ ...c, sourceId, via: "fetch" as const, backfill }, excerptAllowed);
     let res;
     try { res = await upsertMaterial(material); }
     catch (error) {

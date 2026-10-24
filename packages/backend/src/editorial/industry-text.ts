@@ -66,8 +66,8 @@ export async function processIndustryPending(opts: { runArticles?: number } = {}
     }
     const baseline = baselineRow.value.at!;
     const modelSources = industryFullPermissionSources();
-    const rows = await sql<Array<{ id: string; revision: number; title: string; excerpt: string | null; discovered_at: Date; source_id: string }>>`
-      SELECT a.id, a.revision, a.title, a.excerpt, a.discovered_at, a.source_id
+    const rows = await sql<Array<{ id: string; revision: number; title: string; excerpt: string | null; discovered_at: Date; published_at: Date | null; source_id: string }>>`
+      SELECT a.id, a.revision, a.title, a.excerpt, a.discovered_at, a.published_at, a.source_id
       FROM articles a
       LEFT JOIN translations tr ON tr.article_id = a.id AND tr.lang = ${TITLE_LANG} AND tr.revision >= a.revision
       WHERE a.source_id = ANY(${modelSources}::text[])
@@ -80,7 +80,7 @@ export async function processIndustryPending(opts: { runArticles?: number } = {}
     for (const row of rows) {
       if (!(await reserveIndustryDaySlot(row.id))) return { done, reason: "daily article cap reached" };
       try {
-        done.push(await processIndustryItem(row.id, row.revision, row.title, row.excerpt, row.discovered_at, row.source_id));
+        done.push(await processIndustryItem(row.id, row.revision, row.title, row.excerpt, row.published_at, row.source_id));
       } catch (error) {
         done.push({ articleId: row.id, storyId: null, status: "failed", reason: String(error instanceof Error ? error.message : error).slice(0, 200) });
       }
@@ -91,7 +91,7 @@ export async function processIndustryPending(opts: { runArticles?: number } = {}
   }
 }
 
-async function processIndustryItem(articleId: string, revision: number, title: string, excerpt: string | null, discoveredAt: Date, sourceId: string): Promise<{ articleId: string; storyId: number | null; status: string; reason?: string }> {
+async function processIndustryItem(articleId: string, revision: number, title: string, excerpt: string | null, publishedAt: Date | null, sourceId: string): Promise<{ articleId: string; storyId: number | null; status: string; reason?: string }> {
   const material = `${title}\n${excerpt ?? ""}`;
   const res = await chatJson({
     model: await modelOf(),
@@ -120,7 +120,7 @@ async function processIndustryItem(articleId: string, revision: number, title: s
     theme: admission.themes[0]!,
     title,
     articleId,
-    publishedAt: discoveredAt,
+    publishedAt, // the article's own publication date — the same basis classifyIndustryPending uses, so re-entering the same article into the same story stays idempotent
     fact: { subject: fact.s, action: fact.a, object: fact.o, time: fact.time },
   });
   // The Chinese content is stored under its own lang, never mixed with the first lane's zh rows.

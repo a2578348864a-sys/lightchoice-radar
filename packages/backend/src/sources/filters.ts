@@ -39,3 +39,16 @@ export function filterPublicationWindow<C extends Candidate>(candidates: C[], pu
   const latest = now + FUTURE_TOLERANCE_MS;
   return candidates.filter(c => !!c.publishedAt && c.publishedAt.getTime() > after && c.publishedAt.getTime() <= latest);
 }
+
+/**
+ * A source whose permission profile closes excerpt storage keeps only factual metadata: the feed's
+ * own summary AND any full text it carries (content:encoded — some feeds embed the article body)
+ * are dropped before anything is written, for every revision, every time. What a publisher puts in
+ * a public feed is discoverable; storing it is a different licence we do not have.
+ */
+export function stripUnlicensedContent<C extends { excerpt?: string | null; bodyText?: string | null; bodyHtml?: string | null; bodyStatus?: string; media?: unknown }>(
+  candidate: C, excerptAllowed: boolean,
+): C {
+  if (excerptAllowed) return candidate;
+  return { ...candidate, excerpt: null, bodyText: null, bodyHtml: null, bodyStatus: "none" };
+}

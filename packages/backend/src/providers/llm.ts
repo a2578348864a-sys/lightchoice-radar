@@ -241,8 +241,14 @@ async function chatOnce<S extends z.ZodType>(opts: ChatJsonOptions<S>, circuit =
   );
 
   const response = receipt.response as { choices?: Array<{ message?: { content?: string }; finish_reason?: string }>; usage?: Record<string, unknown> };
-  // Usage is the only record of what this request actually cost.
-  if (lane === "translate") await settleTranslationCall(response.usage, { articleId: opts.articleId ?? "", inputChars: userText.length + opts.system.length, maxTokens });
+  // Usage is the only record of what this request actually cost — and a reused receipt's usage was
+  // already settled by the call that produced it. Settling it again would double-book the same
+  // tokens into the lane's ledger (the 2026-10-25 industry audit: recorded spend ran ~5.7× the
+  // provider's real usage while debug rounds re-served cached answers). Conservative direction, but
+  // a wrong account; a reuse settles nothing.
+  if (receipt.reused) {
+    // no settle: the original attempt already booked this usage
+  } else if (lane === "translate") await settleTranslationCall(response.usage, { articleId: opts.articleId ?? "", inputChars: userText.length + opts.system.length, maxTokens });
   else if (lane === "industry") await settleIndustryCall(response.usage, { articleId: opts.articleId ?? "", inputChars: userText.length + opts.system.length, maxTokens });
   const content = response.choices?.[0]?.message?.content ?? "";
   let parsed: z.infer<S>;

@@ -31,9 +31,18 @@ export interface EnsureStoryInput {
  * Finds the story this event key belongs to, or opens it. Two articles with the same key share the
  * story; different keys never share one. The story's frame keeps the key, the theme and the kind so
  * the read layer can group and filter without re-deriving anything.
+ *
+ * A null or empty event key is refused outright: it cannot match anything, so it would silently
+ * open an unmatchable story for every call (the 2026-10-25 incident: a one-off backfill passed a
+ * missing field, 25 duplicate null-key stories had to be merged away). A transaction advisory lock
+ * on the key serialises concurrent creators — two processes racing the same key still get one story.
  */
 export async function ensureIndustryStory(input: EnsureStoryInput): Promise<number> {
+  if (!input.eventKey || !input.eventKey.trim()) {
+    throw new Error(`refusing to open an industry story without an event key (article ${input.articleId})`);
+  }
   return sql.begin(async (tx) => {
+    await tx`SELECT pg_advisory_xact_lock(hashtext(${`industry-story:${input.eventKey}`}))`;
     const [existing] = await tx<{ id: number }[]>`
       SELECT id FROM stories WHERE frame->>'eventKey' = ${input.eventKey} AND merged_into IS NULL LIMIT 1`;
     let storyId: number;

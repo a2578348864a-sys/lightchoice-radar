@@ -7,6 +7,7 @@
 //
 // Judged against the 2026-10-25 real-feed sample set (78 items across the four admitted sources).
 import { type IndustrySourceId, type IndustryTheme } from "./industry-lane.ts";
+import { sha256 } from "../lib/ids.ts";
 
 /** What an item is — sponsorship and paywalled research promos never become research evidence. */
 export type IndustryContentKind =
@@ -108,7 +109,10 @@ export function industryEventKey(input: { sourceId: string; title: string; theme
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .filter((word) => word.length > 2 && !STOPWORDS.has(word));
-  return `${input.themes[0] ?? "none"}|${nouns.slice(0, 6).join(" ")}`;
+  // A title made only of stopwords would give every such article the same bare "theme|" key and
+  // wrongly merge them; its title hash keeps the key unique until real wording exists.
+  const core = nouns.length ? nouns.slice(0, 6).join(" ") : `title:${sha256(input.title).slice(0, 12)}`;
+  return `${input.themes[0] ?? "none"}|${core}`;
 }
 
 const STOPWORDS = new Set([
