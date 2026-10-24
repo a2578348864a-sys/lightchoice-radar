@@ -20,6 +20,14 @@ const KIND_LABEL: Record<string, string> = {
   irrelevant: "无关",
 };
 
+const DAY_OPTIONS = [
+  { value: "7", label: "近 7 天" },
+  { value: "14", label: "近 14 天" },
+  { value: "30", label: "近 30 天" },
+  { value: "60", label: "近 60 天" },
+  { value: "90", label: "近 90 天" },
+];
+
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
   const qs = url.searchParams;
@@ -38,10 +46,22 @@ export function meta() {
   });
 }
 
+/** Theme pills keep the other filters; the form below carries them forward too. */
+function themeHref(params: URLSearchParams, themeId: string | null): string {
+  const next = new URLSearchParams(params);
+  if (themeId) next.set("theme", themeId);
+  else next.delete("theme");
+  const qs = next.toString();
+  return qs ? `/industry?${qs}` : "/industry";
+}
+
 export default function IndustryIndex() {
   const { items } = useLoaderData<typeof loader>();
   const [params] = useSearchParams();
   const theme = params.get("theme");
+  const source = params.get("source") ?? "";
+  const q = params.get("q") ?? "";
+  const days = params.get("days") ?? "30";
   return (
     <main className="mx-auto max-w-3xl px-4 pb-16">
       <header className="mt-6">
@@ -50,19 +70,40 @@ export default function IndustryIndex() {
       </header>
 
       <nav className="mt-4 flex flex-wrap gap-1.5 text-[12px]" aria-label="主题筛选">
-        <Link to="/industry" className={theme ? "pill" : "pill pill-active"}>全部</Link>
+        <Link to={themeHref(params, null)} className={theme ? "pill" : "pill pill-active"}>全部主题</Link>
         {items.themes.map((t) => (
-          <Link key={t.id} to={`/industry?theme=${t.id}`} className={theme === t.id ? "pill pill-active" : "pill"}>{t.label}</Link>
+          <Link key={t.id} to={themeHref(params, t.id)} className={theme === t.id ? "pill pill-active" : "pill"}>{t.label}</Link>
         ))}
       </nav>
 
+      {/* 来源 / 日期 / 关键词：一个无 JS 也可用的 GET 表单，提交后同一页读取 */}
+      <form method="get" action="/industry" className="mt-3 flex flex-wrap items-center gap-2 text-[12px]" aria-label="来源、日期与关键词筛选">
+        {theme ? <input type="hidden" name="theme" value={theme} /> : null}
+        <select name="source" defaultValue={source} aria-label="来源筛选" className="rounded border border-line bg-paper px-2 py-1 text-[12px] text-ink">
+          <option value="">全部来源</option>
+          {items.sources.map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        <select name="days" defaultValue={days} aria-label="日期范围" className="rounded border border-line bg-paper px-2 py-1 text-[12px] text-ink">
+          {DAY_OPTIONS.map((d) => (
+            <option key={d.value} value={d.value}>{d.label}</option>
+          ))}
+        </select>
+        <input type="search" name="q" defaultValue={q} placeholder="标题关键词…" aria-label="关键词搜索" className="min-w-40 flex-1 rounded border border-line bg-paper px-2 py-1 text-[12px] text-ink placeholder:text-ink-2" />
+        <button type="submit" className="rounded bg-accent px-3 py-1 font-medium text-paper">筛选</button>
+        {source || q || params.get("days") ? (
+          <Link to={theme ? `/industry?theme=${theme}` : "/industry"} className="text-ink-2 underline-offset-2 hover:underline">重置</Link>
+        ) : null}
+      </form>
+
       <div className="mt-3 flex flex-wrap gap-2 text-[12px] text-ink-2">
         <Link to="/industry/daily" className="pill">每日精选</Link>
-        <a href="/api/site/industry/export" className="pill">导出研究线索 (Markdown)</a>
+        <a href={`/api/site/industry/export?${params.toString()}`} className="pill">导出研究线索 (Markdown)</a>
       </div>
 
       {items.items.length === 0 ? (
-        <EmptyState title="暂无符合条件的行业条目">要么来源尚无新增，要么现有条目被规则正确排除。不凑数量。</EmptyState>
+        <EmptyState title="暂无符合条件的行业条目">要么该筛选范围下来源尚无新增，要么现有条目被规则正确排除。不凑数量。</EmptyState>
       ) : (
         <ul className="mt-4 divide-y divide-line">
           {items.items.map((item) => (
