@@ -27,6 +27,13 @@ export default [
   route("voc/evidence", "routes/voc-evidence.tsx"),
   route("voc/research", "routes/voc-research.tsx"),
   route("voc/system", "routes/voc-system.tsx"),
+  // Fourth lane — market signals workbench (private research, admin session).
+  route("market", "routes/market.tsx"),
+  route("market/keywords", "routes/market-keywords.tsx"),
+  route("market/products", "routes/market-products.tsx"),
+  route("market/opportunities", "routes/market-opportunities.tsx"),
+  route("market/alerts", "routes/market-alerts.tsx"),
+  route("market/sources", "routes/market-sources.tsx"),
   route("today", "routes/today.tsx"),
   route("all/search-busy", "routes/search-busy.tsx", { id: "all-search-busy" }),
   route("search-busy", "routes/search-busy.tsx", { id: "search-busy" }),

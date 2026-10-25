@@ -1,0 +1,96 @@
+// The fourth lane's private API (market signals). Same posture as the VOC API: every route behind
+// adminHandler — market evidence, opportunities and human decisions are private research material.
+// Reads never trigger collection or model calls; writes are import/review/alert actions only.
+import type { FastifyInstance } from "fastify";
+import { adminHandler } from "./admin-auth.ts";
+import { loadMarketOverview, loadKeywordView, loadProductView, loadOpportunityView, loadAlertsView } from "@aihot/backend/market/market-read";
+import { applyChartSnapshot, applyKeywordSnapshot, parseAmz123KeywordCapture, parseAmazonChartCapture, previewMarketImport, seedMarketSources } from "@aihot/backend/market/market-import";
+import { buildOpportunityCandidates, computeScenarios, evaluateAlerts, refreshOpportunities, reviewOpportunity, type ScenarioInput } from "@aihot/backend/market/market-opportunity";
+import { saveMarketAlertRule, saveMarketSource, type MarketSource } from "@aihot/backend/market/market-model";
+
+export function registerMarket(app: FastifyInstance) {
+  const noStore = { "Cache-Control": "no-store" } as const;
+
+  // Area 1 — overview: 12-module honest board, sources, counts, gaps, budget state.
+  app.get("/api/market/overview", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadMarketOverview())));
+
+  // Area 2 — keyword demand (module 01) with honest filters.
+  app.get("/api/market/keywords", adminHandler(async (req, reply) => {
+    const q = req.query as Record<string, string | undefined>;
+    return reply.headers(noStore).send(await loadKeywordView({ direction: q.direction, q: q.q, limit: q.limit ? Number(q.limit) : undefined }));
+  }));
+
+  // Area 3 — products & competition & prices (modules 03/04/05/06).
+  app.get("/api/market/products", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadProductView())));
+
+  // Area 4 — opportunities (modules 10/12) + generation + review + scenario calculator.
+  app.get("/api/market/opportunities", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadOpportunityView())));
+  app.post("/api/market/opportunities/build", adminHandler(async (req, reply) => {
+    const body = (req.body ?? {}) as { minRise?: number };
+    return reply.headers(noStore).send({ created: await buildOpportunityCandidates({ minRise: body.minRise }) });
+  }));
+  app.post("/api/market/opportunities/review", adminHandler(async (req, reply) => {
+    const body = req.body as { id: string; action: string; note?: string };
+    const allowed = ["deep-dive", "watch", "need-evidence", "high-risk", "exclude", "mark-reviewed"] as const;
+    if (!body?.id || !allowed.includes(body.action as never)) return reply.status(400).send({ error: "id 和合法 action 必填" });
+    const r = await reviewOpportunity(body.id, body.action as never, body.note, "admin");
+    return r.ok ? reply.headers(noStore).send(r) : reply.status(404).send(r);
+  }));
+  app.post("/api/market/scenarios", adminHandler(async (req, reply) => {
+    const body = req.body as Partial<ScenarioInput>;
+    const required: Array<keyof ScenarioInput> = ["salePriceUsd", "purchaseCostUsd", "moqUnits", "shippingPerUnitUsd", "tariffRate", "referralFeeRate", "fbaPerUnitUsd", "adCpcUsd", "conversionRate", "monthlyAdBudgetUsd", "returnRate", "unitsOptimistic", "unitsBase", "unitsConservative"];
+    const missing = required.filter((k) => typeof body[k] !== "number");
+    if (missing.length) return reply.status(400).send({ error: `缺少数值输入：${missing.join(", ")}` });
+    return reply.headers(noStore).send(computeScenarios(body as ScenarioInput));
+  }));
+
+  // Area 5 — alerts (module 12, station-internal only).
+  app.get("/api/market/alerts", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadAlertsView())));
+  app.post("/api/market/alerts/evaluate", adminHandler(async (_req, reply) => reply.headers(noStore).send(await evaluateAlerts())));
+  app.post("/api/market/alerts/rules", adminHandler(async (req, reply) => {
+    const body = req.body as { id: string; name: string; module: string; kind: string; threshold: number; cooldownHours?: number; enabled?: boolean };
+    if (!body?.id || !body?.name || !body?.module || !body?.kind || typeof body.threshold !== "number") return reply.status(400).send({ error: "规则字段不完整" });
+    await saveMarketAlertRule({
+      id: body.id, name: body.name, module: body.module,
+      rule: { kind: body.kind as never, threshold: body.threshold },
+      cooldownHours: body.cooldownHours ?? 24, enabled: body.enabled ?? true,
+    });
+    return reply.headers(noStore).send({ ok: true });
+  }));
+
+  // Area 6 — sources: registry state, seeding of the two R0-DATA real sources, permission-gated import.
+  app.post("/api/market/sources/seed", adminHandler(async (_req, reply) => {
+    await seedMarketSources();
+    return reply.headers(noStore).send({ ok: true });
+  }));
+  app.post("/api/market/sources", adminHandler(async (req, reply) => {
+    const body = req.body as MarketSource;
+    if (!body?.id || !body?.kind || !body?.permission?.uses) return reply.status(400).send({ error: "来源字段不完整" });
+    await saveMarketSource(body);
+    return reply.headers(noStore).send({ ok: true });
+  }));
+  app.get("/api/market/import/preview", adminHandler(async (req, reply) => {
+    const q = req.query as Record<string, string | undefined>;
+    if (!q.sourceId || (q.kind !== "keywords" && q.kind !== "chart")) return reply.status(400).send({ error: "kind 与 sourceId 必填" });
+    return reply.headers(noStore).send(await previewMarketImport({ kind: q.kind, sourceId: q.sourceId }));
+  }));
+
+  // Keyword snapshot import — accepts the R0-DATA capture shape; permission-gated inside.
+  app.post("/api/market/import/keywords", adminHandler(async (req, reply) => {
+    const body = req.body as Parameters<typeof parseAmz123KeywordCapture>[0] & { producer?: string };
+    if (!body?.sourceId || !Array.isArray(body.rows) || !body.periodStart) return reply.status(400).send({ error: "sourceId/periodStart/rows[] 必填" });
+    const snap = parseAmz123KeywordCapture(body, body.producer ?? "Amazon ABA（AMZ123 二手展示）");
+    return reply.headers(noStore).send(await applyKeywordSnapshot(snap));
+  }));
+
+  // Chart snapshot import — accepts the R0-DATA manual-observation shape.
+  app.post("/api/market/import/chart", adminHandler(async (req, reply) => {
+    const body = req.body as Parameters<typeof parseAmazonChartCapture>[0];
+    if (!body?.sourceId || !body?.chartId || !Array.isArray(body.rows) || !body.observedAt) return reply.status(400).send({ error: "sourceId/chartId/observedAt/rows[] 必填" });
+    const snap = parseAmazonChartCapture(body);
+    return reply.headers(noStore).send(await applyChartSnapshot(snap));
+  }));
+
+  // Refresh: rebuild scores + review states after evidence revisions.
+  app.post("/api/market/opportunities/refresh", adminHandler(async (_req, reply) => reply.headers(noStore).send(await refreshOpportunities())));
+}
