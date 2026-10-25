@@ -5,8 +5,8 @@ import type { FastifyInstance } from "fastify";
 import { adminHandler } from "./admin-auth.ts";
 import { loadMarketOverview, loadKeywordView, loadProductView, loadOpportunityView, loadAlertsView } from "@aihot/backend/market/market-read";
 import { applyChartSnapshot, applyKeywordSnapshot, parseAmz123KeywordCapture, parseAmazonChartCapture, previewMarketImport, seedMarketSources } from "@aihot/backend/market/market-import";
-import { buildOpportunityCandidates, computeScenarios, evaluateAlerts, refreshOpportunities, reviewOpportunity, type ScenarioInput } from "@aihot/backend/market/market-opportunity";
-import { saveMarketAlertRule, saveMarketSource, type MarketSource } from "@aihot/backend/market/market-model";
+import { buildOpportunityCandidates, computeScenarios, evaluateAlerts, propagateSourceRevocation, refreshOpportunities, retireUnqualifiedAlerts, reviewOpportunity, type ScenarioInput } from "@aihot/backend/market/market-opportunity";
+import { revokeMarketSource, saveMarketAlertRule, saveMarketSource, type MarketSource } from "@aihot/backend/market/market-model";
 
 export function registerMarket(app: FastifyInstance) {
   const noStore = { "Cache-Control": "no-store" } as const;
@@ -91,6 +91,20 @@ export function registerMarket(app: FastifyInstance) {
     return reply.headers(noStore).send(await applyChartSnapshot(snap));
   }));
 
-  // Refresh: rebuild scores + review states after evidence revisions.
-  app.post("/api/market/opportunities/refresh", adminHandler(async (_req, reply) => reply.headers(noStore).send(await refreshOpportunities())));
+  // Refresh: rebuild scores + review states after evidence revisions; retire now-unqualified alerts.
+  app.post("/api/market/opportunities/refresh", adminHandler(async (_req, reply) => {
+    const refreshed = await refreshOpportunities();
+    const retired = await retireUnqualifiedAlerts();
+    return reply.headers(noStore).send({ ...refreshed, alertsRetired: retired });
+  }));
+
+  // Revoke a source: disabled + stamped, alerts retired, dependent opportunities re-review.
+  app.post("/api/market/sources/revoke", adminHandler(async (req, reply) => {
+    const body = req.body as { id: string; reason?: string };
+    if (!body?.id) return reply.status(400).send({ error: "id 必填" });
+    const revoked = await revokeMarketSource(body.id, body.reason ?? "操作员撤销");
+    if (!revoked) return reply.status(404).send({ error: "来源不存在" });
+    const propagation = await propagateSourceRevocation(body.id, body.reason ?? "操作员撤销");
+    return reply.headers(noStore).send({ ok: true, revokedAt: revoked.revokedAt, ...propagation });
+  }));
 }

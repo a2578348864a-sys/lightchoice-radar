@@ -8,7 +8,7 @@ import type { Screen } from "../components/shell/screens";
 export const handle: Screen = { name: "市场来源" };
 
 interface SourcesResponse {
-  sources: Array<{ id: string; label: string; producer: string; enabled: boolean; automation: string; uses: string[]; evidence: string; notes?: string }>;
+  sources: Array<{ id: string; label: string; producer: string; enabled: boolean; automation: string; uses: string[]; evidence: string; notes?: string; unverifiedUses?: string[]; revokedAt?: string; revokeReason?: string; permissionBasis: string }>;
 }
 
 interface OverviewWithSources extends SourcesResponse { modules: unknown[] }
@@ -44,11 +44,14 @@ export default function MarketSources() {
             <section key={s.id} className="card p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-[13.5px] font-semibold text-ink">{s.label}</h2>
-                <Badge tone={s.enabled ? "ok" : "neutral"}>{s.enabled ? "已启用" : "未启用"}</Badge>
+                <Badge tone={s.revokedAt ? "hot" : s.enabled ? "ok" : "neutral"}>{s.revokedAt ? "已撤销" : s.enabled ? "已启用" : "未启用"}</Badge>
               </div>
               <p className="mt-0.5 text-[12px] text-ink-3">数据生产者：{s.producer}</p>
+              <p className="mt-0.5 text-[11.5px] text-ink-4">授权依据：{s.permissionBasis}</p>
               <p className="mt-0.5 text-[12px] text-ink-3">自动化状态：{autoZh[s.automation] ?? s.automation} · 证据等级 {s.evidence}</p>
-              <p className="mt-1 text-[11.5px] text-ink-4">已授权用途：{s.uses.length ? s.uses.join(" / ") : "无（全部关闭）"}</p>
+              <p className="mt-1 text-[11.5px] text-ink-4">已授权用途（操作员私有研究授权）：{s.uses.length ? s.uses.join(" / ") : "无（全部关闭）"}</p>
+              {s.unverifiedUses?.length ? <p className="mt-1 rounded bg-amber-soft px-2 py-1 text-[11.5px] text-amber-ink">来源网站许可未核实（PERMISSION_UNVERIFIED）：{s.unverifiedUses.join(" / ")}——私有研究授权不升级为网站授权</p> : null}
+              {s.revokedAt && <p className="mt-1 rounded bg-paper-2 px-2 py-1 text-[11.5px] text-warn">已于 {s.revokedAt.slice(0, 10)} 撤销：{s.revokeReason ?? "未注明"}——相关预警已失效、依赖机会进入待复核</p>}
               {s.notes && <p className="mt-1 text-[11.5px] text-ink-4">{s.notes}</p>}
             </section>
           ))}

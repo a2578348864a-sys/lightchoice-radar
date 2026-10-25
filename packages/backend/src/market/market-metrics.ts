@@ -4,7 +4,7 @@
 // fabricated growth rate. Module coverage here follows the master plan §7 contracts.
 import { sql } from "../db.ts";
 import {
-  chartSnapshotBasisVersion, keywordSnapshotBasisVersion,
+  chartSnapshotBasisVersion, keywordSnapshotBasisVersion, loadMarketSources,
   type MarketChartSnapshot, type MarketKeywordSnapshot, type MarketProductRecord,
 } from "./market-model.ts";
 
@@ -206,7 +206,8 @@ export interface MarketSignal {
 export async function detectMarketSignals(opts: { keywordRiseThreshold?: number } = {}): Promise<MarketSignal[]> {
   const rise = opts.keywordRiseThreshold ?? 5;
   const signals: MarketSignal[] = [];
-  const kwSnaps = await loadKeywordSnapshots();
+  const revoked = new Set((await loadMarketSources()).filter((x) => x.revokedAt).map((x) => x.id)); // revoked sources leave the signal layer
+  const kwSnaps = (await loadKeywordSnapshots()).filter((x) => !revoked.has(x.sourceId));
   for (const snap of kwSnaps) {
     const basis = [keywordSnapshotBasisVersion(snap)];
     for (const c of keywordChanges(snap)) {
@@ -220,7 +221,7 @@ export async function detectMarketSignals(opts: { keywordRiseThreshold?: number 
       }
     }
   }
-  const charts = await loadChartSnapshots();
+  const charts = (await loadChartSnapshots()).filter((x) => !revoked.has(x.sourceId));
   const byChart = new Map<string, MarketChartSnapshot[]>();
   for (const c of charts) {
     const list = byChart.get(c.chartId) ?? [];

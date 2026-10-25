@@ -7,7 +7,7 @@
 import { sql } from "../db.ts";
 import {
   loadMarketAlertRules, loadMarketAlerts, loadMarketOpportunities, reviewAfterBasisChange,
-  saveMarketAlerts, saveMarketOpportunity, type MarketAlert, type MarketOpportunity, type MarketReviewAction,
+  saveMarketAlerts, saveMarketOpportunity, type MarketAlert, type MarketAlertKind, type MarketOpportunity, type MarketReviewAction,
   type MarketOpportunityEvidence,
 } from "./market-model.ts";
 import { detectMarketSignals, loadKeywordSnapshots, keywordChanges, METRIC_VERSION, type MarketSignal } from "./market-metrics.ts";
@@ -21,15 +21,19 @@ export const OPPORTUNITY_SCORE_VERSION = "opp-score-v1";
  * honest data gaps; without supply/competition/pain evidence it stays "needs-evidence" and the
  * scorer refuses a total — it can never appear as a "已验证商机".
  */
-export async function buildOpportunityCandidates(opts: { minRise?: number } = {}): Promise<MarketOpportunity[]> {
+export async function buildOpportunityCandidates(opts: { minRise?: number; maxPerRun?: number } = {}): Promise<MarketOpportunity[]> {
   const minRise = opts.minRise ?? 10;
+  const maxPerRun = opts.maxPerRun ?? 20;
   const signals = await detectMarketSignals();
-  const kwSignals = signals.filter((s) => s.module === "01" && s.kind === "keyword-rank-rise" && s.strength >= minRise);
+  const kwSignals = signals
+    .filter((s) => s.module === "01" && s.kind === "keyword-rank-rise" && s.strength >= minRise)
+    .sort((a, b) => b.strength - a.strength)
+    .slice(0, maxPerRun); // research leads are ranked by strength and capped: one keyword movement is a LEAD, not 1/1 of every signal
   const existing = await loadMarketOpportunities();
   const byTitle = new Map(existing.map((o) => [o.title, o]));
   const created: MarketOpportunity[] = [];
   for (const sig of kwSignals) {
-    const title = `需求信号：${sig.subjectZh}`;
+    const title = `研究线索（待补证）：${sig.subjectZh}`;
     const prev = byTitle.get(title);
     if (prev) {
       const refreshed = { ...prev, basisVersion: sig.basisVersions.join("+"), evidence: dedupeEvidence(prev.evidence, evidenceOf(sig)), review: reviewAfterBasisChange(prev.review, sig.basisVersions.join("+")) };
@@ -177,38 +181,92 @@ export async function refreshOpportunities(): Promise<{ refreshed: number; resco
 
 /* ------------------------------------------------------------------- alerts */
 
-/** Evaluates enabled rules against current signals; dedups by (rule, subject, window). */
-export async function evaluateAlerts(): Promise<{ fired: number; deduped: number }> {
+/**
+ * The alert engine (R6-CLOSE task 3 rewrite). Three business layers stay separate:
+ *   signals (facts) -> opportunity candidates (research leads, may refuse scoring) -> alerts.
+ * Rules of kind keyword/product/price fire "market-change" alerts — plain observed changes with
+ * the rule, threshold and evidence spelled out; NEVER displayed as opportunities. Only the
+ * "qualified-opportunity" rule kind fires for candidates whose score is NOT refused (supply or
+ * competition evidence exists) — a refused-score candidate can never raise one.
+ */
+export async function evaluateAlerts(): Promise<{ fired: number; deduped: number; byKind: Record<string, number> }> {
   const rules = (await loadMarketAlertRules()).filter((r) => r.enabled);
-  const signals = await detectMarketSignals();
   const existing = await loadMarketAlerts();
   const seenKeys = new Set(existing.map((a) => a.dedupKey));
   const now = new Date().toISOString();
   const toSave: MarketAlert[] = [];
   let deduped = 0;
+
+  const tryFire = (rule: { id: string; cooldownHours: number }, kind: MarketAlertKind, subject: string, detailZh: string, reasonZh: string, dedupKey: string, evidenceRefs: string[]) => {
+    if (seenKeys.has(dedupKey)) { deduped += 1; return; }
+    const recent = existing.find((a) => a.ruleId === rule.id && a.subject === subject && a.status !== "retired" && Date.now() - Date.parse(a.firedAt) < rule.cooldownHours * 3600_000);
+    if (recent) { deduped += 1; return; }
+    seenKeys.add(dedupKey);
+    toSave.push({
+      id: "alert-" + Math.abs(hashCode(dedupKey)), ruleId: rule.id, kind, subject, detailZh, reasonZh,
+      firedAt: now, evidenceRefs, status: "new", dedupKey,
+    });
+  };
+
   for (const rule of rules) {
-    const window = rule.rule.window ?? "latest";
+    if (rule.rule.kind === "qualified-opportunity") {
+      const opps = await loadMarketOpportunities();
+      for (const opp of opps) {
+        if (opp.score?.total == null) continue; // refused scoring -> never a qualified-opportunity alert
+        if (opp.score.total < rule.rule.threshold) continue;
+        tryFire(rule, "qualified-opportunity", opp.title, opp.summaryZh,
+          `规则「${rule.name}」：已评分候选研究优先级 ${opp.score.total} ≥ ${rule.rule.threshold}（评分版本 ${opp.score.version}；证据版本 ${opp.basisVersion}）。评分=研究优先级，非成功概率。`,
+          `${rule.id}:${opp.id}:${opp.basisVersion}`, opp.evidence.map((e) => e.origin));
+      }
+      continue;
+    }
+    const signals = await detectMarketSignals();
     for (const sig of signals) {
       if (rule.module !== sig.module) continue;
       const match =
         (rule.rule.kind === "keyword-rank-rise" && sig.kind === "keyword-rank-rise" && sig.strength >= rule.rule.threshold) ||
+        (rule.rule.kind === "keyword-rank-drop" && sig.kind === "keyword-rank-drop" && sig.strength >= rule.rule.threshold) ||
         (rule.rule.kind === "product-rank-change" && sig.kind === "chart-rank-change" && sig.strength >= rule.rule.threshold);
       if (!match) continue;
-      const dedupKey = `${rule.id}:${sig.id}:${window}`;
-      if (seenKeys.has(dedupKey)) { deduped += 1; continue; }
-      seenKeys.add(dedupKey);
-      // cooldown: same rule+subject within cooldownHours of an existing alert is skipped
-      const subjectPrefix = sig.id.split(":").slice(0, 3).join(":");
-      const recent = existing.find((a) => a.ruleId === rule.id && a.dedupKey.startsWith(`${rule.id}:${subjectPrefix}`) && Date.now() - Date.parse(a.firedAt) < rule.cooldownHours * 3600_000);
-      if (recent) { deduped += 1; continue; }
-      toSave.push({
-        id: "alert-" + Math.abs(hashCode(dedupKey)), ruleId: rule.id, subject: sig.subjectZh, detailZh: sig.detailZh,
-        firedAt: now, evidenceRefs: sig.evidenceRefs, status: "new", dedupKey,
-      });
+      tryFire(rule, "market-change", sig.subjectZh, sig.detailZh,
+        `规则「${rule.name}」命中：模块 ${rule.module}，阈值 ${rule.rule.threshold}，本次强度 ${sig.strength}；公式 ${sig.formulaVersion}；证据 ${sig.evidenceRefs.join(", ")}。这是普通市场变化通知，不是已验证商机。`,
+        `${rule.id}:${sig.id}`, sig.evidenceRefs);
     }
   }
   if (toSave.length) await saveMarketAlerts(toSave);
-  return { fired: toSave.length, deduped };
+  const byKind: Record<string, number> = {};
+  for (const a of toSave) byKind[a.kind] = (byKind[a.kind] ?? 0) + 1;
+  return { fired: toSave.length, deduped, byKind };
+}
+
+/** Retires alerts whose evidence refs touch the given source id (revocation propagation). */
+export async function retireAlertsForSource(sourceId: string, reason: string): Promise<number> {
+  const alerts = await loadMarketAlerts();
+  let n = 0;
+  for (const a of alerts) {
+    if (a.status === "retired") continue;
+    if (a.evidenceRefs.some((r) => r.includes(`/${sourceId}/`) || r.includes(sourceId))) {
+      await saveMarketAlerts([{ ...a, status: "retired", reasonZh: `已失效：${reason}` }]);
+      n += 1;
+    }
+  }
+  return n;
+}
+
+/** Full revocation propagation: source off -> alerts retired, dependent opportunities re-review. */
+export async function propagateSourceRevocation(sourceId: string, reason: string): Promise<{ alertsRetired: number; opportunitiesFlagged: number }> {
+  const alertsRetired = await retireAlertsForSource(sourceId, reason);
+  const opps = await loadMarketOpportunities();
+  let opportunitiesFlagged = 0;
+  for (const opp of opps) {
+    if (!opp.evidence.some((e) => e.origin.includes(sourceId))) continue;
+    await saveMarketOpportunity({
+      ...opp,
+      review: { ...opp.review, status: "need-evidence", note: `REVIEW_REQUIRED: 证据来源 ${sourceId} 已撤销（${reason}）` },
+    });
+    opportunitiesFlagged += 1;
+  }
+  return { alertsRetired, opportunitiesFlagged };
 }
 
 function hashCode(s: string): number {
@@ -217,7 +275,21 @@ function hashCode(s: string): number {
   return h;
 }
 
-/* ------------------------------------------------ keyword demand context util */
+/** Retires qualified-opportunity alerts whose opportunity now refuses scoring (revision propagation). */
+export async function retireUnqualifiedAlerts(): Promise<number> {
+  const [alerts, opps] = await Promise.all([loadMarketAlerts(), loadMarketOpportunities()]);
+  const qualifiedIds = new Set(opps.filter((o) => o.score?.total != null).map((o) => o.id));
+  let n = 0;
+  for (const a of alerts) {
+    if (a.kind !== "qualified-opportunity" || a.status === "retired") continue;
+    const oppId = a.dedupKey.split(":")[1];
+    if (oppId && !qualifiedIds.has(oppId)) {
+      await saveMarketAlerts([{ ...a, status: "retired", reasonZh: "已失效：候选评分被拒绝（证据版本变化），不再符合高价值条件" }]);
+      n += 1;
+    }
+  }
+  return n;
+}
 
 /** Latest keyword rows for the research page (real data path). */
 export async function latestKeywordRows(): Promise<{ periodStart: string; producer: string; sourceId: string; rows: ReturnType<typeof keywordChanges> } | null> {

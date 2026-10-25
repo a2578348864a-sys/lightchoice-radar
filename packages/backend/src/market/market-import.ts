@@ -114,6 +114,9 @@ async function ensureStorageSources(): Promise<void> {
 export async function applyKeywordSnapshot(snap: MarketKeywordSnapshot): Promise<KeywordImportResult> {
   await ensureStorageSources();
   const source = await loadMarketSource(snap.sourceId);
+  if (source?.revokedAt) {
+    return { stored: 0, revised: 0, productsTouched: 0, basisVersion: "", refusal: `来源已于 ${source.revokedAt.slice(0, 10)} 被撤销（${source.revokeReason ?? "未注明"}）——已撤销来源的新导入被拒绝` };
+  }
   if (!source?.enabled || !sourceAllows(source, "store")) {
     return { stored: 0, revised: 0, productsTouched: 0, basisVersion: "", refusal: source ? "来源许可不含 store 用途或未启用" : "来源未注册" };
   }
@@ -146,6 +149,9 @@ export interface ChartImportResult { snapshotStored: number; productsCreated: nu
 export async function applyChartSnapshot(snap: MarketChartSnapshot): Promise<ChartImportResult> {
   await ensureStorageSources();
   const source = await loadMarketSource(snap.sourceId);
+  if (source?.revokedAt) {
+    return { snapshotStored: 0, productsCreated: 0, productsUpdated: 0, basisVersion: "", refusal: `来源已于 ${source.revokedAt.slice(0, 10)} 被撤销——已撤销来源的新导入被拒绝` };
+  }
   if (!source?.enabled || !sourceAllows(source, "store") || !sourceAllows(source, "compute")) {
     return { snapshotStored: 0, productsCreated: 0, productsUpdated: 0, basisVersion: "", refusal: "来源许可不足（store/compute）或未启用" };
   }
@@ -215,14 +221,24 @@ export function defaultMarketSources(): MarketSource[] {
     {
       id: "amz123-us-keywords", kind: "amz123-keywords", label: "AMZ123 美国站热搜词（ABA 二手展示）",
       producer: "Amazon ABA（经 AMZ123 页面二次展示）", marketplace: "US",
-      permission: { uses: ["store", "compute", "display", "export"], basis: "R0-DATA 2026-10-26 人工等价页面读取样本；页面公开无登录墙、robots 未禁止该路径；周期自动化尚未获操作员授权，故无 fetch 用途", evidence: "L3" },
+      permission: {
+        uses: ["store", "compute", "display"],
+        basis: "操作员授权（operator grant）：对自己以人工等价方式合法读取的公开页面样本，授予本项目私有研究用途（存储/计算/站内展示）。这不等同于 AMZ123 或 Amazon 授予数据使用权。",
+        evidence: "L3",
+      },
+      unverifiedUses: ["fetch", "modelSend", "export"],
       enabled: true, automation: "manual-import-only",
       notes: "周更；「涨跌幅度」为两周排名绝对位移（R0-DATA 100/100 验证），方向须由两周排名推导；无搜索量列。",
     },
     {
       id: "amazon-chart-manual", kind: "amazon-chart-manual", label: "Amazon 官方榜单·受管人工观察",
       producer: "Amazon（官方 Best Sellers 页面，真实浏览器人工等价观察）", marketplace: "US",
-      permission: { uses: ["store", "compute", "display"], basis: "R0-DATA 2026-10-26 真实 Chrome 单页观察（HTTP 200）；无人值守自动采集未获授权，禁止 fetch", evidence: "L3" },
+      permission: {
+        uses: ["store", "compute", "display"],
+        basis: "操作员授权（operator grant）：对自己以真实浏览器人工观察取得的公开页面事实，授予私有研究用途。Amazon 未授予任何自动化采集或再分发许可。",
+        evidence: "L3",
+      },
+      unverifiedUses: ["fetch", "modelSend", "export"],
       enabled: true, automation: "manual-import-only",
       notes: "榜单名次≠销量；榜单自身周期未在页面声明（periodKey=观察日）；无父子/变体信息。",
     },

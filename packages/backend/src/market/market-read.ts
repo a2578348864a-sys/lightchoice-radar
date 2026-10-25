@@ -11,7 +11,8 @@ import {
   loadProducts, marketOverviewInputs, priceChangeRate, trendVerdict, METRIC_VERSION,
 } from "./market-metrics.ts";
 
-export interface ModuleState { module: string; name: string; engineering: "implemented" | "partial" | "stub"; dataState: string; noteZh: string }
+export interface ModuleState { module: string; name: string; engineering: "implemented" | "partial" | "stub"; dataState: string; noteZh: string; /** R6-CLOSE: the third, business-acceptance layer — engineering PASS never inherits here. */
+  business: string }
 
 /** The 12-module honest status board (engineering vs data vs permission, never conflated). */
 export async function moduleStates(): Promise<ModuleState[]> {
@@ -19,24 +20,24 @@ export async function moduleStates(): Promise<ModuleState[]> {
   const latestKw = inputs.keywordSnapshots > 0;
   const multiPeriod = inputs.chartSnapshots.some((c) => c.chartId) && new Set(inputs.chartSnapshots.map((c) => c.chartId + c.periodKey)).size >= 2;
   return [
-    { module: "01", name: "搜索需求雷达", engineering: "implemented", dataState: latestKw ? "真实数据（ABA 二手·周更）" : "无数据", noteZh: latestKw ? `已入库 ${inputs.keywordRows} 行关键词快照；C1 排名变化可算；排名≠搜索量` : "等待获准导入" },
-    { module: "02", name: "类目市场雷达", engineering: "partial", dataState: "仅类目标签", noteZh: "无类目节点 ID/层级/版本（来源 L2 缺）——类目树 BLOCKED；商品带 categoryLabel 标签" },
-    { module: "03", name: "商品与新品雷达", engineering: "implemented", dataState: `真实样本 ${inputs.products.length} 个（人工观察级）`, noteZh: "ASIN 身份+四分首次观察已实现；首次上榜≠新品上架（C4）；无父子/变体（需详情页或 SP-API）" },
-    { module: "04", name: "销售热度雷达", engineering: "implemented", dataState: multiPeriod ? "多期可比" : "单期快照", noteZh: multiPeriod ? "榜内排名变化/进出榜可算（C6/C7/C8 生效）" : "变化计算 NOT_RUN——需第二期同榜快照" },
-    { module: "05", name: "竞争格局雷达", engineering: "implemented", dataState: inputs.products.length ? "样本级可算" : "无数据", noteZh: "样本品牌分布≠全市场份额（C9 强制限定语）" },
-    { module: "06", name: "价格与促销雷达", engineering: "implemented", dataState: "当前价快照", noteZh: "C2 口径可比性引擎就绪；多期历史缺 → 变化率多数 NOT_COMPARABLE 属如实" },
-    { module: "07", name: "趋势与季节雷达", engineering: "implemented", dataState: trendVerdict(inputs.keywordSnapshots).kind, noteZh: trendVerdict(inputs.keywordSnapshots).detail },
-    { module: "08", name: "外部平台雷达", engineering: "stub", dataState: "无获准来源", noteZh: "BLOCKED：eBay/Etsy/Walmart L2 未核验；跨平台只做候选匹配（C11 不相加）" },
-    { module: "09", name: "创新与替代品雷达", engineering: "stub", dataState: "无获准来源", noteZh: "BLOCKED：众筹/专利来源未接入；跨线引用通道已设计（三线材料外发受限）" },
-    { module: "10", name: "供需缺口雷达", engineering: "implemented", dataState: "需求侧可算", noteZh: "关键词上升→候选机会链路已实现；供给/痛点证据缺失时拒绝评分（冻结规则）" },
-    { module: "11", name: "商业可行性雷达", engineering: "implemented", dataState: "计算器就绪", noteZh: "三情景+敏感性纯计算；输入必须逐项标注证据/假设；平台费率可引一线政策证据" },
-    { module: "12", name: "机会发现与预警", engineering: "implemented", dataState: `${inputs.signals.length} 条信号待聚`, noteZh: "规则引擎+去重+冷却+失效（站内）；外部推送默认关闭" },
+    { module: "01", name: "搜索需求雷达", engineering: "implemented", dataState: latestKw ? "真实数据（ABA 二手·周更）" : "无数据", noteZh: latestKw ? `已入库 ${inputs.keywordRows} 行关键词快照；C1 排名变化可算；排名≠搜索量` : "等待获准导入", business: latestKw ? "样本级可用（单期）；周期业务 NOT_RUN" : "NOT_RUN（无数据）" },
+    { module: "02", name: "类目市场雷达", engineering: "partial", dataState: "仅类目标签", noteZh: "无类目节点 ID/层级/版本（来源 L2 缺）——类目树 BLOCKED；商品带 categoryLabel 标签", business: "BLOCKED（仅标签展示）" },
+    { module: "03", name: "商品与新品雷达", engineering: "implemented", dataState: `真实样本 ${inputs.products.length} 个（人工观察级）`, noteZh: "ASIN 身份+四分首次观察已实现；首次上榜≠新品上架（C4）；无父子/变体（需详情页或 SP-API）", business: "样本级可用（6 个真实商品）；变体研究 BLOCKED" },
+    { module: "04", name: "销售热度雷达", engineering: "implemented", dataState: multiPeriod ? "多期可比" : "单期快照", noteZh: multiPeriod ? "榜内排名变化/进出榜可算（C6/C7/C8 生效）" : "变化计算 NOT_RUN——需第二期同榜快照", business: multiPeriod ? "PARTIAL（榜内样本）" : "NOT_RUN（单期）" },
+    { module: "05", name: "竞争格局雷达", engineering: "implemented", dataState: inputs.products.length ? "样本级可算" : "无数据", noteZh: "样本品牌分布≠全市场份额（C9 强制限定语）", business: "样本级可用（n=6，规模极小）" },
+    { module: "06", name: "价格与促销雷达", engineering: "implemented", dataState: "当前价快照", noteZh: "C2 口径可比性引擎就绪；多期历史缺 → 变化率多数 NOT_COMPARABLE 属如实", business: "当前价可用；历史价格 NOT_RUN" },
+    { module: "07", name: "趋势与季节雷达", engineering: "implemented", dataState: trendVerdict(inputs.keywordSnapshots).kind, noteZh: trendVerdict(inputs.keywordSnapshots).detail, business: "NOT_RUN（历史不足，如实提示）" },
+    { module: "08", name: "外部平台雷达", engineering: "stub", dataState: "无获准来源", noteZh: "BLOCKED：eBay/Etsy/Walmart L2 未核验；跨平台只做候选匹配（C11 不相加）", business: "BLOCKED（无获准来源）" },
+    { module: "09", name: "创新与替代品雷达", engineering: "stub", dataState: "无获准来源", noteZh: "BLOCKED：众筹/专利来源未接入；跨线引用通道已设计（三线材料外发受限）", business: "BLOCKED（无获准来源）" },
+    { module: "10", name: "供需缺口雷达", engineering: "implemented", dataState: "需求侧可算", noteZh: "关键词上升→研究线索链路已实现；供给/痛点证据缺失时拒绝评分（冻结规则）", business: "需求侧可用；缺口判断 PARTIAL（反证机制生效）" },
+    { module: "11", name: "商业可行性雷达", engineering: "implemented", dataState: "计算器就绪", noteZh: "三情景+敏感性纯计算；输入必须逐项标注证据/假设；平台费率可引一线政策证据", business: "计算器可用（输入依赖用户假设标注）" },
+    { module: "12", name: "机会发现与预警", engineering: "implemented", dataState: `${inputs.signals.length} 条信号待聚`, noteZh: "规则引擎+类型分层+去重+冷却+失效（站内）；外部推送默认关闭", business: "站内预警可用；真实周期数据 NOT_RUN" },
   ];
 }
 
 export interface MarketOverviewResponse {
   modules: ModuleState[];
-  sources: Array<{ id: string; label: string; producer: string; enabled: boolean; automation: string; uses: string[]; evidence: string; notes?: string }>;
+  sources: Array<{ id: string; label: string; producer: string; enabled: boolean; automation: string; uses: string[]; evidence: string; notes?: string; unverifiedUses?: string[]; revokedAt?: string; revokeReason?: string; permissionBasis: string }>;
   counts: { keywordSnapshots: number; keywordRows: number; chartSnapshots: number; products: number; signals: number; opportunities: number; alerts: number };
   gaps: string[];
   budgetZh: string;
@@ -46,7 +47,7 @@ export async function loadMarketOverview(): Promise<MarketOverviewResponse> {
   const [modules, sources, opps, alerts, inputs] = await Promise.all([moduleStates(), loadMarketSources(), loadMarketOpportunities(), loadMarketAlerts(), marketOverviewInputs()]);
   return {
     modules,
-    sources: sources.map((s) => ({ id: s.id, label: s.label, producer: s.producer, enabled: s.enabled, automation: s.automation, uses: [...sourceUses(s)], evidence: s.permission.evidence, notes: s.notes })),
+    sources: sources.map((s) => ({ id: s.id, label: s.label, producer: s.producer, enabled: s.enabled, automation: s.automation, uses: [...sourceUses(s)], evidence: s.permission.evidence, notes: s.notes, unverifiedUses: s.unverifiedUses, revokedAt: s.revokedAt, revokeReason: s.revokeReason, permissionBasis: s.permission.basis })),
     counts: {
       keywordSnapshots: inputs.keywordSnapshots, keywordRows: inputs.keywordRows,
       chartSnapshots: inputs.chartSnapshots.length, products: inputs.products.length,
@@ -150,12 +151,13 @@ export async function loadProductView(): Promise<ProductsResponse> {
 /* -------------------------------------------------------- opportunity page */
 
 export async function loadOpportunityView(): Promise<{
-  opportunities: Array<{ id: string; title: string; summaryZh: string; status: string; reviewStatus: string; scoreTotal: number | null; scoreRefused?: string; evidenceCount: number; counterCount: number; gapsCount: number }>;
+  opportunities: Array<{ id: string; title: string; summaryZh: string; status: string; reviewStatus: string; reviewNote?: string; qualified: boolean; scoreTotal: number | null; scoreRefused?: string; evidenceCount: number; counterCount: number; gapsCount: number }>;
 }> {
   const opps = await loadMarketOpportunities();
   return {
     opportunities: opps.map((o) => ({
-      id: o.id, title: o.title, summaryZh: o.summaryZh, status: o.status, reviewStatus: o.review.status,
+      id: o.id, title: o.title, summaryZh: o.summaryZh, status: o.status, reviewStatus: o.review.status, reviewNote: o.review.note,
+      qualified: o.score?.total != null,
       scoreTotal: o.score?.total ?? null, scoreRefused: o.score?.refusedReason,
       evidenceCount: o.evidence.length, counterCount: o.counterEvidence.length, gapsCount: o.dataGaps.length,
     })),
@@ -164,11 +166,12 @@ export async function loadOpportunityView(): Promise<{
 
 /* ------------------------------------------------------------- alerts page */
 
-export async function loadAlertsView(): Promise<{ rules: Array<{ id: string; name: string; module: string; kind: string; threshold: number; cooldownHours: number; enabled: boolean }>; alerts: Array<{ id: string; ruleId: string; subject: string; detailZh: string; firedAt: string; status: string }> }> {
+export async function loadAlertsView(): Promise<{ rules: Array<{ id: string; name: string; module: string; kind: string; threshold: number; cooldownHours: number; enabled: boolean }>; alerts: Array<{ id: string; ruleId: string; kind: string; kindZh: string; subject: string; detailZh: string; reasonZh: string; firedAt: string; status: string }> }> {
   const [rules, alerts] = await Promise.all([loadMarketAlertRules(), loadMarketAlerts()]);
+  const kindZh: Record<string, string> = { "market-change": "普通市场变化", "research-lead": "待补证研究线索", "qualified-opportunity": "达到条件的重要机会变化", "source-failure": "来源失败/延迟", "revision-revocation": "事实修订/撤销" };
   return {
     rules: rules.map((r) => ({ id: r.id, name: r.name, module: r.module, kind: r.rule.kind, threshold: r.rule.threshold, cooldownHours: r.cooldownHours, enabled: r.enabled })),
-    alerts: alerts.sort((a, b) => b.firedAt.localeCompare(a.firedAt)).map((a) => ({ id: a.id, ruleId: a.ruleId, subject: a.subject, detailZh: a.detailZh, firedAt: a.firedAt, status: a.status })),
+    alerts: alerts.sort((a, b) => b.firedAt.localeCompare(a.firedAt)).map((a) => ({ id: a.id, ruleId: a.ruleId, kind: a.kind, kindZh: kindZh[a.kind] ?? a.kind, subject: a.subject, detailZh: a.detailZh, reasonZh: a.reasonZh ?? "", firedAt: a.firedAt, status: a.status })),
   };
 }
 

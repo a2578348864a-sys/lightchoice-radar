@@ -41,6 +41,12 @@ export interface MarketSource {
   enabled: boolean;
   /** Adapter state machine (master plan §5.2), kept as an honest record. */
   automation: "manual-import-only" | "authorized-periodic" | "blocked-no-license" | "pending-credentials";
+  /** Uses whose grant by the SOURCE SITE is not verified — operator-private-research use never
+      silently upgrades into a site licence (R6-CLOSE task 2). */
+  unverifiedUses?: MarketUse[];
+  /** Set when the operator revokes the source; downstream observations/metrics/alerts retire. */
+  revokedAt?: string;
+  revokeReason?: string;
   notes?: string;
 }
 
@@ -177,16 +183,23 @@ export interface MarketAlertRule {
   name: string;
   module: string;
   /** Deterministic predicate config, e.g. keyword rank rise ≥ N within the observed window. */
-  rule: { kind: "keyword-rank-rise" | "keyword-rank-drop" | "product-rank-change" | "price-change"; threshold: number; window?: string };
+  rule: { kind: "keyword-rank-rise" | "keyword-rank-drop" | "product-rank-change" | "price-change" | "qualified-opportunity"; threshold: number; window?: string };
   cooldownHours: number;
   enabled: boolean;
 }
 
+/** Alert types are business-distinct (R6-CLOSE task 3): a plain change is never displayed as a
+    qualified opportunity; source failures and revocations are their own kinds. */
+export type MarketAlertKind = "market-change" | "research-lead" | "qualified-opportunity" | "source-failure" | "revision-revocation";
+
 export interface MarketAlert {
   id: string;
   ruleId: string;
+  kind: MarketAlertKind;
   subject: string;
   detailZh: string;
+  /** Why this alert fired — rule, threshold, evidence version; rendered verbatim. */
+  reasonZh: string;
   firedAt: string;
   evidenceRefs: string[];
   status: "new" | "acknowledged" | "retired";
@@ -228,6 +241,15 @@ export async function saveMarketAlerts(alerts: MarketAlert[]): Promise<void> {
     await sql`INSERT INTO settings (key, value, updated_by) VALUES (${ALERT_KEY(a.id)}, ${sql.json(a as never)}, 'market')
               ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
   }
+}
+
+/** Revokes a source: disabled + stamped; downstream propagation lives in market-opportunity. */
+export async function revokeMarketSource(id: string, reason: string): Promise<MarketSource | null> {
+  const source = await loadMarketSource(id);
+  if (!source) return null;
+  const revoked: MarketSource = { ...source, enabled: false, revokedAt: new Date().toISOString(), revokeReason: reason };
+  await saveMarketSource(revoked);
+  return revoked;
 }
 
 export async function loadMarketAlerts(): Promise<MarketAlert[]> {

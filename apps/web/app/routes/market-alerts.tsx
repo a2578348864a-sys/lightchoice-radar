@@ -9,7 +9,7 @@ export const handle: Screen = { name: "市场预警" };
 
 interface AlertsResponse {
   rules: Array<{ id: string; name: string; module: string; kind: string; threshold: number; cooldownHours: number; enabled: boolean }>;
-  alerts: Array<{ id: string; ruleId: string; subject: string; detailZh: string; firedAt: string; status: string }>;
+  alerts: Array<{ id: string; ruleId: string; kind: string; kindZh: string; subject: string; detailZh: string; reasonZh: string; firedAt: string; status: string }>;
 }
 
 export async function loader({ request }: { request: Request }) {
@@ -21,7 +21,7 @@ export function meta() {
   return pageMeta({ title: "市场预警", description: "市场信号站内预警：规则、去重、冷却与失效。", noindex: true, path: "/market/alerts" });
 }
 
-const kindZh: Record<string, string> = { "keyword-rank-rise": "关键词排名上升 ≥", "keyword-rank-drop": "关键词排名下降 ≥", "product-rank-change": "商品榜单位次变化 ≥", "price-change": "价格变化 ≥" };
+const kindZh: Record<string, string> = { "keyword-rank-rise": "关键词排名上升 ≥", "keyword-rank-drop": "关键词排名下降 ≥", "product-rank-change": "商品榜单位次变化 ≥", "price-change": "价格变化 ≥", "qualified-opportunity": "已评分候选优先级 ≥" };
 
 export default function MarketAlerts() {
   const { data } = useLoaderData<typeof loader>();
@@ -60,12 +60,16 @@ export default function MarketAlerts() {
             ) : (
               <ul className="mt-1 space-y-1 text-[12.5px]">
                 {data.alerts.map((a) => (
-                  <li key={a.id} className="card p-2.5">
+                  <li key={a.id} className={`card p-2.5 ${a.status === "retired" ? "opacity-60" : ""}`}>
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <span className="font-medium text-ink">{a.subject}</span>
-                      <span className="text-[11px] text-ink-4">{a.firedAt.slice(0, 16).replace("T", " ")} · {a.status}</span>
+                      <span className="flex items-center gap-1.5 text-[11px] text-ink-4">
+                        <Badge tone={a.kind === "qualified-opportunity" ? "ok" : a.kind === "market-change" ? "neutral" : "amber"}>{a.kindZh}</Badge>
+                        {a.firedAt.slice(0, 16).replace("T", " ")} · {a.status === "retired" ? "已失效" : a.status === "acknowledged" ? "已读" : "新"}
+                      </span>
                     </div>
                     <p className="mt-0.5 text-[12px] text-ink-3">{a.detailZh}</p>
+                    {a.reasonZh && <p className="mt-1 rounded bg-paper-2 px-2 py-1 text-[11.5px] text-ink-4">触发原因：{a.reasonZh}</p>}
                   </li>
                 ))}
               </ul>

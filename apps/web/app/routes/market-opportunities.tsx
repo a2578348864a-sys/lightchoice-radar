@@ -8,7 +8,7 @@ import type { Screen } from "../components/shell/screens";
 export const handle: Screen = { name: "机会研究" };
 
 interface OpportunitiesResponse {
-  opportunities: Array<{ id: string; title: string; summaryZh: string; status: string; reviewStatus: string; scoreTotal: number | null; scoreRefused?: string; evidenceCount: number; counterCount: number; gapsCount: number }>;
+  opportunities: Array<{ id: string; title: string; summaryZh: string; status: string; reviewStatus: string; reviewNote?: string; qualified: boolean; scoreTotal: number | null; scoreRefused?: string; evidenceCount: number; counterCount: number; gapsCount: number }>;
 }
 
 export async function loader({ request }: { request: Request }) {
@@ -50,10 +50,11 @@ export default function MarketOpportunities() {
             <section key={o.id} className="card p-3">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 className="text-[13.5px] font-semibold text-ink">{o.title}</h2>
-                <Badge tone={o.scoreTotal != null ? "ok" : "amber"}>{o.scoreTotal != null ? `研究优先级 ${o.scoreTotal}` : "拒绝评分"}</Badge>
+                <Badge tone={o.qualified ? "ok" : "amber"}>{o.qualified ? `已评分·研究优先级 ${o.scoreTotal}` : "待补证线索·评分拒绝"}</Badge>
               </div>
               <p className="mt-1 text-[12.5px] leading-relaxed text-ink-3">{o.summaryZh}</p>
               <p className="mt-1 text-[11.5px] text-ink-4">支持证据 {o.evidenceCount} · 反证 {o.counterCount} · 数据缺口 {o.gapsCount} · 人工状态：{o.reviewStatus}</p>
+              {o.reviewNote && <p className="mt-0.5 rounded bg-paper-2 px-2 py-1 text-[11.5px] text-amber-ink">{o.reviewNote}</p>}
               {o.scoreRefused && <p className="mt-1 rounded bg-paper-2 px-2 py-1 text-[11.5px] text-warn">{o.scoreRefused}</p>}
               <fetcher.Form method="post" action="/api/market/opportunities/review" className="mt-2 flex flex-wrap items-center gap-1.5">
                 <input type="hidden" name="id" value={o.id} />

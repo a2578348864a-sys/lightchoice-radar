@@ -8,7 +8,7 @@ import type { Screen } from "../components/shell/screens";
 export const handle: Screen = { name: "市场信号" };
 
 interface Overview {
-  modules: Array<{ module: string; name: string; engineering: string; dataState: string; noteZh: string }>;
+  modules: Array<{ module: string; name: string; engineering: string; dataState: string; noteZh: string; business: string }>;
   sources: Array<{ id: string; label: string; producer: string; enabled: boolean; automation: string; uses: string[]; evidence: string; notes?: string }>;
   counts: { keywordSnapshots: number; keywordRows: number; chartSnapshots: number; products: number; signals: number; opportunities: number; alerts: number };
   gaps: string[];
@@ -81,6 +81,7 @@ export default function MarketIndex() {
                     </span>
                   </div>
                   <p className="mt-1 text-[12px] leading-relaxed text-ink-3">{m.noteZh}</p>
+                  <p className="mt-0.5 text-[11.5px] text-ink-4">业务验收：{m.business}</p>
                 </div>
               ))}
             </div>
