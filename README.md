@@ -123,7 +123,7 @@
 3. 明确声明局限：关键词热度 ≠ 销量，排名 ≠ 利润，样本 ≠ 全市场。
 4. 不购买商业数据服务、不使用付费代理、不调用付费 API。
 
-**当前状态：R0 设计冻结+数据实证完成（2026-10-26），工程未启动。** 权威工程主计划见 **[docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md](docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md)**。数据通道现状（R0-DATA 实测）：**关键词级 L3 已取得**（AMZ123 热搜词 100 条真实样本，ABA 二手周更排名；页面无导出入口已实测确认）；**商品级人工观察 L3 已取得**（Amazon Best Sellers Beauty 榜 Top6：ASIN+榜内排名+价格，真实 Chrome 200 读取——但无人值守自动化仍受阻）；SP-API 无资格（L2 负面）、SellerSprite 付费未授权。五项数据能力：A=L3 实证、C=人工观察级 L3（可持续通道未成立）、B/D=零、E=NOT_STARTED。R1 工程启动受主计划 Gate B 约束（数据条件=PARTIAL，待通道授权）。
+**当前状态：R1~R6 工程与隔离验收完成，R6-CLOSE 质量收口完成（2026-10-26）。** 权威工程主计划见 **[docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md](docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md)**。当前阶段目标为**个人本机使用**（R7 云端 = DEFERRED_BY_USER，未来独立评估；R8 本地自然运行 = NOT_STARTED）。工作台入口 `/market`（管理员登录）：关键词需求（AMZ123/ABA 真实样本）、商品观测（Amazon 榜单人工观察真实样本）、研究线索（评分拒绝机制）、分型预警、来源许可（操作员授权与 PERMISSION_UNVERIFIED 严格分离）。数据能力如实：A=样本级、C=人工观察级、B/D=零、E=NOT_STARTED（无正式周期采集）；模型预算 ¥0。
 
 ### 主线状态总表
 
