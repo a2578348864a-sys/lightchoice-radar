@@ -5,6 +5,7 @@ import { pageMeta } from "../lib/seo";
 import { fullDateTime } from "../lib/format";
 import { EmptyState } from "../components/ui/Page";
 import type { Screen } from "../components/shell/screens";
+import { PhoneBar } from "../components/shell/PhoneBar";
 
 export const handle: Screen = { name: "行业精选" };
 
@@ -21,8 +22,9 @@ export function meta() {
 export default function IndustryDaily() {
   const { picks } = useLoaderData<typeof loader>();
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-16">
-      <header className="mt-6">
+    <div className="pb-10">
+      <PhoneBar back={{ to: "/industry", label: "行业动态" }} title="每日精选" />
+      <header className="pb-2 pt-3 lg:pt-1">
         <h1 className="text-xl font-semibold text-ink">行业每日精选</h1>
         <p className="mt-1 text-[13px] text-ink-2">从合格事件中确定性挑选（官方数据优先），每天至多 5 条；没有合格事件时当天为空，不凑数。归档保留当时的证据版本。</p>
       </header>
@@ -52,6 +54,6 @@ export default function IndustryDaily() {
           </section>
         ))
       )}
-    </main>
+    </div>
   );
 }

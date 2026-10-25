@@ -6,6 +6,7 @@ import { monthDayTime, relativeTime } from "../lib/format";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/Page";
 import type { Screen } from "../components/shell/screens";
+import { PhoneBar } from "../components/shell/PhoneBar";
 
 export const handle: Screen = { name: "行业动态" };
 
@@ -71,8 +72,10 @@ export default function IndustryIndex() {
   const pendingZh = Math.max(0, items.counts.admitted - items.counts.zh);
   const expiresAt = status.budget.limits?.expiresAt ?? null;
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-16">
-      <header className="mt-6">
+    <div className="pb-10">
+      {/* 与政策线索列表同一布局约定：root 容器管宽度（手机 ≤640px 带安全留白，桌面 --page-max-wide），页面只管节奏 */}
+      <PhoneBar back={{ to: "/", label: "情报" }} title="行业动态" />
+      <header className="pb-2 pt-3 lg:pt-1">
         <h1 className="text-xl font-semibold text-ink">行业动态</h1>
         <p className="mt-1 text-[13px] text-ink-2">美国消费与电商行业的变化信号：{items.counts.admitted} 条准入 · {items.counts.rejected} 条被规则排除 · {items.counts.stories} 个事件 · {items.counts.zh} 条已有中文。限制准入来源仅展示标题与链接（不存储其摘要文本）。</p>
         {/* 任务 I 第 15 项：运行状态与内容缺项提示 —— 只报事实（来源健康/最近一轮/预算窗口），不假装 Worker 在跑 */}
@@ -120,26 +123,64 @@ export default function IndustryIndex() {
       {items.items.length === 0 ? (
         <EmptyState title="暂无符合条件的行业条目">要么该筛选范围下来源尚无新增，要么现有条目被规则正确排除。不凑数量。</EmptyState>
       ) : (
-        <ul className="mt-4 divide-y divide-line">
-          {items.items.map((item) => (
-            <li key={item.id} className="py-3">
-              <Link to={`/industry/${item.id}`} className="block">
-                <div className="flex items-center gap-2 text-[11px] text-ink-2">
-                  <Badge tone={item.kind === "official-data" ? "ok" : item.kind === "sponsored" ? "neutral" : "amber"}>{KIND_LABEL[item.kind] ?? item.kind}</Badge>
-                  <span>{item.sourceName.split("(")[0]}</span>
-                  <span>·</span>
-                  <span>{item.publishedAt ? monthDayTime(item.publishedAt) : "日期未标注"}</span>
-                  {item.story && item.story.articleCount > 1 ? <span>· {item.story.articleCount} 篇同事件</span> : null}
-                </div>
-                <h2 className="mt-1 text-[15px] font-medium leading-snug text-ink">{item.zhTitle ?? item.title}</h2>
-                {item.zhTitle ? <p className="mt-0.5 text-[12px] text-ink-2">{item.title}</p> : null}
-                {item.excerpt ? <p className="mt-1 line-clamp-2 text-[13px] leading-relaxed text-ink-2">{item.excerpt}</p> : null}
-              </Link>
-            </li>
-          ))}
-        </ul>
+        (() => {
+          // 中文优先排序由后端保证：完整中文情报在前，仅标题线索在后。两组各给一行小节说明，缺口不隐藏。
+          const zhItems = items.items.filter((x) => x.zhTitle);
+          const leadItems = items.items.filter((x) => !x.zhTitle);
+          return (
+            <div className="mt-4">
+              {zhItems.length > 0 ? (
+                <>
+                  <h2 className="pb-1 text-[12px] font-semibold uppercase tracking-wide text-ink-3">完整中文情报（{zhItems.length}）</h2>
+                  <ul className="divide-y divide-line">
+                    {zhItems.map((item) => (
+                      <li key={item.id} className="py-3.5">
+                        <Link to={`/industry/${item.id}`} className="block">
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-3">
+                            <Badge tone={item.kind === "official-data" ? "ok" : "amber"}>{KIND_LABEL[item.kind] ?? item.kind}</Badge>
+                            <span>{item.sourceName.split("(")[0]}</span>
+                            <span>·</span>
+                            <span>{item.publishedAt ? monthDayTime(item.publishedAt) : "日期未标注"}（来源发布）</span>
+                            {item.story && item.story.articleCount > 1 ? <span>· {item.story.articleCount} 篇同事件</span> : null}
+                          </div>
+                          <h3 className="mt-1.5 text-[16px] font-semibold leading-snug text-ink">{item.zhTitle}</h3>
+                          {item.zhSummary ? <p className="mt-1.5 text-[13.5px] leading-[1.75] text-ink-2">{item.zhSummary}</p> : null}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-ink-4">
+                            <span>机器处理 · 未经人工核对</span>
+                            <span>原文：{item.title.slice(0, 64)}{item.title.length > 64 ? "…" : ""}</span>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              {leadItems.length > 0 ? (
+                <>
+                  <h2 className="mt-5 pb-1 text-[12px] font-semibold uppercase tracking-wide text-ink-3">仅标题线索（{leadItems.length}）</h2>
+                  <ul className="divide-y divide-line">
+                    {leadItems.map((item) => (
+                      <li key={item.id} className="py-3">
+                        <Link to={`/industry/${item.id}`} className="block">
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] text-ink-3">
+                            <Badge tone="neutral">{KIND_LABEL[item.kind] ?? item.kind}</Badge>
+                            <span>{item.sourceName.split("(")[0]}</span>
+                            <span>·</span>
+                            <span>{item.publishedAt ? monthDayTime(item.publishedAt) : "日期未标注"}</span>
+                          </div>
+                          <h3 className="mt-1 text-[14px] font-medium leading-snug text-ink-2">{item.title}</h3>
+                          <p className="mt-1 text-[11.5px] text-ink-4">该来源的使用条款不允许保存摘要或机器翻译，仅保留标题线索；点击查看原文。</p>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+            </div>
+          );
+        })()
       )}
-      <p className="mt-6 text-[11px] text-ink-2">中文内容由 DeepSeek 机器处理，未经人工核对；所有数字与日期以原文为准。处理与保存权限按来源分别限定。</p>
-    </main>
+      <p className="mt-6 text-[11px] text-ink-2">中文内容由 DeepSeek 机器处理，未经人工核对；所有数字与日期以原文为准。处理与保存权限按来源分别限定，仅标题线索不代表已完成中文情报。</p>
+    </div>
   );
 }

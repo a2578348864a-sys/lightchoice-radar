@@ -6,6 +6,7 @@ import { fullDateTime } from "../lib/format";
 import { Badge } from "../components/ui/Badge";
 import { IconExternal } from "../components/icons";
 import type { Screen } from "../components/shell/screens";
+import { PhoneBar } from "../components/shell/PhoneBar";
 
 export const handle: Screen = { name: "行业详情" };
 
@@ -21,9 +22,11 @@ export function meta() {
 export default function IndustryDetailPage() {
   const { item } = useLoaderData<typeof loader>();
   return (
-    <main className="mx-auto max-w-3xl px-4 pb-16">
-      <p className="mt-6 text-[12px] text-ink-2"><Link to="/industry" className="underline-offset-2 hover:underline">← 行业动态</Link></p>
-      <header className="mt-2">
+    <div className="pb-12">
+      <PhoneBar back={{ to: "/industry", label: "行业动态" }} title="行业详情" />
+      <div className="mx-auto max-w-[var(--page-max-reading)]">
+      <Link to="/industry" className="mt-2 hidden items-center gap-1.5 text-[12.5px] text-ink-4 transition-colors hover:text-ink-2 lg:inline-flex">← 行业动态</Link>
+      <header className="mt-2 lg:mt-0">
         <div className="flex flex-wrap items-center gap-2 text-[12px] text-ink-2">
           <span>{item.sourceName}</span>
           <span>·</span>
@@ -37,13 +40,24 @@ export default function IndustryDetailPage() {
         </a>
       </header>
 
+      {item.zhSummary ? (
+        <section className="mt-5" aria-label="中文速读">
+          <h2 className="text-[12px] font-semibold uppercase tracking-wide text-ink-2">中文速读（机器处理 · 未经人工核对）</h2>
+          <p className="mt-1 whitespace-pre-line text-[14px] leading-[1.8] text-ink">{item.zhSummary}</p>
+        </section>
+      ) : null}
+
       {item.excerpt ? (
         <section className="mt-5" aria-label="来源摘要">
-          <h2 className="text-[12px] font-semibold uppercase tracking-wide text-ink-2">来源摘要</h2>
+          <h2 className="text-[12px] font-semibold uppercase tracking-wide text-ink-2">来源摘要（原文）</h2>
           <p className="mt-1 text-[14px] leading-relaxed text-ink">{item.excerpt}</p>
         </section>
+      ) : null}
+
+      {item.zhTitle ? null : item.modelProcessing ? (
+        <p className="mt-4 rounded bg-paper-2 px-3 py-2 text-[12px] text-ink-2">该来源允许机器处理，中文内容在预算窗口内按轮次自动生成（每轮限量），本条尚在处理队列中。</p>
       ) : (
-        <p className="mt-5 rounded bg-paper-2 px-3 py-2 text-[12px] text-ink-2">该来源为限制准入：仅保存标题、链接与日期（出版方条款未授权保存摘要文本），分类由规则完成。</p>
+        <p className="mt-4 rounded bg-paper-2 px-3 py-2 text-[12px] text-ink-2">该来源为限制准入：仅保存标题、链接与日期（出版方条款未授权保存摘要文本），分类由规则完成，不生成中文内容。</p>
       )}
 
       {item.story ? (
@@ -84,6 +98,7 @@ export default function IndustryDetailPage() {
       ) : null}
 
       <p className="mt-8 text-[11px] text-ink-2">本页不提供投资、选品或采购建议；行业说明区分「来源明确陈述的事实」与「系统解释」，未验证的推断不作为结论。</p>
-    </main>
+      </div>
+    </div>
   );
 }
