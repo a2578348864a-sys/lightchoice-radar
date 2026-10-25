@@ -22,6 +22,11 @@ export default [
   route("industry", "routes/industry.tsx"),
   route("industry/daily", "routes/industry-daily.tsx"),
   route("industry/:id", "routes/industry-detail.tsx"),
+  // The third lane: consumer voice — a private research workspace (admin-guarded API, never anonymous).
+  route("voc", "routes/voc.tsx"),
+  route("voc/evidence", "routes/voc-evidence.tsx"),
+  route("voc/research", "routes/voc-research.tsx"),
+  route("voc/system", "routes/voc-system.tsx"),
   route("today", "routes/today.tsx"),
   route("all/search-busy", "routes/search-busy.tsx", { id: "all-search-busy" }),
   route("search-busy", "routes/search-busy.tsx", { id: "search-busy" }),

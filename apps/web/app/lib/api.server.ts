@@ -95,3 +95,18 @@ export function cachedPage<T extends object>(seconds: number, value: T, upstream
 export function pageHeaders({ loaderHeaders }: HeadersArgs) {
   return loaderHeaders;
 }
+
+/** VOC loaders read /api/voc/* with the visitor's own cookie; a private workspace answers its
+    honest fallback to anonymous visitors (no redirect to a login they may not have). */
+export async function vocGet<T>(request: Request, path: string): Promise<T | null> {
+  try {
+    const res = await fetch(`${API_BASE_URL}${path}`, {
+      headers: { accept: "application/json", cookie: request.headers.get("cookie") ?? "", "user-agent": request.headers.get("user-agent") ?? "" },
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(15_000)]),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
