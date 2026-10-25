@@ -7,6 +7,7 @@ import type { ModelPreset } from "@aihot/contracts/site-config";
 import { PRESETS } from "@aihot/site/models";
 import { config, credential, paidLaneOf, translationPurposeAllowed } from "../config.ts";
 import { reserveIndustryCall, settleIndustryCall } from "../editorial/industry-budget.ts";
+import { reserveVocCall, settleVocCall } from "../voc/voc-budget.ts";
 import { sha256 } from "../lib/ids.ts";
 import { reserveTranslationCall, settleTranslationCall } from "../editorial/translate-budget.ts";
 import {
@@ -69,6 +70,9 @@ export interface ChatJsonOptions<S extends z.ZodType> {
   parse?: (content: string) => unknown;
   /** The article a translation purpose belongs to, for the translation budget's distinct-article cap. */
   articleId?: string;
+  /** Per-call extra request body (e.g. DeepSeek thinking off). Folded into the receipt identity,
+      so a thinking-off call and a thinking-on call are different logical requests. */
+  extraBody?: Record<string, unknown>;
 }
 
 export interface ChatJsonResult<T> {
@@ -125,11 +129,11 @@ function requestFor<S extends z.ZodType>(opts: ChatJsonOptions<S>, spec: ModelSp
   const userText = typeof opts.user === "string" ? opts.user : JSON.stringify(opts.user);
   const request: ReceiptRequest = {
     service: spec.service, model: spec.model, purpose: opts.purpose, subject: opts.subject,
-    identity: { model: spec.model, promptVersion: opts.promptVersion, system: sha256(opts.system), user: sha256(userText), temperature, maxTokens, extra: spec.extra ?? null },
+    identity: { model: spec.model, promptVersion: opts.promptVersion, system: sha256(opts.system), user: sha256(userText), temperature, maxTokens, extra: { spec: spec.extra ?? null, call: opts.extraBody ?? null } },
     requestSummary: { promptVersion: opts.promptVersion, systemHash: sha256(opts.system), userHash: sha256(userText), userChars: userText.length, temperature, maxTokens },
     attemptTag: opts.attemptTag,
   };
-  return { request, temperature, maxTokens, userText };
+  return { request, temperature, maxTokens, userText, extraBody: opts.extraBody };
 }
 
 /** A call without a backup waits this long for its answer. */
@@ -176,7 +180,7 @@ async function chatOnce<S extends z.ZodType>(opts: ChatJsonOptions<S>, circuit =
   const apiKey = credential("models", spec.apiKeyEnv);
   if (!baseUrl || !apiKey || !spec.model) throw new ModelUnavailableError(`Model ${opts.model} is not configured (${spec.baseUrlEnv}, ${spec.apiKeyEnv}${spec.key === "default" ? ", LLM_MODEL" : ""})`);
 
-  const { request, temperature, maxTokens, userText } = requestFor(opts, spec);
+  const { request, temperature, maxTokens, userText, extraBody } = requestFor(opts, spec);
   const timeoutMs = opts.timeoutMs ?? (circuit ? FAILOVER_TIMEOUT_MS : TIMEOUT_MS);
   let permit: CircuitPermit;
   const body: Record<string, unknown> = {
@@ -191,6 +195,7 @@ async function chatOnce<S extends z.ZodType>(opts: ChatJsonOptions<S>, circuit =
     max_tokens: maxTokens,
     ...(spec.jsonMode && opts.json !== false ? { response_format: { type: "json_object" } } : {}),
     ...(spec.extra ?? {}),
+    ...(extraBody ?? {}),
   };
 
   const receipt = await paidRequest(
@@ -236,6 +241,7 @@ async function chatOnce<S extends z.ZodType>(opts: ChatJsonOptions<S>, circuit =
       // expiry and purpose allowlist are checked before the send.
       if (lane === "translate") await reserveTranslationCall(tx, { articleId: opts.articleId ?? "", inputChars: userText.length + opts.system.length, maxTokens, purpose: opts.purpose });
       else if (lane === "industry") await reserveIndustryCall(tx, { articleId: opts.articleId ?? "", inputChars: userText.length + opts.system.length, maxTokens, purpose: opts.purpose });
+      else if (lane === "voc") await reserveVocCall(tx, { articleId: opts.articleId ?? "", inputChars: userText.length + opts.system.length, maxTokens, purpose: opts.purpose });
       if (circuit) permit = await enterModelCircuit(tx, spec.service, timeoutMs);
     },
   );

@@ -813,3 +813,21 @@ export interface IndustrySourceStatus {
     observationStartedAt: string | null;
   };
 }
+
+/* The third lane's evidence thread, as the evidence page renders it. */
+export interface VocThreadView {
+  questionId: number;
+  title: string;
+  body: string;
+  tags: string[];
+  answers: Array<{ id: number; score: number; isAccepted: boolean; body: string; contentLicense: string | null; comments: Array<{ id: number; body: string; contentLicense: string | null }> }>;
+  comments: Array<{ id: number; body: string; contentLicense: string | null }>;
+  askerFollowUp?: string;
+  attribution: string;
+}
+
+export interface VocEvidenceItemEx extends IndustryItem {
+  thread?: VocThreadView;
+  licensedUses: string[];
+  reviewStatus: string;
+}

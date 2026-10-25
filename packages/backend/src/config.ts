@@ -48,6 +48,9 @@ export type TranslationPurpose = (typeof TRANSLATION_PURPOSES)[number];
 /** The industry lane's own paid purposes (second lane): Chinese processing and evidence-checked events. */
 export const INDUSTRY_PURPOSES = ["industry_title", "industry_excerpt", "industry_event", "industry_merge"] as const;
 export type IndustryPurpose = (typeof INDUSTRY_PURPOSES)[number];
+/** The third lane's (consumer voice) paid purposes: L2 understanding and L3 pain research. */
+export const VOC_PURPOSES = ["voc_l2", "voc_l3"] as const;
+export type VocPurpose = (typeof VOC_PURPOSES)[number];
 
 export const isProduction = env.NODE_ENV === "production";
 // Radar is a no-model product: paid-provider calls stay blocked even if an inherited AIHOT .env
@@ -91,6 +94,25 @@ export const config = {
    * translation switch: turning either off never touches the other lane's spend or window.
    */
   industryEnabled: bool("RADAR_INDUSTRY_ENABLED", false),
+  /**
+   * The third lane's model valve. Since 2026-10-26 the operator has authorised DeepSeek for ALL
+   * four lanes' legitimate processing, so the old "¥0 by default" reading is retired; opening the
+   * valve now means "this lane may call the model for materials whose OWN licences allow it".
+   * Two further gates still refuse everything not explicitly permitted: per-material modelSend
+   * (SE batches license none) and the lane's funded budget window (absent = still ¥0). Default
+   * stays false so a fresh checkout never calls a paid API by accident.
+   */
+  vocModelEnabled: bool("VOC_MODEL_ENABLED", false),
+  /** The third lane's caps: environment defaults DENY (0) — funding happens via an explicit window. */
+  voc: {
+    round: env.RADAR_VOC_ROUND?.trim() || "",
+    maxRequests: int("RADAR_VOC_MAX_REQUESTS", 0),
+    maxArticles: int("RADAR_VOC_MAX_ARTICLES", 0),
+    budgetCny: num("RADAR_VOC_BUDGET_CNY", 0),
+    priceInPerMTokens: num("RADAR_VOC_PRICE_IN", 2.5),
+    priceOutPerMTokens: num("RADAR_VOC_PRICE_OUT", 9),
+    purposes: [...VOC_PURPOSES],
+  },
   translate: {
     /**
      * Identifier of the paid window now running (e.g. "r47"). Every window keeps its own caps and its
@@ -147,10 +169,16 @@ export function industryPurposeAllowed(purpose: string): boolean {
 }
 
 /** Which lane a purpose belongs to; null when no switch opens it (rule mode keeps refusing it). */
-export function paidLaneOf(purpose: string): "translate" | "industry" | null {
+export function paidLaneOf(purpose: string): "translate" | "industry" | "voc" | null {
   if (translationPurposeAllowed(purpose)) return "translate";
   if (industryPurposeAllowed(purpose)) return "industry";
+  if (vocPurposeAllowed(purpose)) return "voc";
   return null;
+}
+
+/** The consumer-voice lane's own valve: independent of the other switches, its own purposes only. */
+export function vocPurposeAllowed(purpose: string): boolean {
+  return config.vocModelEnabled && (VOC_PURPOSES as readonly string[]).includes(purpose);
 }
 
 const groupCache = new Map<CredentialGroup, Record<string, string>>();
