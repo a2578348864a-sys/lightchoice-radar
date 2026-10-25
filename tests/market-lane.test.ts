@@ -11,15 +11,19 @@ import { after, before, test } from "node:test";
 process.env.RADAR_RUN_DIR = mkdtempSync(path.join(tmpdir(), "market-lane-"));
 
 const { sql, closeDb } = await import("@aihot/backend/db");
-const { saveMarketSource, sourceAllows, loadMarketSources, loadMarketOpportunities, saveMarketAlertRule, loadMarketAlerts, revokeMarketSource, saveMarketOpportunity } = await import("@aihot/backend/market/market-model");
+const { saveMarketSource, sourceAllows, loadMarketSources, loadMarketOpportunities, saveMarketAlertRule, loadMarketAlerts, revokeMarketSource, saveMarketOpportunity, saveMarketExternalRecord, loadMarketExternalRecords, saveMarketInnovationCue, loadMarketInnovationCues } = await import("@aihot/backend/market/market-model");
 const {
-  applyChartSnapshot, applyKeywordSnapshot, parseAmz123KeywordCapture, parseAmazonChartCapture,
+  applyChartSnapshot, applyKeywordSnapshot, applyCsvImport, parseAmz123KeywordCapture, parseAmazonChartCapture,
   seedMarketSources, defaultMarketSources,
 } = await import("@aihot/backend/market/market-import");
 const {
   brandDistribution, chartRankChanges, comparableChartPair, comparablePrice, keywordChanges,
   keywordSeries, priceChangeRate, trendsSpliceable, detectMarketSignals, trendVerdict,
+  keywordHistoryDetail, productHistoryDetail, categoryMarketSummary,
 } = await import("@aihot/backend/market/market-metrics");
+const {
+  parseCsv, suggestColumnMappings, mapAndValidateKeywordRows, mapAndValidateProductRows, sanitizeCsvFormula,
+} = await import("@aihot/backend/market/csv-parser");
 const {
   buildOpportunityCandidates, computeScenarios, evaluateAlerts, propagateSourceRevocation,
   retireUnqualifiedAlerts, reviewOpportunity, scoreOpportunity,
@@ -341,4 +345,171 @@ test("多期序列：同来源同词可成序列；跨来源序列标记不可�
   const other = { ...s2, sourceId: "another-source" };
   const mixed = keywordSeries([s1, other], "alpha");
   assert.equal(mixed.comparable, false, "different sources are not assumed comparable (C11)");
+});
+
+/* -------------------------------------------------- P1: CSV parser & mapping */
+
+test("CSV 解析器：BOM 处理、引号转义、多行单元格与公式注入防御", () => {
+  const csvWithBom = "\uFEFFKeyword,Rank,Note\r\n\"coffee, grinder\",12,\"good\r\nvalue\"\r\n=1+1,15,calc";
+  const parsed = parseCsv(csvWithBom);
+  assert.equal(parsed.headers.length, 3);
+  assert.equal(parsed.headers[0], "Keyword");
+  assert.equal(parsed.rows.length, 2);
+  assert.equal(parsed.rows[0]![0], "coffee, grinder");
+  assert.equal(parsed.rows[0]![2], "good\r\nvalue");
+  assert.equal(parsed.rows[1]![0], "'=1+1", "formula injection prefix '=' sanitized with leading quote");
+});
+
+test("CSV 智能列映射与行校验：中英文别名识别、ASIN 强校验、重复过滤", () => {
+  const kwHeaders = ["搜索词", "当前排名", "上周排名", "位移"];
+  const kwMapping = suggestColumnMappings(kwHeaders, "keywords");
+  assert.equal(kwMapping.keyword, 0);
+  assert.equal(kwMapping.rankThisWeek, 1);
+  assert.equal(kwMapping.rankLastWeek, 2);
+
+  const prodHeaders = ["Item ASIN", "BSR Rank", "Current Price", "Product Title", "Category"];
+  const prodMapping = suggestColumnMappings(prodHeaders, "products");
+  assert.equal(prodMapping.asin, 0);
+  assert.equal(prodMapping.chartRank, 1);
+  assert.equal(prodMapping.price, 2);
+
+  // Validate error interception
+  const badRows = [
+    ["", "10", "20", "10"], // empty keyword
+    ["valid kw", "invalid-rank", "20", "10"], // bad rank
+    ["dup kw", "10", "20", "10"],
+    ["dup kw", "15", "20", "5"], // duplicate
+  ];
+  const kwRes = mapAndValidateKeywordRows(badRows, { keyword: 0, rankThisWeek: 1, rankLastWeek: 2 });
+  assert.equal(kwRes.validRows.length, 1);
+  assert.equal(kwRes.duplicateCount, 1);
+  assert.equal(kwRes.errorRows.length, 2);
+});
+
+test("通用 CSV 导入引擎：关键词 CSV 入库、入库前校验与幂等性", async () => {
+  const csvText = `Keyword,Current Rank,Last Week\r\n"wireless ear buds",15,30\r\n"bluetooth speaker",4,10`;
+  const res = await applyCsvImport({
+    kind: "keywords",
+    csvText,
+    sourceId: KW_SOURCE,
+    producer: "测试 CSV 导入",
+    mapping: { keyword: 0, rankThisWeek: 1, rankLastWeek: 2 },
+    periodStart: "2026-11-05",
+    periodEnd: "2026-11-12",
+  });
+  assert.equal(res.ok, true);
+  assert.equal(res.validRowsCount, 2);
+  assert.equal(res.stored, 1);
+
+  // Re-import same CSV -> idempotent (0 stored)
+  const res2 = await applyCsvImport({
+    kind: "keywords",
+    csvText,
+    sourceId: KW_SOURCE,
+    producer: "测试 CSV 导入",
+    mapping: { keyword: 0, rankThisWeek: 1, rankLastWeek: 2 },
+    periodStart: "2026-11-05",
+    periodEnd: "2026-11-12",
+  });
+  assert.equal(res2.stored, 0);
+  assert.equal(res2.revised, 0);
+});
+
+/* -------------------------------------------------- P2: Multi-period history */
+
+test("多周期关键词历史追踪：跨期位移汇总、走势判定与 C1 说明", async () => {
+  // Ingest Period 1 & Period 2 for the same keyword
+  await applyKeywordSnapshot(parseAmz123KeywordCapture(kwInput("2026-10-01", [["espresso tamper", 100, 150]]), "p"));
+  await applyKeywordSnapshot(parseAmz123KeywordCapture(kwInput("2026-10-08", [["espresso tamper", 60, 100]]), "p"));
+  await applyKeywordSnapshot(parseAmz123KeywordCapture(kwInput("2026-10-15", [["espresso tamper", 30, 60]]), "p"));
+
+  const history = await keywordHistoryDetail("espresso tamper");
+  assert.equal(history.totalPeriods, 3);
+  assert.equal(history.points.length, 3);
+  assert.equal(history.trend, "up", "rank 100 -> 30 is net movement +70 (upward)");
+  assert.equal(history.bestRank, 30);
+  assert.equal(history.latestRank, 30);
+  assert.match(history.trendZh, /排名前进/);
+  assert.match(history.reasonZh, /转化率/);
+});
+
+test("多周期商品与价格历史追踪：报价变动率、C2 口径可比性与榜单状态", async () => {
+  const asin = "B0HISTPRD1";
+  const mkSnap = (periodKey: string, rank: number, price: string) =>
+    parseAmazonChartCapture({
+      sourceId: CHART_SOURCE,
+      chartId: "beauty-history-chart",
+      chartKind: "bestsellers",
+      categoryLabel: "Beauty Care",
+      observedAt: `${periodKey}T10:00:00Z`,
+      complete: true,
+      rows: [{ asin, chartRank: rank, price, title: "Historical Test Product" }],
+    });
+
+  await applyChartSnapshot(mkSnap("2026-10-10", 10, "$20.00"));
+  await applyChartSnapshot(mkSnap("2026-10-17", 5, "$25.00"));
+
+  const pHistory = await productHistoryDetail(asin);
+  assert.equal(pHistory.totalObservations, 2);
+  assert.equal(pHistory.priceComparability.ok, true);
+  assert.equal(pHistory.priceChangeRate, 0.25, "$20.00 -> $25.00 is +25%");
+  assert.equal(pHistory.rankMovement.positionsMoved, 5, "Rank 10 -> 5 moved up 5 positions");
+  assert.equal(pHistory.rankMovement.direction, "up");
+});
+
+/* -------------------------------------------------- P3/P4: Modules & Candidates */
+
+test("类目市场雷达 (M02)：按类目标签聚合、计算价格区间与关联关键词", async () => {
+  const summary = await categoryMarketSummary();
+  assert.ok(summary.categories.length > 0);
+  const beautyCat = summary.categories.find((c) => c.categoryLabel.includes("Beauty"));
+  assert.ok(beautyCat, "found category card for Beauty");
+  assert.ok(beautyCat.productCount >= 1);
+  assert.ok(beautyCat.priceRange.min != null);
+  assert.match(beautyCat.notesZh, /PARTIAL/);
+});
+
+test("机会候选跨周期防重：多期上升信号刷新已有候选，杜绝重复卡片", async () => {
+  // Signal 1 for keyword "super-serum"
+  await applyKeywordSnapshot(parseAmz123KeywordCapture(kwInput("2026-11-01", [["super-serum", 10, 30]]), "p"));
+  const created1 = await buildOpportunityCandidates({ minRise: 10 });
+  const opp1 = created1.find((o) => o.title.includes("super-serum"));
+  assert.ok(opp1, "candidate created for super-serum in period 1");
+
+  // Ingest Period 2 with another rise
+  await applyKeywordSnapshot(parseAmz123KeywordCapture(kwInput("2026-11-08", [["super-serum", 5, 20]]), "p"));
+  const created2 = await buildOpportunityCandidates({ minRise: 10 });
+  // Should not create another candidate with different id for same keyword
+  const allOpps = await loadMarketOpportunities();
+  const serumOpps = allOpps.filter((o) => o.title.includes("super-serum") || o.id.includes("super-serum"));
+  assert.equal(serumOpps.length, 1, "deduplicated: exactly one opportunity candidate per keyword identity");
+});
+
+test("外部平台与创新线索 (M08/M09)：私有记录存储与读取", async () => {
+  await saveMarketExternalRecord({
+    id: "ext-1",
+    platform: "ebay",
+    externalId: "ebay-item-12345",
+    title: "Vintage Coffee Grinder Hand Mill",
+    price: "$29.99",
+    currency: "USD",
+    observedAt: "2026-10-26",
+    candidateAsin: "B0HISTPRD1",
+    matchConfidence: 0.85,
+    notes: "类似造型，手工打磨",
+  });
+  const extList = await loadMarketExternalRecords();
+  assert.ok(extList.some((e) => e.id === "ext-1" && e.platform === "ebay"));
+
+  await saveMarketInnovationCue({
+    id: "cue-1",
+    title: "可折叠防尘豆仓设计",
+    cueType: "feature-diff",
+    differenceSummaryZh: "折叠设计缩减包装体积 40%，且杜绝咖啡豆残粉卡扣痛点",
+    source: "用户真实反馈与众筹观察",
+    observedAt: "2026-10-26",
+    verified: false,
+  });
+  const cues = await loadMarketInnovationCues();
+  assert.ok(cues.some((c) => c.id === "cue-1" && c.cueType === "feature-diff"));
 });

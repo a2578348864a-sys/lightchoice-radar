@@ -494,3 +494,13 @@
 - **LOCAL_PERSISTENCE_READY = PASS**：本机 5544 端口 PostgreSQL 持久化有效；使用 `pg_dump` 成功制作本地自定义格式备份，并在全新隔离数据库 `lightchoice_radar_restore_test` 中经 `pg_restore` 验证完整恢复 48 张表与业务数据，正式库全程零误碰；备份文件存储于被 `.gitignore` 排除的目录。
 - **LOCAL_BUSINESS_READY = PASS**：商业情景计算器三情景纯计算与敏感性分析正常；机会候选生成修复为默认全量保留不再静默丢弃（opts.maxPerRun 可选）；人工研究决策绑定证据版本；站内分型预警与冷却去重机制正常；来源撤销联动失效传播验证通过。
 - **边界保持**：R7 云端保持 DEFERRED_BY_USER；R8 本地自然运行保持 NOT_STARTED；前三主线零影响，DeepSeek 调用 0 次，新增费用 ¥0。
+
+**第四主线 OVERNIGHT-01 市场信号深度建设收口（2026-10-26，个人市场情报工作台业务能力跃升）**：
+- **P1_IMPORT_WORKBENCH = PASS**：纯 TypeScript RFC 4180 CSV 解析器就绪（BOM 处理、双引号转义、多行单元格、公式注入防御），智能别名推测与交互式字段映射，导入前校验（有效/重复/格式异常行号与字段定位）与多期快照样例预览，CSRF 守门幂等入库零重复；Excel .xlsx 说明引导。
+- **P2_HISTORICAL_OBSERVATIONS = PASS**：关键词多期追踪（keywordHistoryDetail，位移方向、连续趋势、未内插缺失识别、反转 Y 轴 Sparkline 图表）、商品多期追踪（productHistoryDetail，报价变动率、C2 口径可比性检查、进出榜状态）。
+- **P3_TWELVE_MODULE_CAPABILITIES = PASS**：类目雷达（M02 样本类目聚合看板、品牌分布与价格区间）、销售热度（M04 榜内多期位移）、价格与促销（M06 跨期追踪）、外部平台（M08）与创新线索（M09）私有记录存储与读取全线打通。
+- **P4_OPPORTUNITY_AND_ALERT_QUALITY = PASS**：机会候选跨期去重（opp-kw- 唯一身份，多期上升刷新已有线索而非产生重复卡片）；一键「⚡ 从上升词生成研究候选」前端打通；预警去重冷却与一键评估打通。
+- **P5_MARKET_UI_AND_DATA_QUALITY = PASS**：Web 六大路由全线升级，多期周期下拉筛选、关键词下钻历史抽屉、ASIN 观测历史抽屉、类目卡片矩阵、数据质量总览卡片。
+- **P6_LOCAL_STABILITY = PASS**：测试全程在隔离库 lightchoice_radar_test 执行，正式库 lightchoice_radar 零写入、零污染；前三主线 Worker 稳定运行。
+- **P7_ISOLATED_E2E = PASS**：单元与集成测试 29/29 全过；TypeScript 全仓 0 错误；Web 构建 2.78s + 773ms 成功；真实 Chrome 自动化浏览器验收 10/10 项全过，Console 0 错误，移动端 390px 零溢出。
+- **边界保持**：R7 云端保持 DEFERRED_BY_USER；R8 本地自然运行保持 NOT_STARTED；前三主线零影响，DeepSeek 调用 0 次，新增费用 ¥0；未执行 git push。

@@ -12,6 +12,9 @@ import {
   chartSnapshotBasisVersion, keywordSnapshotBasisVersion, loadMarketSource, saveMarketSource,
   sourceAllows, type MarketChartSnapshot, type MarketKeywordSnapshot, type MarketProductRecord, type MarketSource,
 } from "./market-model.ts";
+import {
+  parseCsv, mapAndValidateKeywordRows, mapAndValidateProductRows, type RowValidationError,
+} from "./csv-parser.ts";
 
 /* ------------------------------------------------------------------ adapters */
 
@@ -211,6 +214,136 @@ function brandOf(title: string | null): string | null {
   if (!title) return null;
   const m = /^([A-Za-z][A-Za-z0-9&.'-]*(?:\s+[A-Za-z][A-Za-z0-9&.'-]*)?)\s/.exec(title.trim());
   return m ? m[1]! : null;
+}
+
+/* -------------------------------------------------------- generic CSV import */
+
+export interface CsvImportInput {
+  kind: "keywords" | "chart";
+  csvText: string;
+  sourceId: string;
+  producer?: string;
+  mapping: Record<string, number>;
+  periodStart?: string;
+  periodEnd?: string;
+  sourceUpdatedAt?: string | null;
+  observedAt?: string;
+  chartId?: string;
+  chartKind?: MarketChartSnapshot["chartKind"];
+  categoryLabel?: string | null;
+  complete?: boolean;
+}
+
+export interface CsvImportResult {
+  ok: boolean;
+  totalParsedRows: number;
+  validRowsCount: number;
+  duplicateCount: number;
+  errorRows: RowValidationError[];
+  stored: number;
+  revised: number;
+  basisVersion?: string;
+  refusal?: string;
+}
+
+export async function applyCsvImport(input: CsvImportInput): Promise<CsvImportResult> {
+  const parsed = parseCsv(input.csvText);
+  if (parsed.rows.length === 0) {
+    return {
+      ok: false,
+      totalParsedRows: 0,
+      validRowsCount: 0,
+      duplicateCount: 0,
+      errorRows: [{ line: 1, field: "file", value: "", error: "文件无有效数据行" }],
+      stored: 0,
+      revised: 0,
+      refusal: "CSV 文件解析后没有数据行",
+    };
+  }
+
+  const now = new Date().toISOString();
+
+  if (input.kind === "keywords") {
+    const { validRows, errorRows, duplicateCount } = mapAndValidateKeywordRows(parsed.rows, input.mapping);
+    if (validRows.length === 0) {
+      return {
+        ok: false,
+        totalParsedRows: parsed.rows.length,
+        validRowsCount: 0,
+        duplicateCount,
+        errorRows,
+        stored: 0,
+        revised: 0,
+        refusal: "没有通过校验的有效关键词行",
+      };
+    }
+    const observedAt = input.observedAt || (input.periodEnd ? `${input.periodEnd}T12:00:00Z` : now);
+    const snap: MarketKeywordSnapshot = {
+      sourceId: input.sourceId,
+      periodStart: input.periodStart || now.slice(0, 10),
+      periodEnd: input.periodEnd || now.slice(0, 10),
+      sourceUpdatedAt: input.sourceUpdatedAt ?? null,
+      observedAt,
+      producer: input.producer || "人工 CSV 导入",
+      secondaryDisplay: true,
+      rows: validRows,
+    };
+    const res = await applyKeywordSnapshot(snap);
+    return {
+      ok: !res.refusal,
+      totalParsedRows: parsed.rows.length,
+      validRowsCount: validRows.length,
+      duplicateCount,
+      errorRows,
+      stored: res.stored,
+      revised: res.revised,
+      basisVersion: res.basisVersion,
+      refusal: res.refusal,
+    };
+  } else {
+    const { validRows, errorRows, duplicateCount } = mapAndValidateProductRows(parsed.rows, input.mapping);
+    if (validRows.length === 0) {
+      return {
+        ok: false,
+        totalParsedRows: parsed.rows.length,
+        validRowsCount: 0,
+        duplicateCount,
+        errorRows,
+        stored: 0,
+        revised: 0,
+        refusal: "没有通过校验的有效商品行",
+      };
+    }
+    const snap: MarketChartSnapshot = {
+      sourceId: input.sourceId,
+      chartId: input.chartId || `chart-${input.sourceId}`,
+      chartKind: input.chartKind || "bestsellers",
+      marketplace: "US",
+      categoryLabel: input.categoryLabel ?? null,
+      topN: validRows.length,
+      complete: input.complete ?? true,
+      periodKey: (input.observedAt || now).slice(0, 10),
+      observedAt: input.observedAt || now,
+      rows: validRows.map((r) => ({
+        asin: r.asin,
+        chartRank: r.chartRank,
+        price: r.price,
+        title: r.title,
+      })),
+    };
+    const res = await applyChartSnapshot(snap);
+    return {
+      ok: !res.refusal,
+      totalParsedRows: parsed.rows.length,
+      validRowsCount: validRows.length,
+      duplicateCount,
+      errorRows,
+      stored: res.snapshotStored,
+      revised: res.productsUpdated,
+      basisVersion: res.basisVersion,
+      refusal: res.refusal,
+    };
+  }
 }
 
 /* ------------------------------------------------------------- source seeding */

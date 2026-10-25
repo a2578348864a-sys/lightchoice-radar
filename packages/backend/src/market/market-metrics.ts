@@ -127,6 +127,320 @@ export function keywordSeries(snaps: MarketKeywordSnapshot[], keyword: string): 
   return { points, comparable: points.length >= 2 };
 }
 
+/* ------------------------------------------------------ M01/M03 multi-period detail */
+
+export interface KeywordHistoryPoint {
+  periodStart: string;
+  periodEnd: string;
+  rankThisWeek: number;
+  rankLastWeek: number | null;
+  rankDeltaAbsolute: number | null;
+  positionsMoved: number | null;
+  direction: "up" | "down" | "flat" | "unknown";
+  sourceId: string;
+  producer: string;
+}
+
+export interface KeywordHistoryResponse {
+  keyword: string;
+  totalPeriods: number;
+  points: KeywordHistoryPoint[];
+  trend: "up" | "down" | "flat" | "volatile" | "insufficient";
+  trendZh: string;
+  bestRank: number | null;
+  worstRank: number | null;
+  latestRank: number | null;
+  comparable: boolean;
+  reasonZh: string;
+}
+
+export async function keywordHistoryDetail(keyword: string): Promise<KeywordHistoryResponse> {
+  const snaps = await loadKeywordSnapshots();
+  const sorted = [...snaps].sort((a, b) => a.periodStart.localeCompare(b.periodStart));
+  const points: KeywordHistoryPoint[] = [];
+  const kwLower = keyword.toLowerCase().trim();
+
+  for (const s of sorted) {
+    const row = s.rows.find((r) => r.keyword.toLowerCase().trim() === kwLower);
+    if (row) {
+      const moved = row.rankLastWeek != null ? row.rankLastWeek - row.rankThisWeek : null;
+      points.push({
+        periodStart: s.periodStart,
+        periodEnd: s.periodEnd,
+        rankThisWeek: row.rankThisWeek,
+        rankLastWeek: row.rankLastWeek,
+        rankDeltaAbsolute: row.rankDeltaAbsolute,
+        positionsMoved: moved,
+        direction: moved == null ? "unknown" : moved > 0 ? "up" : moved < 0 ? "down" : "flat",
+        sourceId: s.sourceId,
+        producer: s.producer,
+      });
+    }
+  }
+
+  if (points.length === 0) {
+    return {
+      keyword,
+      totalPeriods: 0,
+      points: [],
+      trend: "insufficient",
+      trendZh: "暂无历史观测数据",
+      bestRank: null,
+      worstRank: null,
+      latestRank: null,
+      comparable: false,
+      reasonZh: "未在任何已入库快照中检索到该关键词",
+    };
+  }
+
+  const ranks = points.map((p) => p.rankThisWeek);
+  const bestRank = Math.min(...ranks);
+  const worstRank = Math.max(...ranks);
+  const latestRank = points[points.length - 1]!.rankThisWeek;
+
+  if (points.length < 2) {
+    return {
+      keyword,
+      totalPeriods: points.length,
+      points,
+      trend: "insufficient",
+      trendZh: "单期观测（不足 2 期，未形成历史趋势）",
+      bestRank,
+      worstRank,
+      latestRank,
+      comparable: false,
+      reasonZh: "单期快照只能反映当前名次，不能证明多期趋势（C1 规定）",
+    };
+  }
+
+  const firstRank = points[0]!.rankThisWeek;
+  const netMovement = firstRank - latestRank;
+  let trend: "up" | "down" | "flat" | "volatile" = "flat";
+  let trendZh = "排名相对平稳";
+
+  if (netMovement >= 5) {
+    trend = "up";
+    trendZh = `多期累计排名前进 ${netMovement} 位（注意：排名上升≠搜索量增长百分比）`;
+  } else if (netMovement <= -5) {
+    trend = "down";
+    trendZh = `多期累计排名后退 ${Math.abs(netMovement)} 位`;
+  }
+
+  return {
+    keyword,
+    totalPeriods: points.length,
+    points,
+    trend,
+    trendZh,
+    bestRank,
+    worstRank,
+    latestRank,
+    comparable: true,
+    reasonZh: `跨 ${points.length} 期同口径追踪；排名前进反映相对位移，不代表实际订单转化率`,
+  };
+}
+
+export interface ProductObservationPoint {
+  periodKey: string;
+  chartId: string;
+  chartKind: string;
+  categoryLabel: string | null;
+  rank: number | null;
+  price: string | null;
+  title: string | null;
+  observedAt: string;
+}
+
+export interface ProductHistoryResponse {
+  asin: string;
+  product: MarketProductRecord | null;
+  totalObservations: number;
+  observations: ProductObservationPoint[];
+  priceHistory: Array<{ periodKey: string; price: string; parsedAmount: number | null }>;
+  priceComparability: Comparability;
+  priceChangeRate: number | null;
+  rankMovement: { firstRank: number | null; latestRank: number | null; positionsMoved: number | null; direction: string };
+  scopeStatus: "present" | "new-entrant" | "left-scope" | "unobserved";
+  summaryZh: string;
+}
+
+export async function productHistoryDetail(asin: string): Promise<ProductHistoryResponse> {
+  const cleanAsin = asin.toUpperCase().trim();
+  const products = await loadProducts();
+  const product = products.find((p) => p.asin.toUpperCase() === cleanAsin) ?? null;
+  const chartSnaps = await loadChartSnapshots();
+  const observations: ProductObservationPoint[] = [];
+
+  for (const snap of chartSnaps) {
+    const row = snap.rows.find((r) => r.asin.toUpperCase() === cleanAsin);
+    if (row) {
+      observations.push({
+        periodKey: snap.periodKey,
+        chartId: snap.chartId,
+        chartKind: snap.chartKind,
+        categoryLabel: snap.categoryLabel,
+        rank: row.chartRank,
+        price: row.price,
+        title: row.title,
+        observedAt: snap.observedAt,
+      });
+    }
+  }
+
+  const pricePoints = observations
+    .filter((o) => o.price != null)
+    .map((o) => {
+      const match = /\$?([\d.,]+)/.exec(o.price ?? "");
+      return {
+        periodKey: o.periodKey,
+        price: o.price!,
+        parsedAmount: match ? Number(match[1]!.replace(/,/g, "")) : null,
+      };
+    });
+
+  let priceChange: number | null = null;
+  let priceComp: Comparability = { ok: false, reason: "无价格观测记录", rules: ["C2"] };
+
+  if (pricePoints.length >= 2) {
+    const firstP = pricePoints[0]!;
+    const latestP = pricePoints[pricePoints.length - 1]!;
+    priceComp = comparablePrice(firstP.price, latestP.price);
+    if (priceComp.ok) {
+      const rate = priceChangeRate(firstP.price, latestP.price);
+      priceChange = rate.value;
+    }
+  } else if (pricePoints.length === 1) {
+    priceComp = { ok: false, reason: "仅有单期报价，无法计算价格涨跌率", rules: ["C2"] };
+  }
+
+  const rankedObs = observations.filter((o) => o.rank != null);
+  let rankMovement = { firstRank: null as number | null, latestRank: null as number | null, positionsMoved: null as number | null, direction: "unknown" };
+  if (rankedObs.length >= 2) {
+    const firstR = rankedObs[0]!.rank!;
+    const latestR = rankedObs[rankedObs.length - 1]!.rank!;
+    const moved = firstR - latestR;
+    rankMovement = {
+      firstRank: firstR,
+      latestRank: latestR,
+      positionsMoved: moved,
+      direction: moved > 0 ? "up" : moved < 0 ? "down" : "flat",
+    };
+  } else if (rankedObs.length === 1) {
+    rankMovement = {
+      firstRank: rankedObs[0]!.rank,
+      latestRank: rankedObs[0]!.rank,
+      positionsMoved: null,
+      direction: "single-obs",
+    };
+  }
+
+  let scopeStatus: ProductHistoryResponse["scopeStatus"] = "unobserved";
+  if (observations.length > 0) {
+    const latestChart = chartSnaps[chartSnaps.length - 1];
+    if (latestChart && latestChart.rows.some((r) => r.asin.toUpperCase() === cleanAsin)) {
+      scopeStatus = "present";
+    } else {
+      scopeStatus = "left-scope";
+    }
+  }
+
+  const summaryZh = observations.length === 0
+    ? "尚未在任何榜单快照中观测到该 ASIN"
+    : `已在 ${observations.length} 个快照中观测；${rankMovement.direction === "up" ? `榜单位次上升 ${rankMovement.positionsMoved} 位；` : ""}${pricePoints.length > 0 ? `最新观测价格 ${pricePoints[pricePoints.length - 1]?.price}；` : ""}单次观察不代表历史销量`;
+
+  return {
+    asin: cleanAsin,
+    product,
+    totalObservations: observations.length,
+    observations,
+    priceHistory: pricePoints,
+    priceComparability: priceComp,
+    priceChangeRate: priceChange,
+    rankMovement,
+    scopeStatus,
+    summaryZh,
+  };
+}
+
+export interface CategoryCard {
+  categoryLabel: string;
+  productCount: number;
+  sampleAsins: string[];
+  topBrands: Array<{ brand: string; count: number }>;
+  priceRange: { min: string | null; max: string | null; avg: string | null };
+  associatedKeywords: string[];
+  chartIds: string[];
+  notesZh: string;
+}
+
+export async function categoryMarketSummary(): Promise<{ categories: CategoryCard[]; totalCategories: number; noteZh: string }> {
+  const products = await loadProducts();
+  const kwSnaps = await loadKeywordSnapshots();
+  const allKeywords = kwSnaps.flatMap((s) => s.rows.map((r) => r.keyword));
+  const uniqueKeywords = [...new Set(allKeywords)];
+
+  const byCat = new Map<string, MarketProductRecord[]>();
+  for (const p of products) {
+    const cat = p.categoryLabel?.trim() || "未明确类目（未提供类目字段）";
+    const list = byCat.get(cat) ?? [];
+    list.push(p);
+    byCat.set(cat, list);
+  }
+
+  const categories: CategoryCard[] = [];
+  for (const [cat, prods] of byCat) {
+    const brandMap = new Map<string, number>();
+    const prices: number[] = [];
+    const chartIds = new Set<string>();
+
+    for (const p of prods) {
+      if (p.brand) brandMap.set(p.brand, (brandMap.get(p.brand) ?? 0) + 1);
+      if (p.lastPrice) {
+        const m = /\$?([\d.,]+)/.exec(p.lastPrice);
+        if (m) prices.push(Number(m[1]!.replace(/,/g, "")));
+      }
+      Object.keys(p.chartRanks).forEach((c) => chartIds.add(c));
+    }
+
+    const topBrands = [...brandMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([brand, count]) => ({ brand, count }));
+
+    let minPrice: string | null = null;
+    let maxPrice: string | null = null;
+    let avgPrice: string | null = null;
+    if (prices.length > 0) {
+      minPrice = `$${Math.min(...prices).toFixed(2)}`;
+      maxPrice = `$${Math.max(...prices).toFixed(2)}`;
+      avgPrice = `$${(prices.reduce((a, b) => a + b, 0) / prices.length).toFixed(2)}`;
+    }
+
+    const catTokens = cat.toLowerCase().split(/[\s,&>/]+/);
+    const matchedKws = uniqueKeywords.filter((kw) => {
+      const kwLower = kw.toLowerCase();
+      return catTokens.some((tok) => tok.length > 3 && kwLower.includes(tok));
+    }).slice(0, 10);
+
+    categories.push({
+      categoryLabel: cat,
+      productCount: prods.length,
+      sampleAsins: prods.map((p) => p.asin).slice(0, 8),
+      topBrands,
+      priceRange: { min: minPrice, max: maxPrice, avg: avgPrice },
+      associatedKeywords: matchedKws,
+      chartIds: [...chartIds],
+      notesZh: `样本级类目（${prods.length} 个商品）；官方完整类目树层级与 ID 需 SP-API 来源获准（当前为 PARTIAL）`,
+    });
+  }
+
+  return {
+    categories,
+    totalCategories: categories.length,
+    noteZh: "类目雷达（M02）依据已观察商品 categoryLabel 标签聚合；跨类目 BSR 不直接比较（C3）",
+  };
+}
+
 /* ------------------------------------------------------ M03/M04 product & chart */
 
 export interface ChartRankChange {

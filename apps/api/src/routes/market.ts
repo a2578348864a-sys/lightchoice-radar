@@ -4,9 +4,10 @@
 import type { FastifyInstance } from "fastify";
 import { adminHandler } from "./admin-auth.ts";
 import { loadMarketOverview, loadKeywordView, loadProductView, loadOpportunityView, loadAlertsView } from "@aihot/backend/market/market-read";
-import { applyChartSnapshot, applyKeywordSnapshot, parseAmz123KeywordCapture, parseAmazonChartCapture, previewMarketImport, seedMarketSources } from "@aihot/backend/market/market-import";
+import { keywordHistoryDetail, productHistoryDetail, categoryMarketSummary } from "@aihot/backend/market/market-metrics";
+import { applyChartSnapshot, applyKeywordSnapshot, applyCsvImport, parseAmz123KeywordCapture, parseAmazonChartCapture, previewMarketImport, seedMarketSources, type CsvImportInput } from "@aihot/backend/market/market-import";
 import { buildOpportunityCandidates, computeScenarios, evaluateAlerts, propagateSourceRevocation, refreshOpportunities, retireUnqualifiedAlerts, reviewOpportunity, type ScenarioInput } from "@aihot/backend/market/market-opportunity";
-import { revokeMarketSource, saveMarketAlertRule, saveMarketSource, type MarketSource } from "@aihot/backend/market/market-model";
+import { revokeMarketSource, saveMarketAlertRule, saveMarketSource, saveMarketExternalRecord, loadMarketExternalRecords, saveMarketInnovationCue, loadMarketInnovationCues, type MarketSource, type MarketExternalRecord, type MarketInnovationCue } from "@aihot/backend/market/market-model";
 
 export function registerMarket(app: FastifyInstance) {
   const noStore = { "Cache-Control": "no-store" } as const;
@@ -14,14 +15,25 @@ export function registerMarket(app: FastifyInstance) {
   // Area 1 — overview: 12-module honest board, sources, counts, gaps, budget state.
   app.get("/api/market/overview", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadMarketOverview())));
 
-  // Area 2 — keyword demand (module 01) with honest filters.
+  // Area 2 — keyword demand (module 01) with honest filters & multi-period history.
   app.get("/api/market/keywords", adminHandler(async (req, reply) => {
     const q = req.query as Record<string, string | undefined>;
-    return reply.headers(noStore).send(await loadKeywordView({ direction: q.direction, q: q.q, limit: q.limit ? Number(q.limit) : undefined }));
+    return reply.headers(noStore).send(await loadKeywordView({ direction: q.direction, q: q.q, limit: q.limit ? Number(q.limit) : undefined, periodStart: q.periodStart }));
+  }));
+  app.get("/api/market/keywords/history", adminHandler(async (req, reply) => {
+    const q = req.query as Record<string, string | undefined>;
+    if (!q.keyword) return reply.status(400).send({ error: "keyword 查询参数必填" });
+    return reply.headers(noStore).send(await keywordHistoryDetail(q.keyword));
   }));
 
-  // Area 3 — products & competition & prices (modules 03/04/05/06).
+  // Area 3 — products & competition & prices (modules 03/04/05/06) & categories (module 02).
   app.get("/api/market/products", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadProductView())));
+  app.get("/api/market/products/history", adminHandler(async (req, reply) => {
+    const q = req.query as Record<string, string | undefined>;
+    if (!q.asin) return reply.status(400).send({ error: "asin 查询参数必填" });
+    return reply.headers(noStore).send(await productHistoryDetail(q.asin));
+  }));
+  app.get("/api/market/categories", adminHandler(async (_req, reply) => reply.headers(noStore).send(await categoryMarketSummary())));
 
   // Area 4 — opportunities (modules 10/12) + generation + review + scenario calculator.
   app.get("/api/market/opportunities", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadOpportunityView())));
@@ -89,6 +101,33 @@ export function registerMarket(app: FastifyInstance) {
     if (!body?.sourceId || !body?.chartId || !Array.isArray(body.rows) || !body.observedAt) return reply.status(400).send({ error: "sourceId/chartId/observedAt/rows[] 必填" });
     const snap = parseAmazonChartCapture(body);
     return reply.headers(noStore).send(await applyChartSnapshot(snap));
+  }));
+
+  // Generic CSV file import workbench endpoint.
+  app.post("/api/market/import/csv", adminHandler(async (req, reply) => {
+    const body = req.body as CsvImportInput;
+    if (!body?.kind || !body?.csvText || !body?.sourceId || !body?.mapping) {
+      return reply.status(400).send({ error: "kind, csvText, sourceId 和 mapping 映射必填" });
+    }
+    const res = await applyCsvImport(body);
+    return reply.headers(noStore).send(res);
+  }));
+
+  // Area 7 — External platforms (module 08) & Innovations (module 09) private manual records.
+  app.get("/api/market/externals", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadMarketExternalRecords())));
+  app.post("/api/market/externals", adminHandler(async (req, reply) => {
+    const body = req.body as MarketExternalRecord;
+    if (!body?.id || !body?.platform || !body?.title) return reply.status(400).send({ error: "外部记录字段不完整" });
+    await saveMarketExternalRecord(body);
+    return reply.headers(noStore).send({ ok: true });
+  }));
+
+  app.get("/api/market/innovations", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadMarketInnovationCues())));
+  app.post("/api/market/innovations", adminHandler(async (req, reply) => {
+    const body = req.body as MarketInnovationCue;
+    if (!body?.id || !body?.title || !body?.differenceSummaryZh) return reply.status(400).send({ error: "创新线索字段不完整" });
+    await saveMarketInnovationCue(body);
+    return reply.headers(noStore).send({ ok: true });
   }));
 
   // Refresh: rebuild scores + review states after evidence revisions; retire now-unqualified alerts.

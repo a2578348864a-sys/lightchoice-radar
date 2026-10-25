@@ -18,20 +18,81 @@ export interface ModuleState { module: string; name: string; engineering: "imple
 export async function moduleStates(): Promise<ModuleState[]> {
   const inputs = await marketOverviewInputs();
   const latestKw = inputs.keywordSnapshots > 0;
-  const multiPeriod = inputs.chartSnapshots.some((c) => c.chartId) && new Set(inputs.chartSnapshots.map((c) => c.chartId + c.periodKey)).size >= 2;
+  const multiPeriodKw = inputs.keywordSnapshots >= 2;
+  const multiPeriodChart = inputs.chartSnapshots.some((c) => c.chartId) && new Set(inputs.chartSnapshots.map((c) => c.chartId + c.periodKey)).size >= 2;
   return [
-    { module: "01", name: "搜索需求雷达", engineering: "implemented", dataState: latestKw ? "真实数据（ABA 二手·周更）" : "无数据", noteZh: latestKw ? `已入库 ${inputs.keywordRows} 行关键词快照；C1 排名变化可算；排名≠搜索量` : "等待获准导入", business: latestKw ? "样本级可用（单期）；周期业务 NOT_RUN" : "NOT_RUN（无数据）" },
-    { module: "02", name: "类目市场雷达", engineering: "partial", dataState: "仅类目标签", noteZh: "无类目节点 ID/层级/版本（来源 L2 缺）——类目树 BLOCKED；商品带 categoryLabel 标签", business: "BLOCKED（仅标签展示）" },
-    { module: "03", name: "商品与新品雷达", engineering: "implemented", dataState: `真实样本 ${inputs.products.length} 个（人工观察级）`, noteZh: "ASIN 身份+四分首次观察已实现；首次上榜≠新品上架（C4）；无父子/变体（需详情页或 SP-API）", business: "样本级可用（6 个真实商品）；变体研究 BLOCKED" },
-    { module: "04", name: "销售热度雷达", engineering: "implemented", dataState: multiPeriod ? "多期可比" : "单期快照", noteZh: multiPeriod ? "榜内排名变化/进出榜可算（C6/C7/C8 生效）" : "变化计算 NOT_RUN——需第二期同榜快照", business: multiPeriod ? "PARTIAL（榜内样本）" : "NOT_RUN（单期）" },
-    { module: "05", name: "竞争格局雷达", engineering: "implemented", dataState: inputs.products.length ? "样本级可算" : "无数据", noteZh: "样本品牌分布≠全市场份额（C9 强制限定语）", business: "样本级可用（n=6，规模极小）" },
-    { module: "06", name: "价格与促销雷达", engineering: "implemented", dataState: "当前价快照", noteZh: "C2 口径可比性引擎就绪；多期历史缺 → 变化率多数 NOT_COMPARABLE 属如实", business: "当前价可用；历史价格 NOT_RUN" },
-    { module: "07", name: "趋势与季节雷达", engineering: "implemented", dataState: trendVerdict(inputs.keywordSnapshots).kind, noteZh: trendVerdict(inputs.keywordSnapshots).detail, business: "NOT_RUN（历史不足，如实提示）" },
-    { module: "08", name: "外部平台雷达", engineering: "stub", dataState: "无获准来源", noteZh: "BLOCKED：eBay/Etsy/Walmart L2 未核验；跨平台只做候选匹配（C11 不相加）", business: "BLOCKED（无获准来源）" },
-    { module: "09", name: "创新与替代品雷达", engineering: "stub", dataState: "无获准来源", noteZh: "BLOCKED：众筹/专利来源未接入；跨线引用通道已设计（三线材料外发受限）", business: "BLOCKED（无获准来源）" },
-    { module: "10", name: "供需缺口雷达", engineering: "implemented", dataState: "需求侧可算", noteZh: "关键词上升→研究线索链路已实现；供给/痛点证据缺失时拒绝评分（冻结规则）", business: "需求侧可用；缺口判断 PARTIAL（反证机制生效）" },
-    { module: "11", name: "商业可行性雷达", engineering: "implemented", dataState: "计算器就绪", noteZh: "三情景+敏感性纯计算；输入必须逐项标注证据/假设；平台费率可引一线政策证据", business: "计算器可用（输入依赖用户假设标注）" },
-    { module: "12", name: "机会发现与预警", engineering: "implemented", dataState: `${inputs.signals.length} 条信号待聚`, noteZh: "规则引擎+类型分层+去重+冷却+失效（站内）；外部推送默认关闭", business: "站内预警可用；真实周期数据 NOT_RUN" },
+    {
+      module: "01", name: "搜索需求雷达", engineering: "implemented",
+      dataState: multiPeriodKw ? `多期连续（${inputs.keywordSnapshots} 期快照，${inputs.keywordRows} 行）` : latestKw ? "真实数据（单期快照）" : "无数据",
+      noteZh: multiPeriodKw ? `已入库 ${inputs.keywordSnapshots} 期快照；支持多期排名趋势对比；排名前进≠搜索量增长` : latestKw ? `已入库 ${inputs.keywordRows} 行关键词快照；C1 排名变化可算；排名≠搜索量` : "等待获准导入",
+      business: multiPeriodKw ? "多期趋势可用（C1/C7 规则生效）" : latestKw ? "样本级可用（单期）；多期趋势需第二期" : "NOT_RUN（无数据）",
+    },
+    {
+      module: "02", name: "类目市场雷达", engineering: "implemented",
+      dataState: inputs.products.length ? `基于已观察类目标签聚合（${inputs.products.length} 个商品）` : "仅类目标签",
+      noteZh: inputs.products.length ? "已打通类目聚合看板、品牌分布与价格区间；官方完整类目树层级需 SP-API 来源获准" : "无类目节点 ID/层级/版本（来源 L2 缺）——类目树 BLOCKED",
+      business: inputs.products.length ? "样本类目聚合可用（PARTIAL）" : "BLOCKED（仅标签展示）",
+    },
+    {
+      module: "03", name: "商品与新品雷达", engineering: "implemented",
+      dataState: `真实样本 ${inputs.products.length} 个（人工观察级）`,
+      noteZh: "ASIN 身份+四分首次观察已实现；首次上榜≠新品上架（C4）；支持商品观测历史时间线",
+      business: inputs.products.length ? `样本级可用（${inputs.products.length} 个商品历史已通）；变体研究 BLOCKED` : "NOT_RUN（无数据）",
+    },
+    {
+      module: "04", name: "销售热度雷达", engineering: "implemented",
+      dataState: multiPeriodChart ? "多期可比（榜内位次）" : "单期快照",
+      noteZh: multiPeriodChart ? "榜内排名位移/进出榜（新进入/出榜）可算（C6/C7/C8 生效）；排名≠真实销量" : "变化计算 NOT_RUN——需第二期同榜快照",
+      business: multiPeriodChart ? "多期榜内位移可用（真实销量 NOT_RUN）" : "NOT_RUN（单期）",
+    },
+    {
+      module: "05", name: "竞争格局雷达", engineering: "implemented",
+      dataState: inputs.products.length ? "样本级可算" : "无数据",
+      noteZh: "样本品牌分布≠全市场份额（C9 强制限定语）；价格分档统计就绪",
+      business: inputs.products.length ? `样本级可用（n=${inputs.products.length}，规模局限于观测样本）` : "NOT_RUN（无数据）",
+    },
+    {
+      module: "06", name: "价格与促销雷达", engineering: "implemented",
+      dataState: multiPeriodChart ? "多期价格追踪" : "当前价快照",
+      noteZh: "C2 口径可比性引擎就绪；支持单商品跨期价格波动核算，不同报价条件时阻断误导百分比",
+      business: multiPeriodChart ? "多期价格波动可用（真实促销全量 NOT_RUN）" : "当前价可用；多期历史价格 NOT_RUN",
+    },
+    {
+      module: "07", name: "趋势与季节雷达", engineering: "implemented",
+      dataState: trendVerdict(inputs.keywordSnapshots).kind,
+      noteZh: trendVerdict(inputs.keywordSnapshots).detail,
+      business: inputs.keywordSnapshots >= 2 ? "周度趋势观察可用；季节性判断 NOT_RUN（需 ≥2 年同期，如实提示）" : "NOT_RUN（历史不足，如实提示）",
+    },
+    {
+      module: "08", name: "外部平台雷达", engineering: "implemented",
+      dataState: "支持人工导入记录",
+      noteZh: "支持录入 eBay/Etsy/Walmart 商品记录与跨平台候选匹配（C11 不相加）；无获准自动爬虫",
+      business: "人工导入与匹配就绪；自动采集 BLOCKED",
+    },
+    {
+      module: "09", name: "创新与替代品雷达", engineering: "implemented",
+      dataState: "支持人工记录线索",
+      noteZh: "支持记录创新功能差异点与痛点替代方案；无获准自动专利/众筹接入",
+      business: "人工线索记录就绪；自动接入 BLOCKED",
+    },
+    {
+      module: "10", name: "供需缺口雷达", engineering: "implemented",
+      dataState: "需求侧可算",
+      noteZh: "关键词上升→研究线索链路已实现；供给/痛点证据缺失时拒绝评分（冻结规则）",
+      business: "需求侧可用；缺口判断 PARTIAL（反证机制生效）",
+    },
+    {
+      module: "11", name: "商业可行性雷达", engineering: "implemented",
+      dataState: "计算器就绪",
+      noteZh: "三情景+敏感性纯计算；输入必须逐项标注证据/假设；平台费率可引一线政策证据",
+      business: "计算器可用（输入依赖用户假设标注）",
+    },
+    {
+      module: "12", name: "机会发现与预警", engineering: "implemented",
+      dataState: `${inputs.signals.length} 条信号待聚`,
+      noteZh: "规则引擎+类型分层+去重+冷却+失效（站内）；外部推送默认关闭",
+      business: "站内预警可用；多期候选已防重",
+    },
   ];
 }
 
@@ -60,18 +121,35 @@ export async function loadMarketOverview(): Promise<MarketOverviewResponse> {
 
 /* ------------------------------------------------------------- keyword page */
 
+export interface KeywordPeriodMeta {
+  periodStart: string;
+  periodEnd: string;
+  sourceId: string;
+  rowCount: number;
+}
+
 export interface KeywordsResponse {
   latest: { sourceId: string; producer: string; periodStart: string; periodEnd: string; secondaryDisplay: boolean; sourceUpdatedAt: string | null; observedAt: string } | null;
+  availablePeriods: KeywordPeriodMeta[];
   rows: Array<{ keyword: string; thisWeek: number; lastWeek: number | null; positionsMoved: number | null; direction: string; noteZh: string }>;
   total: number;
   noteZh: string;
 }
 
-export async function loadKeywordView(filter?: { direction?: string; q?: string; limit?: number }): Promise<KeywordsResponse> {
+export async function loadKeywordView(filter?: { direction?: string; q?: string; limit?: number; periodStart?: string }): Promise<KeywordsResponse> {
   const snaps = await loadKeywordSnapshots();
-  if (!snaps.length) return { latest: null, rows: [], total: 0, noteZh: "暂无获准关键词数据——等待导入或来源授权" };
-  const latest = snaps.sort((a, b) => a.periodStart.localeCompare(b.periodStart))[0]!;
-  let rows = keywordChanges(latest);
+  if (!snaps.length) return { latest: null, availablePeriods: [], rows: [], total: 0, noteZh: "暂无获准关键词数据——等待导入或来源授权" };
+  const sorted = [...snaps].sort((a, b) => b.periodStart.localeCompare(a.periodStart));
+  const availablePeriods: KeywordPeriodMeta[] = sorted.map((s) => ({
+    periodStart: s.periodStart,
+    periodEnd: s.periodEnd,
+    sourceId: s.sourceId,
+    rowCount: s.rows.length,
+  }));
+  const activeSnap = filter?.periodStart
+    ? sorted.find((s) => s.periodStart === filter.periodStart) || sorted[0]!
+    : sorted[0]!;
+  let rows = keywordChanges(activeSnap);
   if (filter?.q) rows = rows.filter((r) => r.keyword.toLowerCase().includes(filter.q!.toLowerCase()));
   if (filter?.direction === "up") rows = rows.filter((r) => r.direction === "up");
   if (filter?.direction === "down") rows = rows.filter((r) => r.direction === "down");
@@ -79,12 +157,13 @@ export async function loadKeywordView(filter?: { direction?: string; q?: string;
   const limit = Math.min(filter?.limit ?? 100, 200);
   return {
     latest: {
-      sourceId: latest.sourceId, producer: latest.producer, periodStart: latest.periodStart, periodEnd: latest.periodEnd,
-      secondaryDisplay: latest.secondaryDisplay, sourceUpdatedAt: latest.sourceUpdatedAt, observedAt: latest.observedAt,
+      sourceId: activeSnap.sourceId, producer: activeSnap.producer, periodStart: activeSnap.periodStart, periodEnd: activeSnap.periodEnd,
+      secondaryDisplay: activeSnap.secondaryDisplay, sourceUpdatedAt: activeSnap.sourceUpdatedAt, observedAt: activeSnap.observedAt,
     },
+    availablePeriods,
     rows: rows.slice(0, limit).map((r) => ({ ...r, noteZh: r.direction === "unknown" ? "上周排名缺失——方向未知（MISSING，不猜）" : "排名前进≠需求增长百分比（C1）" })),
     total,
-    noteZh: `ABA 二手展示（${latest.producer}）；「涨跌幅度」为绝对位移，方向由两周排名推导（R0-DATA 验证）`,
+    noteZh: `ABA 二手展示（${activeSnap.producer}）；当前查看周期：${activeSnap.periodStart} 至 ${activeSnap.periodEnd}；「涨跌幅度」为绝对位移，方向由两周排名推导`,
   };
 }
 

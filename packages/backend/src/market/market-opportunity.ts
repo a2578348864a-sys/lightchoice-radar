@@ -29,18 +29,28 @@ export async function buildOpportunityCandidates(opts: { minRise?: number; /** O
     .sort((a, b) => b.strength - a.strength)
     .slice(0, opts.maxPerRun); // optional cap; undefined keeps every qualifying lead
   const existing = await loadMarketOpportunities();
-  const byTitle = new Map(existing.map((o) => [o.title, o]));
+  const byKey = new Map(existing.map((o) => [o.id, o]));
   const created: MarketOpportunity[] = [];
   for (const sig of kwSignals) {
-    const title = `研究线索（待补证）：${sig.subjectZh}`;
-    const prev = byTitle.get(title);
+    const kwMatch = /关键词「(.+?)」/.exec(sig.subjectZh);
+    const kw = kwMatch ? kwMatch[1]! : sig.id;
+    const cleanKwId = kw.toLowerCase().replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || "kw";
+    const oppId = `opp-kw-${cleanKwId}`;
+    const title = `研究线索（待补证）：关键词「${kw}」需求上升`;
+    const prev = byKey.get(oppId) || existing.find((o) => o.title === title || o.id === "opp-" + sig.id.replace(/[^a-z0-9-]/gi, "").slice(0, 60));
     if (prev) {
-      const refreshed = { ...prev, basisVersion: sig.basisVersions.join("+"), evidence: dedupeEvidence(prev.evidence, evidenceOf(sig)), review: reviewAfterBasisChange(prev.review, sig.basisVersions.join("+")) };
+      const refreshed = {
+        ...prev,
+        basisVersion: sig.basisVersions.join("+"),
+        evidence: dedupeEvidence(prev.evidence, evidenceOf(sig)),
+        review: reviewAfterBasisChange(prev.review, sig.basisVersions.join("+")),
+      };
       await saveMarketOpportunity(refreshed);
+      byKey.set(prev.id, refreshed);
       continue;
     }
     const opp: MarketOpportunity = {
-      id: "opp-" + sig.id.replace(/[^a-z0-9-]/gi, "").slice(0, 60), title,
+      id: oppId, title,
       summaryZh: `${sig.detailZh} 该信号仅证明关键词排名变化；供给、竞争与消费者痛点证据尚未取得。`,
       status: "needs-evidence", module: "10",
       evidence: [evidenceOf(sig)],
@@ -54,6 +64,7 @@ export async function buildOpportunityCandidates(opts: { minRise?: number; /** O
       basisVersion: sig.basisVersions.join("+"), createdAt: new Date().toISOString(),
     };
     await saveMarketOpportunity(opp);
+    byKey.set(opp.id, opp);
     created.push(opp);
   }
   return created;

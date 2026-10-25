@@ -257,6 +257,54 @@ export async function loadMarketAlerts(): Promise<MarketAlert[]> {
   return rows.map((r) => r.value);
 }
 
+/* ------------------------------------------------ external platforms & innovations */
+
+export interface MarketExternalRecord {
+  id: string;
+  platform: "ebay" | "etsy" | "walmart" | "tiktok" | "other";
+  externalId: string;
+  title: string;
+  price: string | null;
+  currency: string;
+  url?: string;
+  observedAt: string;
+  candidateAsin?: string | null;
+  matchConfidence?: number;
+  notes?: string;
+}
+
+export interface MarketInnovationCue {
+  id: string;
+  title: string;
+  cueType: "feature-diff" | "pain-point-fix" | "substitute-solution" | "patent-trend";
+  targetKeywordOrAsin?: string;
+  differenceSummaryZh: string;
+  source: string;
+  observedAt: string;
+  verified: boolean;
+  notes?: string;
+}
+
+export async function saveMarketExternalRecord(rec: MarketExternalRecord): Promise<void> {
+  await sql`INSERT INTO settings (key, value, updated_by) VALUES (${`market.external.${rec.id}`}, ${sql.json(rec as never)}, 'market')
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
+}
+
+export async function loadMarketExternalRecords(): Promise<MarketExternalRecord[]> {
+  const rows = await sql<{ value: MarketExternalRecord }[]>`SELECT value FROM settings WHERE key LIKE 'market.external.%' ORDER BY key`;
+  return rows.map((r) => r.value);
+}
+
+export async function saveMarketInnovationCue(cue: MarketInnovationCue): Promise<void> {
+  await sql`INSERT INTO settings (key, value, updated_by) VALUES (${`market.innovation.${cue.id}`}, ${sql.json(cue as never)}, 'market')
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
+}
+
+export async function loadMarketInnovationCues(): Promise<MarketInnovationCue[]> {
+  const rows = await sql<{ value: MarketInnovationCue }[]>`SELECT value FROM settings WHERE key LIKE 'market.innovation.%' ORDER BY key`;
+  return rows.map((r) => r.value);
+}
+
 /* ------------------------------------------------------- evidence versioning */
 
 /** Snapshot articles carry a basis version = sourceId + period + content hash; opportunities bind to it. */
