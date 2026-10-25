@@ -244,7 +244,7 @@ test("来源撤销传播：预警失效+机会待复核+再导入被拒+信号�
   assert.ok(signals.every((x) => !x.id.includes(KW_SOURCE)), "no signals from the revoked source");
 });
 
-test("候选降噪：按强度排序并封顶，不再一信号一候选", async () => {
+test("候选生成：默认全量创建不静默丢弃；显式 cap 才封顶；均标注研究线索", async () => {
   // restore the keyword source for this test's own supply
   await saveMarketSource({
     id: KW_SOURCE, kind: "amz123-keywords", label: "测试关键词源", producer: "p", marketplace: "US",
@@ -253,10 +253,14 @@ test("候选降噪：按强度排序并封顶，不再一信号一候选", async
   const rows: Array<[string, number, number | null]> = Array.from({ length: 30 }, (_, i) => [`bulk-word-${i}`, i + 1, i + 200]);
   await applyKeywordSnapshot(parseAmz123KeywordCapture(kwInput("2026-11-24", rows), "p"));
   const before = (await loadMarketOpportunities()).length;
-  const created = await buildOpportunityCandidates({ minRise: 10, maxPerRun: 20 });
-  assert.ok(created.length <= 20, `capped at 20 (created ${created.length})`);
-  const after = (await loadMarketOpportunities()).length;
-  assert.ok(after - before <= 20, `total candidates grew by ≤20 (was ${before}, now ${after})`);
+  // 30 bulk words all rose ≥10 (200→i+1): default build must create ALL of them — no silent drop
+  const created = await buildOpportunityCandidates({ minRise: 10 });
+  assert.ok(created.length >= 30, `default build creates every qualifying lead (created ${created.length})`);
+  assert.ok((await loadMarketOpportunities()).length - before >= 30);
+  // an explicit cap is opt-in only, and never deletes existing candidates
+  const capped = await buildOpportunityCandidates({ minRise: 10, maxPerRun: 5 });
+  assert.ok(capped.length <= 5, `explicit cap respected (created ${capped.length})`);
+  assert.ok(created.every((o) => o.title.startsWith("研究线索（待补证）")));
 });
 
 test("商业情景：三情景纯计算+假设声明", () => {

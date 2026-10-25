@@ -21,14 +21,13 @@ export const OPPORTUNITY_SCORE_VERSION = "opp-score-v1";
  * honest data gaps; without supply/competition/pain evidence it stays "needs-evidence" and the
  * scorer refuses a total — it can never appear as a "已验证商机".
  */
-export async function buildOpportunityCandidates(opts: { minRise?: number; maxPerRun?: number } = {}): Promise<MarketOpportunity[]> {
+export async function buildOpportunityCandidates(opts: { minRise?: number; /** Opt-in cap for callers that want a bounded batch; default creates ALL qualifying leads (idempotent dedup — nothing is silently dropped). */ maxPerRun?: number } = {}): Promise<MarketOpportunity[]> {
   const minRise = opts.minRise ?? 10;
-  const maxPerRun = opts.maxPerRun ?? 20;
   const signals = await detectMarketSignals();
   const kwSignals = signals
     .filter((s) => s.module === "01" && s.kind === "keyword-rank-rise" && s.strength >= minRise)
     .sort((a, b) => b.strength - a.strength)
-    .slice(0, maxPerRun); // research leads are ranked by strength and capped: one keyword movement is a LEAD, not 1/1 of every signal
+    .slice(0, opts.maxPerRun); // optional cap; undefined keeps every qualifying lead
   const existing = await loadMarketOpportunities();
   const byTitle = new Map(existing.map((o) => [o.title, o]));
   const created: MarketOpportunity[] = [];

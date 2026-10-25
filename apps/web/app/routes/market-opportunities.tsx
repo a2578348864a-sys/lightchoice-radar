@@ -1,5 +1,6 @@
-import { useLoaderData, useFetcher } from "react-router";
+import { useLoaderData } from "react-router";
 import { marketGet } from "../lib/api.server";
+import { marketPost } from "../lib/market-client";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
 import { Badge } from "../components/ui/Badge";
@@ -27,7 +28,6 @@ const reviewActions = [
 
 export default function MarketOpportunities() {
   const { data } = useLoaderData<typeof loader>();
-  const fetcher = useFetcher();
   return (
     <div className="pb-10">
       <PhoneBar back={{ to: "/market", label: "市场信号" }} title="机会研究" />
@@ -56,12 +56,11 @@ export default function MarketOpportunities() {
               <p className="mt-1 text-[11.5px] text-ink-4">支持证据 {o.evidenceCount} · 反证 {o.counterCount} · 数据缺口 {o.gapsCount} · 人工状态：{o.reviewStatus}</p>
               {o.reviewNote && <p className="mt-0.5 rounded bg-paper-2 px-2 py-1 text-[11.5px] text-amber-ink">{o.reviewNote}</p>}
               {o.scoreRefused && <p className="mt-1 rounded bg-paper-2 px-2 py-1 text-[11.5px] text-warn">{o.scoreRefused}</p>}
-              <fetcher.Form method="post" action="/api/market/opportunities/review" className="mt-2 flex flex-wrap items-center gap-1.5">
-                <input type="hidden" name="id" value={o.id} />
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
                 {reviewActions.map((a) => (
-                  <button key={a.action} type="submit" name="action" value={a.action} className="pill">{a.label}</button>
+                  <ReviewButton key={a.action} id={o.id} action={a.action} label={a.label} />
                 ))}
-              </fetcher.Form>
+              </div>
             </section>
           ))}
         </div>
@@ -77,6 +76,15 @@ export default function MarketOpportunities() {
 }
 
 import { useState } from "react";
+function ReviewButton({ id, action, label }: { id: string; action: string; label: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button type="button" className={`pill ${done ? "font-semibold" : ""}`} onClick={async () => {
+      const { status } = await marketPost("/api/market/opportunities/review", { id, action });
+      if (status === 200) setDone(true);
+    }}>{label}{done ? " ✓" : ""}</button>
+  );
+}
 const FIELDS = [
   { k: "salePriceUsd", label: "售价 $", v: "19.99" }, { k: "purchaseCostUsd", label: "采购价 $", v: "4.50" },
   { k: "moqUnits", label: "MOQ", v: "500" }, { k: "shippingPerUnitUsd", label: "头程/件 $", v: "1.20" },
@@ -93,12 +101,9 @@ function ScenarioCalculator() {
   const [error, setError] = useState<string | null>(null);
   const submit = async () => {
     setError(null);
-    const res = await fetch("/api/market/scenarios", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify(Object.fromEntries(Object.entries(values).map(([k, v]) => [k, Number(v)]))),
-    });
-    if (!res.ok) { setError("输入不完整（全部字段需为数值）"); setResult(null); return; }
-    setResult(await res.json());
+    const { status, body } = await marketPost<{ rows?: unknown; error?: string }>("/api/market/scenarios", Object.fromEntries(Object.entries(values).map(([k, v]) => [k, Number(v)])));
+    if (status !== 200 || !body) { setError(body?.error ?? `请求被拒绝（${status}）`); setResult(null); return; }
+    setResult(body as never);
   };
   return (
     <div className="mt-2">

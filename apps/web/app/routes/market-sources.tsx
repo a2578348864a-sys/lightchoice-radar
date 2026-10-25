@@ -1,4 +1,6 @@
 import { Link, useLoaderData } from "react-router";
+import { useState } from "react";
+import { marketPost } from "../lib/market-client";
 import { marketGet } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
@@ -59,9 +61,51 @@ export default function MarketSources() {
         </div>
       )}
 
+      <section className="mt-5" aria-label="获准数据导入">
+        <h2 className="pb-1 text-[12px] font-semibold uppercase tracking-wide text-ink-3">获准数据导入（人工等价读取样本 / 榜单人工观察）</h2>
+        <p className="mt-1 text-[12px] text-ink-3">
+          仅导入你合法取得且来源许可允许存储的数据（粘贴 JSON）。系统会校验字段、按来源许可门禁、按周期幂等入库；导入≠自动采集。
+        </p>
+        <ImportPanel />
+      </section>
+
       <nav className="mt-4 flex flex-wrap gap-1.5 text-[12px]">
         <Link to="/market" className="pill">← 返回总览</Link>
       </nav>
+    </div>
+  );
+}
+
+function ImportPanel() {
+  const [mode, setMode] = useState<"keywords" | "chart">("keywords");
+  const [json, setJson] = useState("");
+  const [result, setResult] = useState<string | null>(null);
+  const busy = false; // direct fetch; busy state tracked via local disabled flag
+  const submit = async () => {
+    setResult(null);
+    let parsed: unknown;
+    try { parsed = JSON.parse(json); } catch { setResult("❌ JSON 解析失败：请粘贴完整的 JSON 文本"); return; }
+    const path = mode === "keywords" ? "/api/market/import/keywords" : "/api/market/import/chart";
+    const { status, body } = await marketPost<{ stored?: number; revised?: number; productsCreated?: number; refusal?: string; error?: string; detail?: string }>(path, parsed);
+    if (status !== 200) { setResult(`❌ 导入被拒绝（${status}）：${body?.error ?? body?.detail ?? body?.refusal ?? "见上方来源许可与字段要求"}`); return; }
+    setResult(`✅ 导入成功：${JSON.stringify(body)}`);
+    setJson("");
+  };
+  const placeholder = mode === "keywords"
+    ? '{\n  "sourceId": "amz123-us-keywords",\n  "periodStart": "2026-10-17",\n  "periodEnd": "2026-10-23",\n  "sourceUpdatedAt": "2026-10-23T00:44:47",\n  "observedAt": "2026-10-26T07:30:00Z",\n  "producer": "Amazon ABA（AMZ123 二手展示）",\n  "rows": [{ "keyword": "…", "rankThisWeek": 1, "rankLastWeek": 2 }]\n}'
+    : '{\n  "sourceId": "amazon-chart-manual",\n  "chartId": "amazon-us-bestsellers-beauty",\n  "chartKind": "bestsellers",\n  "categoryLabel": "Beauty & Personal Care",\n  "observedAt": "2026-10-25T17:20:00Z",\n  "complete": true,\n  "rows": [{ "asin": "B0XXXXXXXX", "chartRank": 1, "price": "$11.97", "title": "…" }]\n}';
+  return (
+    <div className="mt-2">
+      <div className="flex gap-1.5 text-[12px]">
+        <button type="button" onClick={() => setMode("keywords")} className={mode === "keywords" ? "pill font-semibold" : "pill"}>关键词快照</button>
+        <button type="button" onClick={() => setMode("chart")} className={mode === "chart" ? "pill font-semibold" : "pill"}>榜单人工观察</button>
+      </div>
+      <textarea value={json} onChange={(e) => setJson(e.target.value)} rows={8} placeholder={placeholder}
+        className="mt-2 w-full rounded border border-line bg-paper px-2 py-1.5 font-mono text-[11.5px] text-ink" aria-label="导入 JSON" />
+      <button type="button" onClick={submit} className="mt-1.5 rounded bg-accent px-3 py-1 font-medium text-paper disabled:opacity-50">
+        {busy ? "导入中…" : "导入（按来源许可校验）"}
+      </button>
+      {result && <p className="mt-1.5 rounded bg-paper-2 px-2 py-1 font-mono text-[11.5px] text-ink-2">{result}</p>}
     </div>
   );
 }
