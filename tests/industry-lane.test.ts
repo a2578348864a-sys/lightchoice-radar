@@ -70,9 +70,9 @@ test("sponsorship decided by the publisher's own category, not by title words", 
 /* ------------------------------------------------- the permission profiles */
 
 test("model processing stays closed for every source that was never licensed for it", () => {
-  assert.deepEqual(industryFullPermissionSources(), ["industry-bea-news"], "only the public-domain government source reaches the model");
+  assert.deepEqual(industryFullPermissionSources(), ["industry-bea-news", "industry-frb-press"], "only the public-domain government sources reach the model");
   for (const [id, profile] of Object.entries(INDUSTRY_SOURCES)) {
-    if (id !== "industry-bea-news") {
+    if (!id.includes("bea") && !id.includes("frb")) {
       assert.equal(profile.modelProcessing, false, `${id} must not be model-processed`);
       assert.equal(profile.saveExcerpt, false, `${id} must not store excerpts`);
     }

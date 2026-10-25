@@ -23,9 +23,9 @@ export function industrySourceMeta(): Array<{ id: IndustrySourceId; name: string
 }
 
 /** The zh title an article carries, if the lane has processed it. */
-async function zhTitleOf(articleId: string): Promise<string | null> {
-  const [row] = await sql<{ title: string | null }[]>`SELECT title FROM translations WHERE article_id = ${articleId} AND lang = 'zh-industry' ORDER BY revision DESC, created_at DESC LIMIT 1`;
-  return row?.title ?? null;
+async function zhOf(articleId: string): Promise<{ title: string | null; summary: string | null }> {
+  const [row] = await sql<{ title: string | null; body_text: string | null }[]>`SELECT title, body_text FROM translations WHERE article_id = ${articleId} AND lang = 'zh-industry' ORDER BY revision DESC, created_at DESC LIMIT 1`;
+  return { title: row?.title ?? null, summary: zhSummaryOf(row?.body_text ?? null) };
 }
 
 interface IndustryItemRow {
@@ -48,7 +48,14 @@ interface IndustryItemRow {
   articles_same_event: number | null;
 }
 
-function mapItem(row: IndustryItemRow, zhTitle: string | null): IndustryItem {
+/** The stored Chinese answer is quick-read + research + caveat paragraphs; a card shows the first two. */
+function zhSummaryOf(bodyText: string | null): string | null {
+  if (!bodyText) return null;
+  const paragraphs = bodyText.split(/\n\n+/).filter((p) => p.trim());
+  return paragraphs.slice(0, 2).join("\n\n").trim() || null;
+}
+
+function mapItem(row: IndustryItemRow, zh: { title: string | null; summary: string | null }): IndustryItem {
   const sourceProfile = INDUSTRY_SOURCES[row.source_id as IndustrySourceId];
   return {
     id: row.id,
@@ -60,7 +67,8 @@ function mapItem(row: IndustryItemRow, zhTitle: string | null): IndustryItem {
     publishedAt: row.published_at?.toISOString() ?? null,
     discoveredAt: row.discovered_at.toISOString(),
     excerpt: row.excerpt,
-    zhTitle,
+    zhTitle: zh.title,
+    zhSummary: zh.summary,
     kind: (row.kind as IndustryItem["kind"]) ?? "news",
     themes: (row.themes ?? []) as IndustryItem["themes"],
     story: row.story_public_id ? {
@@ -124,13 +132,22 @@ function filterSql(query: IndustryQuery): { where: string } {
 export async function loadIndustryItems(query: IndustryQuery = {}): Promise<IndustryListResponse> {
   const { where } = filterSql(query);
   const rows = await queryIndustryRows(where, `ORDER BY coalesce(a.published_at, a.discovered_at) DESC`, LIST_LIMIT);
-  const zhMap = new Map<string, string>();
+  // Chinese-complete items lead the reading flow; metadata-only leads follow, newest first within each group.
+  const zhIds = new Set((await sql<{ article_id: string }[]>`
+    SELECT DISTINCT article_id FROM translations WHERE lang = 'zh-industry' AND article_id = ANY(${rows.map((r) => r.id)}::text[])`).map((r) => r.article_id));
+  rows.sort((a, b) => {
+    const az = zhIds.has(a.id) ? 0 : 1;
+    const bz = zhIds.has(b.id) ? 0 : 1;
+    if (az !== bz) return az - bz;
+    return (b.published_at ?? b.discovered_at).getTime() - (a.published_at ?? a.discovered_at).getTime();
+  });
+  const zhMap = new Map<string, { title: string | null; summary: string | null }>();
   if (rows.length) {
-    const zhRows = await sql<Array<{ article_id: string; title: string }>>`
-      SELECT DISTINCT ON (article_id) article_id, title FROM translations
+    const zhRows = await sql<Array<{ article_id: string; title: string; body_text: string | null }>>`
+      SELECT DISTINCT ON (article_id) article_id, title, body_text FROM translations
       WHERE lang = 'zh-industry' AND article_id = ANY(${rows.map((r) => r.id)}::text[])
       ORDER BY article_id, revision DESC, created_at DESC`;
-    for (const r of zhRows) zhMap.set(r.article_id, r.title);
+    for (const r of zhRows) zhMap.set(r.article_id, { title: r.title, summary: zhSummaryOf(r.body_text) });
   }
   const [counts] = await sql<{ admitted: number; rejected: number }[]>`
     SELECT count(*) FILTER (WHERE raw->'industry'->>'admitted' = 'true')::int AS admitted,
@@ -139,13 +156,14 @@ export async function loadIndustryItems(query: IndustryQuery = {}): Promise<Indu
   const [stories] = await sql<{ n: number }[]>`
     SELECT count(DISTINCT p.story_id)::int AS n FROM publications p
     JOIN articles a ON a.id = p.article_id
-    WHERE a.source_id = ANY(${INDUSTRY_SOURCE_IDS}::text[]) AND p.story_id IS NOT NULL`;
+    WHERE a.source_id = ANY(${INDUSTRY_SOURCE_IDS}::text[]) AND p.story_id IS NOT NULL
+      AND a.raw->'industry'->>'admitted' = 'true'`;
   const [zh] = await sql<{ n: number }[]>`
     SELECT count(DISTINCT t.article_id)::int AS n FROM translations t
     JOIN articles a ON a.id = t.article_id
     WHERE t.lang = 'zh-industry' AND a.source_id = ANY(${INDUSTRY_SOURCE_IDS}::text[])`;
   return {
-    items: rows.map((r) => mapItem(r, zhMap.get(r.id) ?? null)),
+    items: rows.map((r) => mapItem(r, zhMap.get(r.id) ?? { title: null, summary: null })),
     counts: { admitted: counts?.admitted ?? 0, rejected: counts?.rejected ?? 0, stories: stories?.n ?? 0, zh: zh?.n ?? 0 },
     themes: INDUSTRY_THEMES.map((t) => ({ id: t, label: INDUSTRY_THEME_LABEL[t] })),
     sources: industrySourceMeta(),
@@ -171,10 +189,10 @@ export async function loadIndustryDetail(id: string): Promise<IndustryDetail | n
         SELECT version, digest, latest, receipt_id, article_ids, created_at FROM story_digests
         WHERE story_id = ${row.story_id} ORDER BY version DESC`
     : [];
-  const zhTitle = await zhTitleOf(row.id);
-  const siblingItems = await Promise.all(siblings.map(async (s) => mapItem(s, await zhTitleOf(s.id))));
+  const zh = await zhOf(row.id);
+  const siblingItems = await Promise.all(siblings.map(async (s) => mapItem(s, await zhOf(s.id))));
   return {
-    ...mapItem(row, zhTitle),
+    ...mapItem(row, zh),
     siblings: siblingItems,
     digestVersions: digests.map((d) => ({ version: d.version, digest: d.digest, latest: d.latest, receiptId: d.receipt_id, articleIds: d.article_ids, createdAt: d.created_at.toISOString() })),
   };

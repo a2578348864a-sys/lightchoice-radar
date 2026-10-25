@@ -36,8 +36,8 @@ const THEME_RULES: Array<{ theme: IndustryTheme; pattern: RegExp }> = [
   { theme: "consumer-demand", pattern: /consumer spending|consumer demand|holiday (?:spending|sales|shopping)|shopper[s]?\b|retail sales|spending (?:rose|grew|fell|shift|slow)|household|purchasing|black friday|cyber monday|halloween spending|back-to-school|consumer confidence|deals? (?:shift|rise|fall)|discounts? (?:drive|deepen)|price sensitive/i },
   { theme: "ecommerce-competition", pattern: /\bAmazon\b|\beBay\b|\bEtsy\b|\bShopify\b|TikTok Shop|marketplace[s]?\b|\bWalmart\b (?:marketplace|connect| Fulfillment)|e-?commerce (?:platform|rival|sales|share|shift)|online sales|direct-to-consumer|\bDTC\b|third-party sellers?\b|seller fees|fulfillment (?:service|network)|AI (?:shopping )?agents?|agentic (?:shopping|AI)|Temu|SHEIN|Alibaba/i },
   { theme: "category-trends", pattern: /store concept|product (?:launch|line|innovation)|new (?:category|products?)|beauty (?:category|sales)|apparel (?:brand|category)|furniture|grocery (?:trend|category)|pet (?:category|sales)|Toy[s]?\b (?:category|sales)|fresh food|frozen food|refrigerated|snack (?:category|sales)|beverage (?:category|innovation)|private label|category (?:trend|shift|growth)/i },
-  { theme: "supply-chain-cost", pattern: /supply chain|tariff[s]?\b|freight|logistics|distribution (?:center|network)|warehouse[s]?\b|\bfulfillment\b|\b3PL\b|supplier[s]?\b|port[s]?\b|container|cold chain|factory|manufactur(?:ing|er) (?:shift|move)|sourcing|inventory (?:build|cost|cut)|import (?:cost|duties)|customs/i },
-  { theme: "economic-data", pattern: /\bGDP\b|gross domestic product|Personal Income and Outlays|PCE\b|consumer price|inflation (?:report|data|rose|eased)|retail inventories|business inventories|advance report|monthly retail trade|e-commerce report|wholesale (?:trade|inventories)|trade deficit|international trade in goods|jobless claims|unemployment (?:rate|claims)/i },
+  { theme: "supply-chain-cost", pattern: /supply chain|tariff[s]?\b|freight|transportation services index|logistics|distribution (?:center|network)|warehouse[s]?\b|\bfulfillment\b|\b3PL\b|supplier[s]?\b|\bport[s]?\b|container|cold chain|factory|manufactur(?:ing|er) (?:shift|move)|sourcing|inventory (?:build|cost|cut)|import (?:cost|duties)|customs/i },
+  { theme: "economic-data", pattern: /consumer credit|survey of consumer|federal funds|discount rate|fomc|open market committee|economic projection|\bGDP\b|gross domestic product|Personal Income and Outlays|PCE\b|consumer price|inflation (?:report|data|rose|eased)|retail inventories|business inventories|advance report|monthly retail trade|e-commerce report|wholesale (?:trade|inventories)|trade deficit|international trade in goods|jobless claims|unemployment (?:rate|claims)/i },
 ];
 
 /** Non-US market as the main subject: kept out unless the item also names a US-side effect. */
@@ -45,7 +45,7 @@ const NON_US_MARKET = /\bEurope(?:an)?\b|\bUK\b|Britain|Canada(?:a)?n?\b tariffs
 const US_MARKET = /\bUS\b|\bU\.S\.\.?|\bAmerica\b|American\b|United States|Trump|White House|Congress|Fed(?:eral Reserve)?\b|\bCPSC\b|\bFTC\b|Washington/i;
 
 /** Sources whose whole output is a US government agency: the market gate passes by identity. */
-const OFFICIAL_SOURCES: readonly string[] = ["industry-bea-news"];
+const OFFICIAL_SOURCES: readonly string[] = ["industry-bea-news", "industry-frb-press", "industry-bts-news"];
 
 /** The kind an item carries before any theme judgment: sponsor copy never becomes evidence. */
 function kindOf(title: string, summary: string): IndustryContentKind {

@@ -392,6 +392,58 @@
         }
       },
       "$comment": "限制准入：Breaking Media 条款未见 RSS 复用授权（2026-10-25 核实），仅元数据。主题2/3。Sponsored/Research 类别由门禁识别。"
+    },
+    {
+      "id": "industry-frb-press",
+      "name": "美联储理事会新闻",
+      "kind": "rss",
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "enabled": true,
+      "tags": [
+        "industry_lane",
+        "行业动态",
+        "经济数据",
+        "美国官方"
+      ],
+      "config": {
+        "feedUrl": "https://www.federalreserve.gov/feeds/press_all.xml",
+        "acceptLanguage": "en-US,en;q=0.9",
+        "saveExcerpt": true,
+        "publishedAfter": "2026-08-01T00:00:00Z",
+        "_aihot": {
+          "initialBackfillLimit": 20,
+          "initialBackfillMonths": 2
+        }
+      },
+      "$comment": "美联储理事会新闻稿（美国联邦政府机构，公有领域 17 USC 105）。四权全开：发现/保存/模型处理/展示。robots 无限制（404）。主题5（经济数据）+ 主题1（消费需求：消费者调查/消费信贷）。2026-10-25 核实。"
+    },
+    {
+      "id": "industry-bts-news",
+      "name": "美国交通统计局动态",
+      "kind": "rss",
+      "tier": "T1",
+      "participation_mode": "editorial",
+      "interval_minutes": 360,
+      "enabled": false,
+      "tags": [
+        "industry_lane",
+        "行业动态",
+        "供应链",
+        "货运数据"
+      ],
+      "config": {
+        "feedUrl": "https://www.bts.gov/rss.xml",
+        "acceptLanguage": "en-US,en;q=0.9",
+        "saveExcerpt": true,
+        "publishedAfter": "2026-08-01T00:00:00Z",
+        "_aihot": {
+          "initialBackfillLimit": 15,
+          "initialBackfillMonths": 2
+        }
+      },
+      "$comment": "美国交通统计局（DOT，内容为公有领域）。已停用：站点 WAF 拦截自报身份的爬虫 UA，伪装浏览器 UA 属于规避拦截且无官方授权依据；待取得明确许可后重新评估。历史 10 篇记录与配置保留不删。2026-10-25 停用。"
     }
   ]
 }

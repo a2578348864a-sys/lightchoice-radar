@@ -12,6 +12,8 @@
 // its own evidence and a use without evidence stays closed ("full" vs "metadata-only" below).
 export const INDUSTRY_SOURCE_IDS = [
   "industry-bea-news",
+  "industry-frb-press",
+  "industry-bts-news",
   "industry-retail-dive",
   "industry-supply-chain-dive",
   "industry-modern-retail",
@@ -46,7 +48,7 @@ export interface IndustrySourceProfile {
   basisUrl: string;
   verifiedAt: string;
   /** Discovery: the publisher's own public feed, robots-allowed. Every admitted source has this. */
-  discovery: true;
+  discovery: boolean;
   /** Saving the feed's own summary text. "full" = public-domain source; "metadata-only" = not evidenced. */
   saveExcerpt: boolean;
   /** Sending material to DeepSeek. Public-domain government work only, on current evidence. */
@@ -70,6 +72,24 @@ export const INDUSTRY_SOURCES: Record<IndustrySourceId, IndustrySourceProfile> =
     basisUrl: "https://www.bea.gov (U.S. government work, public domain)",
     verifiedAt: "2026-10-25",
     discovery: true, saveExcerpt: true, modelProcessing: true, displayContent: true,
+  },
+  "industry-frb-press": {
+    id: "industry-frb-press",
+    publisher: "U.S. Federal Reserve Board",
+    basisUrl: "https://www.federalreserve.gov (U.S. federal government agency; public domain, 17 U.S.C. § 105; no robots restrictions)",
+    verifiedAt: "2026-10-25",
+    discovery: true, saveExcerpt: true, modelProcessing: true, displayContent: true,
+  },
+  "industry-bts-news": {
+    id: "industry-bts-news",
+    publisher: "U.S. Bureau of Transportation Statistics (DOT)",
+    // Suspended 2026-10-25: the content is public domain, but the site's WAF answers 403 to the
+    // engine's self-identifying crawler UA while admitting browser UAs — reaching it meant spoofing
+    // a browser, and no documented permission for that exists. Discovery, model processing and
+    // display of NEW material are closed; the 10 stored articles and their config stay.
+    basisUrl: "https://www.bts.gov (public domain, but automated access behind a WAF that blocks crawler UAs; no documented allowance for browser-UA automation — suspended pending explicit permission)",
+    verifiedAt: "2026-10-25",
+    discovery: false, saveExcerpt: false, modelProcessing: false, displayContent: false,
   },
   "industry-retail-dive": {
     id: "industry-retail-dive",

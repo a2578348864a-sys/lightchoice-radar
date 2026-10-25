@@ -754,6 +754,8 @@ export interface IndustryItem {
   discoveredAt: string;
   excerpt: string | null;
   zhTitle: string | null;
+  /** The processed Chinese summary (quick read + research direction), when the lane produced one. */
+  zhSummary: string | null;
   kind: IndustryKind;
   themes: IndustryThemeId[];
   story: IndustryStoryRef | null;
