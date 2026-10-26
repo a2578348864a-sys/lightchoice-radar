@@ -1,13 +1,10 @@
-# 第四主线「市场信号」权威工程主计划（AUTO-TRUTH 真实收口版）
+# 第四主线「市场信号」权威工程主计划（MARKET-FREEZE-01 阶段冻结版）
 
 > **文档身份**：第四主线唯一工程主计划。本文件取代此前一切关于第四主线的分散草案与补丁编号，后续修订直接改写本文件对应章节并在 CURRENT.md 记录。
-> **工程落地状态**：
-> - **AUTO-FIRST**：彻底淘汰手工 CSV/Excel 导入方案，确立全自动监控与合规守护产品范式，固化 12 模块原始契约与定义；
-> - **AUTO-RUN**：完成后台专用调度 Worker（`radar-market`）开发，通过 PostgreSQL 顾问锁（`7204229008`）单实例排他、会话级执行互斥锁（`7204229009`）与多日停机单窗口防风暴保护；接通美国官方 CPSC 消费品安全通告流（`cpsc-product-recalls`），产出 7 段式确定性中文解释；
-> - **AUTO-ACTIVATE**：将 `radar-market` 深度整合入本机受管运维体系（`start-radar.cmd` 六步启动、`stop-radar.cmd` 七步停机、`status-radar.cmd` 锁状态探针）；单 Run ID 全链追溯实证；Amazon 核心数据源全景梳理；
-> - **AUTO-TRUTH**：严谨验真与事实纠偏收口。严格拆分 CPSC 双模式、消除虚假在线、全栈诚信验收；
-> - **MARKET-DATA-FIRST**：核心数据准入深度核查与最小业务决策。落实“先数据、后开发、真实验证、停止空功能建设”原则，完成五大核心维度 10 大候选来源 2026 最新官方条文和实测核验，查明 SP-API 专业卖家资质门禁（$39.99/月 + 品牌备案）、PA-API 5.0 24小时缓存与禁止商业情报库协议限制、Keepa 无免费套餐（€49/月起）等关键事实；全面停止无数据支撑的空功能建设，系统保持诚实空态，向用户提供 3 个具体现实选择。
-> - **云端部署**：`R7_CLOUD_DEPLOYMENT = DEFERRED_BY_USER`，`R8_LOCAL_NATURAL_OPERATION = NOT_STARTED`。
+> **工程落地与阶段冻结状态**：
+> - **MARKET-FREEZE-01（阶段性工程冻结）**：`MARKET_ENGINEERING = FROZEN_WITH_LIMITATIONS`，`AMAZON_CORE_DATA = BLOCKED_BY_SOURCE_ELIGIBILITY`，`AMAZON_MARKET_NATURAL_OPERATION = NOT_STARTED`。保留已有 12 模块代码、权限门禁、数据模型、历史观测、调度 Worker、顾问锁排他与前端诚实看板；暂停新增功能开发，杜绝继续投入无真实数据支撑的软件建设；彻底纠正 SP-API 细分角色与品牌备案要求、Creators API 准入考核（过去30天10单）与禁止情报库条款、CPSC 真实网络被 SSRF 拦截事实；前三主线保持稳定，无新增费用（¥0）；
+> - **历史迭代交付**：AUTO-FIRST（淘汰手工导入）→ AUTO-RUN（后台专属调度闭环）→ AUTO-ACTIVATE（单 Run ID 贯穿与受管运维）→ AUTO-TRUTH（双模式严格拆分与全栈诚信验收）→ MARKET-DATA-FIRST（来源准入深度核查）；
+> - **云端部署**：`R7_CLOUD_DEPLOYMENT = DEFERRED_BY_USER`。
 > **执行边界**：前三主线业务零受扰；DeepSeek 模型调用 0 次（¥0）；外部商业数据采购 ¥0；Git 遵守本地精准提交（严禁 git push，严禁 git add .）。
 
 ---
