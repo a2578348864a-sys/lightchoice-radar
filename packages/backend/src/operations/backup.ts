@@ -3,7 +3,7 @@
 // daily/ (Sundays also weekly/, the 1st also monthly/). A few local copies are kept.
 import { execFile } from "node:child_process";
 import { createHash, createHmac } from "node:crypto";
-import { createReadStream } from "node:fs";
+import { createReadStream, existsSync } from "node:fs";
 import { mkdir, readdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -14,6 +14,21 @@ import { screenshotsForwarded } from "./feedback.ts";
 
 const run = promisify(execFile);
 const KEEP_LOCAL = 3;
+
+/**
+ * pg_dump / pg_restore locations. A production host has them on PATH; the Windows runtime keeps
+ * PostgreSQL in a private directory, so honour the same RADAR_PG_BIN convention radar-local.ts uses
+ * before falling back to PATH — otherwise the nightly cron fails on spawn.
+ */
+function pgTool(name: "pg_dump" | "pg_restore"): string {
+  const bin = process.env.RADAR_PG_BIN?.trim();
+  if (bin) {
+    const candidate = path.join(bin, `${name}.exe`);
+    if (process.platform !== "win32" || existsSync(candidate)) return candidate;
+    if (existsSync(path.join(bin, name))) return path.join(bin, name);
+  }
+  return name;
+}
 
 interface Store {
   secretId: string;
@@ -26,6 +41,20 @@ interface Store {
 /** Backups run where the object store is configured (production); development never uploads. */
 export function backupConfigured(): boolean {
   return store() !== null;
+}
+
+/**
+ * Local backups are on by default (RADAR_BACKUP_LOCAL !== "false"): a zero-cloud deployment still
+ * gets a verified local dump on schedule, kept in .data/backups with the same retention rules. Set
+ * the variable to "false" to fall back to the old store-only behaviour.
+ */
+export function backupLocalEnabled(): boolean {
+  return (process.env.RADAR_BACKUP_LOCAL ?? "").trim().toLowerCase() !== "false";
+}
+
+/** True when the ops.backup cron should exist at all (a store, or local dumps turned on). */
+export function backupScheduled(): boolean {
+  return backupConfigured() || backupLocalEnabled();
 }
 
 /** The object store, from the environment (backend.env); named one by one so the template check sees them. */
@@ -99,9 +128,9 @@ export async function runBackup(now = new Date()) {
     env[key === "user" ? "PGUSER" : "PGPASSWORD"] = decodeURIComponent(option.slice(separator + 1));
     return false;
   }).join("&");
-  await run("pg_dump", ["--format=custom", "--compress=6", "--no-owner", "--file", dump, connection.href], { env, maxBuffer: 16 * 1024 * 1024 });
+  await run(pgTool("pg_dump"), ["--format=custom", "--compress=6", "--no-owner", "--file", dump, connection.href], { env, maxBuffer: 16 * 1024 * 1024 });
   // Verify before shipping: the archive must list cleanly.
-  await run("pg_restore", ["--list", dump], { maxBuffer: 64 * 1024 * 1024 });
+  await run(pgTool("pg_restore"), ["--list", dump], { maxBuffer: 64 * 1024 * 1024 });
   const files = path.join(dir, `${name}-files-${stamp}.tar.gz`);
   // An empty archive only when there is nothing to keep. A failure to read or pack existing files is
   // tried once more and otherwise reported: the database dump still ships, but the run fails.
@@ -118,21 +147,23 @@ export async function runBackup(now = new Date()) {
     kept.push(d);
   }
   let filesError: string | null = null;
-  if (!kept.length) await run("tar", ["-czf", files, "-T", "/dev/null"]);
-  else {
-    const pack = () => run("tar", ["-czf", files, "-C", config.dataDir, ...kept]);
+  // Windows tar reads "D:\..." as a remote host spec (--force-local disables that) and has no
+  // /dev/null; with nothing to keep there is simply no files archive this run.
+  if (kept.length) {
+    const pack = () => run("tar", ["--force-local", "-czf", files, "-C", config.dataDir, ...kept]);
     await pack().catch(() => pack()).catch((error: unknown) => {
       // tar's own words: the message starts with the whole command line, which can fill the excerpt.
       const stderr = (error as { stderr?: unknown })?.stderr;
       filesError = String(typeof stderr === "string" && stderr.trim() ? stderr.trim() : error instanceof Error ? error.message : error).slice(0, 300);
     });
   }
+  const shipped = filesError ? [dump] : [dump, ...(kept.length ? [files] : [])];
   const out: Array<{ key: string; bytes: number; sha256: string }> = [];
   const today = beijingDate(now);
   const prefixes = ["daily"];
   if (beijingWeekday(today) === "星期日") prefixes.push("weekly");
   if (today.endsWith("-01")) prefixes.push("monthly");
-  for (const file of filesError ? [dump] : [dump, files]) {
+  for (const file of shipped) {
     const size = (await stat(file)).size;
     const sha = await fileSha256(file);
     for (const p of prefixes) {
@@ -151,7 +182,9 @@ export async function runBackup(now = new Date()) {
   const summary = { at: now.toISOString(), uploaded: !!s && !filesError, objects: out, ...(filesError ? { filesError } : {}) };
   await sql`INSERT INTO settings (key, value, updated_by) VALUES ('backup.last', ${sql.json(summary as never)}, 'backup')
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
-  if (!s) throw new Error("backup made locally but not uploaded: object store credentials are not configured");
+  // A local-only run is a real success for a zero-cloud deployment: the verified dump is on disk and
+  // retention keeps the newest few. Only a real failure (files archive) still fails the run so the
+  // backup.stale alert sees it.
   if (filesError) throw new Error(`database backed up, but the file archive failed: ${filesError}`);
   return summary;
 }

@@ -8,8 +8,10 @@
 // lock disappears with the session.
 import { sql } from "@aihot/backend/db";
 
-/** One key per worker role; stable across restarts, distinct from any other advisory lock. */
-const LOCK_KEYS = {
+/** One key per worker role; stable across restarts, distinct from any other advisory lock.
+ *  The single source of truth: scripts/radar-ops.ts, scripts/radar-local.ts and radar-translate-state.ts
+ *  import this table instead of redeclaring the numbers (three hand-copied tables had drifted apart). */
+export const LOCK_KEYS = {
   "radar-announcements": 7_204_229_001,
   "ads-policy": 7_204_229_002,
   // The dedicated lead worker is a role of its own: it may run beside the family worker, and it must
@@ -21,7 +23,10 @@ const LOCK_KEYS = {
   "radar-industry": 7_204_229_005,
   // The fourth lane's market signals scheduler worker: dedicated advisory lock.
   "radar-market": 7_204_229_008,
-} as const;
+  // The maintenance worker (ops.retention + ops.backup cron + the startup sweep of interrupted runs
+  // left by retired scopes). 7_204_229_009 is taken: it is the market scheduler's execution lock.
+  "radar-maintenance": 7_204_229_010,
+} as const satisfies Record<string, number>;
 
 export type WorkerRole = keyof typeof LOCK_KEYS;
 

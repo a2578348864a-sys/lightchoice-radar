@@ -9,8 +9,10 @@ import { sql } from "@aihot/backend/db";
 import { heartbeatAlive, readRunRecord, type RunRecord } from "../apps/worker/src/control.ts";
 import { commandLineMatches, expectedCommandFragment, queryWindowsProcess } from "../apps/worker/src/process-identity.ts";
 
-/** The role's advisory lock key (same value as apps/worker/src/instance-lock.ts). */
-export const TRANSLATE_LOCK_KEY = 7_204_229_004;
+import { LOCK_KEYS } from "../apps/worker/src/instance-lock.ts";
+
+/** The role's advisory lock key, from the single source of truth (apps/worker/src/instance-lock.ts). */
+export const TRANSLATE_LOCK_KEY: number = LOCK_KEYS["radar-translate"];
 
 /**
  * The first lane's official/regulatory sources: the only ones the content worker may analyse and

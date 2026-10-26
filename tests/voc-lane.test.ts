@@ -79,7 +79,11 @@ test("L1 确定性分类：类别/极性/待复核来自原文，不冒充中文
   assert.ok(l1.categories.includes("噪音与静电"), `categories: ${l1.categories.join(",")}`);
   assert.ok(["negative", "mixed"].includes(l1.polarity));
   assert.equal(typeof l1.language, "string");
-  assert.ok(l1.needsReview || true, "review flag is data-driven");
+  // A complete sample (categories hit, answers present, asker follow-up seen) needs no review; the
+  // flag must be data-driven in BOTH directions or it is decoration.
+  assert.equal(l1.needsReview, false, "a complete sample does not need review");
+  const incomplete = classifyL1({ ...parseSeQuestion(seQuestion), answers: [] });
+  assert.equal(incomplete.needsReview, true, "a sample without answers is marked for review");
   const zh = classifyL1({ ...parseSeQuestion(seQuestion), title: "磨豆机坏了", body: "卡住了不动" });
   assert.equal(zh.language, "zh");
 });
@@ -155,19 +159,26 @@ test("批次撤销原子传播：仅剩批次撤销→材料失效；旧后台�
 
 /* --------------------------------------------------------- review & concurrency */
 
-test("人工决定记录在所见版本上；材料并发变化→REVIEW_REQUIRED 而非静默覆盖", async () => {
+test("人工决定绑定到所见修订；修订推进后旧决定保留、旧窗口条件写不命中", async () => {
   const [a] = await sql<{ id: string }[]>`SELECT id FROM articles WHERE url LIKE '%71001%'`;
+  const [before] = await sql<{ revision: number }[]>`SELECT revision FROM articles WHERE id = ${a!.id}`;
   const ok = await recordReview({ articleId: a!.id, action: "confirm", decidedBy: "user", recordedBy: "user" });
   assert.equal(ok.ok, true);
-  // Material changes between read and write → the write re-marks REVIEW_REQUIRED.
-  const staleRevision = 1;
-  const stale = await sql<{ id: string }[]>`
-    UPDATE articles SET raw = jsonb_set(raw, '{voc,review}', ${JSON.stringify({ status: "confirmed", evidenceRevision: staleRevision, decidedBy: "user" })}::jsonb), updated_at = now()
-    WHERE id = ${a!.id} AND revision <> ${staleRevision} AND raw->'voc'->'review'->>'evidenceRevision' = ${String(staleRevision)} RETURNING id`;
-  // (the guard path itself is what recordReview uses; simulate the direct outcome check:)
-  const [after0] = await sql<{ raw: { voc: { review: { status: string; evidenceRevision?: number } } } }[]>`SELECT raw FROM articles WHERE id = ${a!.id}`;
-  assert.equal(after0!.raw.voc.review.status, "confirmed");
-  assert.equal(typeof after0!.raw.voc.review.evidenceRevision, "number");
+  const [after] = await sql<{ raw: { voc: { review: { status: string; evidenceRevision?: number } } }; revision: number }[]>`SELECT raw, revision FROM articles WHERE id = ${a!.id}`;
+  assert.equal(after!.raw.voc.review.status, "confirmed");
+  // The decision is bound to the revision the decider actually saw — not to "latest" in the abstract.
+  assert.equal(after!.raw.voc.review.evidenceRevision, before!.revision, "decision binds to the seen revision");
+  // Another writer advances the material revision (a real edit would): the old decision stays put.
+  await sql`UPDATE articles SET revision = revision + 1 WHERE id = ${a!.id}`;
+  const [held] = await sql<{ er: string; revision: number }[]>`SELECT raw->'voc'->'review'->>'evidenceRevision' AS er, revision FROM articles WHERE id = ${a!.id}`;
+  assert.equal(Number(held!.er), before!.revision, "the old decision keeps pointing at the revision it was made on");
+  assert.equal(held!.revision, before!.revision + 1);
+  // The database ground truth of the REVIEW_REQUIRED guard: a conditional write keyed on the seen
+  // revision must miss once the revision moved — that is what recordReview's WHERE clause relies on.
+  const staleWrite = await sql`UPDATE articles SET raw = jsonb_set(raw, '{voc,review}', '{"status":"rejected"}'::jsonb) WHERE id = ${a!.id} AND revision = ${before!.revision} RETURNING id`;
+  assert.equal(staleWrite.length, 0, "a stale-window conditional write hits nothing");
+  // Restore the revision so later reads of this record stay consistent with their own expectations.
+  await sql`UPDATE articles SET revision = ${before!.revision} WHERE id = ${a!.id}`;
 });
 
 /* ------------------------------------------------------------ pain grouping */

@@ -803,8 +803,11 @@ test("CPSC 真实只读网络探测 (Live Source Probe)", async (t) => {
   } catch (err: unknown) {
     const elapsedMs = Date.now() - startMs;
     const errMsg = err instanceof Error ? err.message : String(err);
-    // Anti-fraud: ZERO fallback XML injection. Honestly reports BLOCKED_BY_NETWORK.
-    t.diagnostic(`[LIVE_SOURCE_FETCH: BLOCKED_BY_NETWORK] Blocked after ${elapsedMs}ms: ${errMsg}`);
-    assert.ok(errMsg.includes("fetch failed") || errMsg.includes("Blocked private address") || errMsg.includes("ECONNRESET"), "Failure must be attributable to network/SSRF guard");
+    const networkAttributable = errMsg.includes("fetch failed") || errMsg.includes("Blocked private address") || errMsg.includes("ECONNRESET");
+    // Anti-fraud: ZERO fallback XML injection. A network-unreachable environment SKIPS the probe —
+    // a skip is recorded as skipped, never as a pass; an unexpected error still fails the test.
+    t.diagnostic(`[LIVE_SOURCE_FETCH: SKIPPED_NETWORK_UNAVAILABLE] after ${elapsedMs}ms: ${errMsg}`);
+    assert.ok(networkAttributable, `Failure must be attributable to network/SSRF guard, got: ${errMsg}`);
+    t.skip("live CPSC fetch unreachable in this environment (SSRF guard / offline) — counted as skipped, not passed");
   }
 });

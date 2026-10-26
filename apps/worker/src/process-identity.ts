@@ -37,6 +37,8 @@ const EXPECTED_COMMAND: Record<WorkerRole, string> = {
   "radar-translate": "apps/worker/src/main.ts",
   "radar-industry": "radar-industry.ts",
   "radar-market": "radar-market.ts",
+  // The maintenance worker is the main entry with RADAR_WORKER_SCOPE=maintenance.
+  "radar-maintenance": "apps/worker/src/main.ts",
 };
 
 export function expectedCommandFragment(role: WorkerRole): string {

@@ -27,11 +27,9 @@ import {
   type WorkerRole,
 } from "../apps/worker/src/control.ts";
 import { queryWindowsProcess, verifyAndTerminateByHandle, verifyWorkerIdentity } from "../apps/worker/src/process-identity.ts";
+import { LOCK_KEYS as WORKER_LOCK_KEYS } from "../apps/worker/src/instance-lock.ts";
 import { startDetached, startOnHiddenConsole } from "./process-start.ts";
-// The industry lane's role key, read from the lane's own registry (one source of truth).
-const INDUSTRY_LOCK_KEY = 7_204_229_005;
 import {
-  TRANSLATE_LOCK_KEY,
   TRANSLATE_SOURCES,
   TRANSLATE_SOURCE_LABEL,
   beijingStamp,
@@ -43,8 +41,8 @@ import {
 } from "./radar-translate-state.ts";
 
 const RUN_DIR = path.join(REPO_ROOT, ".data", "_diag");
-/** Must match the keys in apps/worker/src/instance-lock.ts. */
-const LOCK_KEYS: Record<string, number> = { "ads-policy": 7_204_229_002, "radar-announcements": 7_204_229_001, "amz123-leads": 7_204_229_003, "radar-translate": TRANSLATE_LOCK_KEY, "radar-industry": INDUSTRY_LOCK_KEY, "radar-market": 7_204_229_008 };
+/** The single source of truth is apps/worker/src/instance-lock.ts; nothing here redeclares a number. */
+const LOCK_KEYS: Record<string, number> = WORKER_LOCK_KEYS;
 const WEB_PORT = 3000;
 const API_PORT = 3001;
 const RADAR_SOURCES = ["amazon-us-announcements", "amazon-us-fee-updates", "ads-policy-pages", "rss-cpsc-recalls", "us-federal-register-cpsc", "us-federal-register-ftc", "amz123-policy-leads"];
@@ -59,6 +57,8 @@ const TARGETS: Record<string, { worker: WorkerRole; supervisor?: WorkerRole }> =
   translate: { worker: "radar-translate" },
   industry: { worker: "radar-industry" },
   market: { worker: "radar-market" },
+  // The maintenance worker: no collection queues, only retention/backup timers and the startup sweep.
+  maintenance: { worker: "radar-maintenance" },
 };
 
 const truthy = (value: string | undefined) => /^(1|true|yes|on)$/i.test(String(value ?? "").trim());
@@ -207,6 +207,12 @@ async function status(): Promise<number> {
   line("公告 Worker", `${workerLock || workerAlive ? "运行中" : "未运行"}${workerRecord && pidAlive(workerRecord.pid) ? ` · pid ${workerRecord.pid}` : ""}`);
   line("线索 Worker", `${leadLock || leadAlive ? "运行中" : "未运行"}${leadRecord && pidAlive(leadRecord.pid) ? ` · pid ${leadRecord.pid}` : ""}`);
   line("市场信号 Worker", `${marketLock || marketAlive ? "运行中" : "未运行"}${marketRecord && pidAlive(marketRecord.pid) ? ` · pid ${marketRecord.pid}` : ""}`);
+  const maintenanceLock = await lockHeld(LOCK_KEYS["radar-maintenance"]!);
+  const maintenanceAlive = heartbeatAlive("radar-maintenance");
+  const maintenanceRecord = readRunRecord("radar-maintenance");
+  line("维护 Worker", `${maintenanceLock || maintenanceAlive ? "运行中" : "未运行"}${maintenanceRecord && pidAlive(maintenanceRecord.pid) ? ` · pid ${maintenanceRecord.pid}` : ""}`);
+  const lastBackup = await sql`SELECT value->>'at' AS at, value->>'uploaded' AS uploaded FROM settings WHERE key = 'backup.last'`.then(r => r[0]);
+  line("最近备份", lastBackup?.at ? `${beijingStamp(new Date(lastBackup.at))}${lastBackup.uploaded === "false" ? "（本地）" : ""}` : "暂无记录");
   // Automatic Chinese translation: the state is the worker's own lock/heartbeat plus stored rows —
   // never "the switch is set" alone, and never "the last job succeeded" as proof it is healthy now.
   // The session lock is the strong signal: PostgreSQL drops it the moment the process dies. A fresh
@@ -354,6 +360,31 @@ async function start(target: string | undefined, ports: { web: number; api: numb
     return 0;
   }
 
+  if (target === "maintenance") {
+    if (await lockHeld(LOCK_KEYS["radar-maintenance"]!) || heartbeatAlive("radar-maintenance")) {
+      console.log("维护 Worker 已在运行，不重复启动。");
+      return 1;
+    }
+    clearControlState("radar-maintenance");
+    const pid = startDetached({
+      entry: path.join(REPO_ROOT, "apps/worker/src/main.ts"),
+      nodeArgs: ["--env-file-if-exists=.env"],
+      logName: "worker-maintenance.log",
+      env: {
+        ...process.env,
+        COLLECT_ENABLED: "false",
+        RADAR_WORKER_SCOPE: "maintenance",
+        // The pg binaries live in the private runtime dir on this machine (same default radar-local uses);
+        // runBackup would otherwise fail on spawn every night.
+        RADAR_PG_BIN: process.env.RADAR_PG_BIN || "D:\Workspace\LightChoiceRadarRuntime\postgresql-17.11\pgsql\bin",
+      },
+    });
+    console.log(`维护 Worker（每日清理 03:30 · 备份 04:10）pid=${pid ?? "?"} 日志 .data/_diag/worker-maintenance.log`);
+    console.log("  备份落在 .data/backups/（本地保留最近 3 份；未配置云端对象存储时不上传）。");
+    console.log("  停止：node --env-file=.env scripts/radar-ops.ts stop maintenance");
+    return 0;
+  }
+
   if (target === "market") {
     if (await lockHeld(LOCK_KEYS["radar-market"]!) || heartbeatAlive("radar-market")) {
       console.log("市场信号调度 Worker 已在运行，不重复启动。");
@@ -443,7 +474,7 @@ async function start(target: string | undefined, ports: { web: number; api: numb
     console.log(`Ads 监督进程 pid=${pid ?? "?"} 日志 .data/_diag/ads-policy-daemon.log`);
     return 0;
   }
-  console.log("用法：start api | start web | start announcements | start leads | start ads | start industry | start market");
+  console.log("用法：start api | start web | start announcements | start leads | start ads | start industry | start market | start maintenance");
   return 1;
 }
 
