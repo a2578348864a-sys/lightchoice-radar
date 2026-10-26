@@ -47,11 +47,38 @@ const loginPage = (returnTo: string, error?: string) => `/admin/login?${new URLS
 
 export type AdminHandler = (req: FastifyRequest, reply: FastifyReply, admin: AdminPrincipal) => Promise<unknown>;
 
+/**
+ * Local personal mode stand-in (RADAR_LOCAL_PERSONAL_MODE): this Radar deployment is one person's
+ * own machine, so the workbench lanes read and operate without signing in — but only for requests
+ * that provably come from this machine's loopback. The fixed CSRF token keeps every write guarded
+ * exactly like the session flow: a cross-site form cannot set the header, and a cross-origin page
+ * cannot read it from /api/admin/me.
+ */
+const LOCAL_PERSONAL_PRINCIPAL: AdminPrincipal = { userId: null, name: "本地个人模式", csrf: "local-personal", dev: true };
+
+/** Host names that mean "this machine" for the Host header check (DNS-rebinding defense). */
+const LOOPBACK_HOSTNAMES = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
+
+/**
+ * True when local personal mode is on AND this request provably originates from this machine's own
+ * loopback. The TCP peer address decides — never req.ip (trustProxy is on, so X-Forwarded-For is
+ * attacker-writable) and never any forwarded header. The Host header must also name this machine,
+ * which kills DNS-rebinding (a rebound page sends the attacker's hostname).
+ */
+export function localPersonalRequestOk(req: FastifyRequest): boolean {
+  if (!config.localPersonal) return false;
+  const remote = req.socket.remoteAddress ?? "";
+  if (remote !== "127.0.0.1" && remote !== "::1" && remote !== "::ffff:127.0.0.1") return false;
+  const host = String(req.headers.host ?? "");
+  const hostname = host.startsWith("[") ? host.slice(0, host.indexOf("]") + 1) : host.split(":")[0];
+  return LOOPBACK_HOSTNAMES.has(hostname.toLowerCase());
+}
+
 /** Guard for /api/admin/*: a live session (or the development stand-in); writes need the CSRF token. */
 export function adminHandler(fn: AdminHandler) {
   return async (req: FastifyRequest, reply: FastifyReply) => {
     reply.header("Cache-Control", "no-store");
-    const admin = await sessionPrincipal(req.headers.cookie);
+    const admin = await sessionPrincipal(req.headers.cookie) ?? (localPersonalRequestOk(req) ? LOCAL_PERSONAL_PRINCIPAL : null);
     if (!admin) return sendProblem(req, reply, { status: 401, code: "unauthorized", detail: "Sign in to the admin first." });
     if (req.method !== "GET" && req.method !== "HEAD" && req.headers["x-csrf-token"] !== admin.csrf) {
       return sendProblem(req, reply, { status: 403, code: "forbidden", detail: "Missing or stale CSRF token." });

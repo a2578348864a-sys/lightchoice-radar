@@ -60,6 +60,9 @@ const ruleOnlyMode = SITE.name === "LightChoice Radar" || bool("RULE_ONLY_MODE",
 /** AIHOT_CREDENTIALS_DIR, else the site's own default (relative to the repository). */
 const credentialsDir = env.AIHOT_CREDENTIALS_DIR || DEPLOYMENT.credentialsDir;
 
+// Name of this deployment in alerts ("production" sends them without a prefix).
+const environmentName = str("AIHOT_ENVIRONMENT", isProduction ? "production" : "development");
+
 export const config = {
   databaseUrl: str("DATABASE_URL", "postgres://127.0.0.1:5432/aihot"),
   apiPort: int("API_PORT", 3001),
@@ -78,7 +81,15 @@ export const config = {
   credentialsDir: credentialsDir ? path.resolve(REPO_ROOT, credentialsDir) : null,
   dataDir: str("AIHOT_DATA_DIR", path.join(REPO_ROOT, ".data")),
   // Name of this deployment in alerts ("production" sends them without a prefix).
-  environmentName: str("AIHOT_ENVIRONMENT", isProduction ? "production" : "development"),
+  environmentName: environmentName,
+  /**
+   * LightChoice Radar 本地个人模式（RADAR_LOCAL_PERSONAL_MODE）。这是运行在用户本人电脑上的单人本地
+   * 情报中心：开关打开时，第三/第四主线（VOC/市场）与管理接口在本机回环请求下不再要求管理员登录，
+   * 但写操作仍需 CSRF 令牌、采集许可门禁与调度互斥锁全部保留。安全条件由 API 在请求级强制校验：
+   * TCP 对端必须为本机回环地址（不看任何可伪造的代理标头），Host 必须是本机回环主机名（防 DNS 重绑定），
+   * 且生产环境一律关闭——云端或同机反向代理转发的公网流量永远不会满足本地个人模式。
+   */
+  localPersonal: SITE.name === "LightChoice Radar" && bool("RADAR_LOCAL_PERSONAL_MODE", false) && environmentName !== "production",
   // External-action valve: off unless the environment turns it on, like COLLECT_ENABLED (read by the
   // worker).
   modelCallsEnabled: bool("MODEL_CALLS_ENABLED", false),
