@@ -34,9 +34,15 @@ interface Overview {
     signals: number;
     opportunities: number;
     alerts: number;
+    safetyEvents?: number;
   };
   gaps: string[];
   budgetZh: string;
+  scheduler?: {
+    isRunning: boolean;
+    pid?: number;
+    nextDueAt: string | null;
+  };
 }
 
 interface CategoryCard {
@@ -120,26 +126,31 @@ export default function MarketIndex() {
                 {overview.counts.keywordSnapshots >= 2 ? "✅ 已建立多期观测基线" : "单期初始基线"}
               </span>
             </div>
-            <dl className="mt-1 grid grid-cols-2 gap-2 text-[12.5px] sm:grid-cols-4">
+            <dl className="mt-1 grid grid-cols-2 gap-2 text-[12.5px] sm:grid-cols-5">
               <div className="card p-3">
                 <dt className="text-ink-4">关键词快照</dt>
                 <dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.counts.keywordSnapshots} 期</dd>
                 <span className="text-[10.5px] text-ink-3">{overview.counts.keywordRows} 行关键词</span>
               </div>
               <div className="card p-3">
-                <dt className="text-ink-4">榜单快照</dt>
+                <dt className="text-ink-4">榜单与商品</dt>
                 <dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.counts.chartSnapshots} 期</dd>
                 <span className="text-[10.5px] text-ink-3">{overview.counts.products} 个观察商品</span>
               </div>
               <div className="card p-3">
-                <dt className="text-ink-4">市场变化信号</dt>
+                <dt className="text-ink-4">变化信号</dt>
                 <dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.counts.signals} 条</dd>
                 <span className="text-[10.5px] text-ink-3">确定性规则匹配</span>
               </div>
               <div className="card p-3">
-                <dt className="text-ink-4">研究候选与预警</dt>
+                <dt className="text-ink-4">研究候选/预警</dt>
                 <dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.counts.opportunities} 个</dd>
                 <span className="text-[10.5px] text-ink-3">{overview.counts.alerts} 条站内预警</span>
+              </div>
+              <div className="card p-3">
+                <dt className="text-ok">CPSC 安全反证</dt>
+                <dd className="mt-0.5 text-[18px] font-semibold text-ok">{overview.counts.safetyEvents ?? 0} 起</dd>
+                <span className="text-[10.5px] text-ink-3">官方公开召回流</span>
               </div>
             </dl>
             <p className="mt-2 text-[11.5px] text-ink-4">{overview.budgetZh}</p>

@@ -513,3 +513,10 @@
 - **自动变化分析与 7 段式确定性中文解释**：`packages/backend/src/market/market-opportunity.ts` 建立稳定唯一标识 `opp:${marketplace}:${subjectType}:${identifier}`，输出 7 段式确定性中文解释（发生了什么、变化对比、支持证据、反证证据、为何关注、为何非即时暴利商机、仍需验证信息缺口），严防无根据的商业夸大。
 - **工作台自动情报看板升级**：`/market/sources` 重构为「自动来源监控与调度看板」，支持一键「⚡ 立即触发到期自动采集与分析」，展示各来源调度周期、最后执行、错误与合规说明。
 - **严格工程验证与零污染边界**：全仓 `npm run typecheck` 0 错误；单元与集成测试 **34/34 PASS**；Web 生产打包成功；真实 Chrome 自动化浏览器验收 **10/10 PASS**（0 文件上传残余、自动化调度触发与反馈正常、移动端 390px 零溢出、Console 0 错误）；正式库零写入，前三主线零受扰，DeepSeek 调用 0 次（¥0），外部商业服务采购 ¥0；未执行 git push。
+
+**第四主线 AUTO-RUN 本机真实自动运行闭环收口（2026-10-26，脱离浏览器与人工点击的本机自主情报流水线）**：
+- **专用后台调度 Worker 守护（A 组目标达成）**：新建 `apps/worker/src/radar-market.ts` 独立守护进程，注册专用 PostgreSQL 顾问锁（键 `7204229008`）作为单实例排他门禁；接入 `scripts/radar-ops.ts start|stop market` 受管启停；启动后常驻后台自主轮询到期来源，无需打开浏览器或前台网页；关机自然终止，开机安全恢复。
+- **调度器并发互斥锁与实时状态探针（B 组目标达成）**：`packages/backend/src/market/market-scheduler.ts` 引入基于 reserved 物理连接的互斥锁（键 `7204229009`），并发或多进程触发时自动阻断（reason: 已有另一个调度任务正在执行，互斥保护生效）；新增 `getMarketSchedulerStatus()` 探针，前端 `/market/sources` 实时显示「后台调度器在线 (PID)/未运行」状态徽章与多日停机防风暴补偿说明。
+- **CPSC 安全事件数据模型与确定性解释（C/D 组目标达成）**：数据模型建立独立的 `ProductSafetyEvent`，严格区分发布时间（sourcePublishedAt）、抓取时间（observedAt）与入库时间（ingestedAt）；品类推断候选 Browse Node ID 显式设为 null（绝不冒充 Amazon 官方节点）；输出 7 段式确定性中文解释框架（明确限定未与特定 ASIN 绑定，严禁推断为爆品商机或销量增长），仅直通 M09 创新与安全反证及 M12 站内安全预警，坚决杜绝误生商业机会。
+- **自动化自主触发与全栈工程实证（E 组目标达成）**：`scripts/verify-autonomous-scheduler.ts` 完全脱离浏览器与人工点击，验证后台 Worker 自主抓取到期任务（PID 实测）、安全推进调度水位与单实例排他退出（退出码 0）；Playwright 真实 Chrome 浏览器验收 10/10 项全过（Console 0 错误、390px 零水平溢出、调度器徽章与安全反证实时可见）；全仓 `npm run typecheck` 0 错误；测试集 **38/38 PASS**。
+- **边界与安全保持**：R7 云端保持 DEFERRED_BY_USER；R8 本地自然运行保持 NOT_STARTED；正式库零写入，测试全程在隔离库运行；前三主线零受扰；DeepSeek 调用 0 次（¥0）；外部商业服务采购 ¥0；未执行 git push。

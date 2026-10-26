@@ -56,11 +56,12 @@ async function run() {
     const hasModuleBoard = await page.locator("text=12 模块能力状态矩阵").isVisible();
     const hasGaps = await page.locator("text=当前数据缺口").isVisible();
     const hasBudget = await page.locator("text=第四主线模型预算 ¥0").isVisible();
+    const hasSafetyCounter = await page.locator("text=CPSC 安全反证").isVisible();
     
     const moduleCards = await page.locator('section[aria-label="12 模块状态"] .card').count();
-    await logResult("3. 市场总览：12模块状态板、诚实空态、零模型预算声明全部正常",
-      Boolean(hasDataOverview && hasModuleBoard && hasGaps && hasBudget && moduleCards === 12),
-      `12模块卡片数=${moduleCards}`
+    await logResult("3. 市场总览：12模块状态板、诚实空态、零模型预算与安全反证计数全部正常",
+      Boolean(hasDataOverview && hasModuleBoard && hasGaps && hasBudget && hasSafetyCounter && moduleCards === 12),
+      `12模块卡片数=${moduleCards}, safetyCounter=${hasSafetyCounter}`
     );
 
     // 4. Keyword Demand Page (/market/keywords)
@@ -119,6 +120,7 @@ async function run() {
     await page.goto(`${BASE_URL}/market/sources`, { waitUntil: "networkidle" });
     const sourceTitle = await page.textContent("h1");
     const hasScheduleSection = await page.locator('section[aria-label="调度执行与操作"]').isVisible();
+    const hasSchedulerBadge = await page.locator("text=后台调度器").isVisible();
     const triggerBtn = page.locator('button:has-text("立即触发到期自动采集与分析")');
     const hasTriggerBtn = await triggerBtn.isVisible();
     const hasSourceLedger = await page.locator('section[aria-label="来源台账"]').isVisible();
@@ -130,12 +132,12 @@ async function run() {
 
     // Trigger auto scheduler
     await triggerBtn.click();
-    await page.waitForTimeout(1500);
+    await page.locator("text=自动调度执行完成").waitFor({ state: "visible", timeout: 10000 }).catch(() => {});
     const hasRunFeedback = await page.locator("text=自动调度执行完成").isVisible();
 
-    await logResult("8. 自动来源管理与调度看板：周期状态、一键触发自动调度、零文件上传残留",
-      Boolean(sourceTitle?.includes("自动来源") && hasScheduleSection && hasTriggerBtn && hasSourceLedger && fileInputCount === 0 && !hasDragDropZone && !hasExcelGuide && hasRunFeedback),
-      `fileInputs=${fileInputCount}, triggerExecuted=${hasRunFeedback}`
+    await logResult("8. 自动来源管理与调度看板：调度器在线状态探针、一键触发自动调度、零文件上传残留",
+      Boolean(sourceTitle?.includes("自动来源") && hasScheduleSection && hasSchedulerBadge && hasTriggerBtn && hasSourceLedger && fileInputCount === 0 && !hasDragDropZone && !hasExcelGuide && hasRunFeedback),
+      `fileInputs=${fileInputCount}, triggerExecuted=${hasRunFeedback}, schedulerBadge=${hasSchedulerBadge}`
     );
 
     // 9. Mobile Viewport (390px) Check

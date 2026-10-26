@@ -322,6 +322,58 @@ export async function loadMarketInnovationCues(): Promise<MarketInnovationCue[]>
   return rows.map((r) => r.value);
 }
 
+/* ------------------------------------------------ product safety events (CPSC) */
+
+export interface ProductSafetyEventCategoryCandidate {
+  rawCategory: string;
+  normalizedCategoryZh: string;
+  mappingBasis: string;
+  confidence: "low" | "medium" | "high";
+  humanConfirmed: boolean;
+  browseNodeId: null; // explicitly null: text classification is NEVER an official Amazon Browse Node ID
+}
+
+export interface ProductSafetyEventExplanation {
+  officialAnnouncementZh: string;
+  productScopeZh: string;
+  safetyRiskZh: string;
+  whyResearchWorthyZh: string;
+  developmentCautionZh: string;
+  amazonIdentityVerificationZh: string;
+  unsupportedConclusionsZh: string[];
+}
+
+export interface ProductSafetyEvent {
+  id: string; // evt:cpsc:recall:${hash}
+  sourceId: string;
+  officialUrl: string;
+  recallTitle: string;
+  productName: string;
+  hazardType: string;
+  hazardDescriptionZh: string;
+  categoryCandidate: ProductSafetyEventCategoryCandidate;
+  sourcePublishedAt: string; // actual announcement date from pubDate
+  feedUpdatedAt?: string | null;
+  observedAt: string; // time Radar fetched it
+  ingestedAt: string; // time saved to database
+  explanation: ProductSafetyEventExplanation;
+}
+
+export async function saveProductSafetyEvent(event: ProductSafetyEvent): Promise<void> {
+  await sql`INSERT INTO settings (key, value, updated_by) VALUES (${`market.safety-event.${event.id}`}, ${sql.json(event as never)}, 'market')
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`;
+}
+
+export async function loadProductSafetyEvents(): Promise<ProductSafetyEvent[]> {
+  const rows = await sql<{ value: ProductSafetyEvent }[]>`SELECT value FROM settings WHERE key LIKE 'market.safety-event.%' ORDER BY key`;
+  return rows.map((r) => r.value);
+}
+
+export async function loadProductSafetyEvent(id: string): Promise<ProductSafetyEvent | null> {
+  const [row] = await sql<{ value: ProductSafetyEvent }[]>`SELECT value FROM settings WHERE key = ${`market.safety-event.${id}`}`;
+  return row?.value ?? null;
+}
+
 /* ------------------------------------------------------- evidence versioning */
 
 /** Snapshot articles carry a basis version = sourceId + period + content hash; opportunities bind to it. */

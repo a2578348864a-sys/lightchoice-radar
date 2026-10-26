@@ -123,7 +123,7 @@
 3. 明确声明局限：关键词热度 ≠ 销量，排名 ≠ 利润，样本 ≠ 全市场。
 4. 不购买商业数据服务、不使用付费代理、不调用付费 API。
 
-**当前状态：第四主线 AUTO-FIRST 全自动市场情报系统纠偏完成（2026-10-26）。** 权威工程主计划见 **[docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md](docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md)**。彻底废除用户端手工 CSV/Excel 上传工作台路线，确立“自动发现来源 → 自动采集获准数据 → 自动标准化与历史蓄积 → 自动检测变化 → 自动生成信号与候选 → 自动更新情报看板 → 人工最终决策”的自动化闭环：官方 CPSC 消费品安全数据流自动接入、调度引擎、自动分析与看板升级全线闭环。工作台入口 `/market`（管理员登录）。模型预算保持 ¥0。
+**当前状态：第四主线 AUTO-RUN 本机真实自动运行闭环收口（2026-10-26）。** 权威工程主计划见 **[docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md](docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md)**。实现专用后台调度 Worker（`radar-market`，PID/顾问锁守护，可脱离浏览器全自动轮询）、并发互斥锁（7204229009）、CPSC 官方公开产品安全通报清洗入库与反证隔离（直通 M09 创新反证与 M12 风险预警，严禁误报商业商机）、实时调度器在线探针看板。工作台入口 `/market`（管理员登录）。受管运维：`node scripts/radar-ops.ts start market`。模型预算保持 ¥0。
 
 ### 主线状态总表
 
@@ -132,7 +132,7 @@
 | 1 | 平台政策 | **进行中（Amazon 平台政策 2 条 + 美国监管 20 条已真实入库；监管来源已进入专用 Worker 定时调度并实测跑通；回测 10/10、公告门禁召回 3/3；但 Amazon 平台政策只有 2 条、登录后自动恢复未验证）** | 补充 Amazon 官方政策来源，提高平台政策真实覆盖；完成注销登录后的自动恢复验证 |
 | 2 | 行业动态 | 未开始 | 等主线 1 验收通过 |
 | 3 | 消费者原声 | 部分具备（社区 RSS 已通，评论/Reddit/YouTube 未接） | 等主线 1、2 通过后补齐来源 |
-| 4 | 市场信号 | **AUTO-FIRST 自动化纠偏完成（[主计划](docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md)）；CPSC 官方数据流自动接入、调度引擎、自动分析与看板升级** | 用户开机即可查看系统自动发现的市场变化与研究候选；云端部署按用户决定暂缓 |
+| 4 | 市场信号 | **AUTO-RUN 自动运行闭环完成（[主计划](docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md)）；后台 Worker 守护、CPSC 安全流接入、调度探针与前端看板全闭环** | 开机启动 Worker 后全自动运行；等待官方合规 Amazon 来源资质授权（如 SP-API）；云端部署按用户决定暂缓 |
 
 ---
 

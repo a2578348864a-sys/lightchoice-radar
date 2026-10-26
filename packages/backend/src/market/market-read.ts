@@ -4,22 +4,24 @@
 import { sql } from "../db.ts";
 import {
   loadMarketAlerts, loadMarketAlertRules, loadMarketOpportunities, loadMarketSources,
-  sourceUses, type MarketProductRecord,
+  loadProductSafetyEvents, sourceUses, type MarketProductRecord,
 } from "./market-model.ts";
 import {
   brandDistribution, chartRankChanges, keywordChanges, loadChartSnapshots, loadKeywordSnapshots,
   loadProducts, marketOverviewInputs, priceChangeRate, trendVerdict, METRIC_VERSION,
 } from "./market-metrics.ts";
+import { getMarketSchedulerStatus, type MarketSchedulerStatus } from "./market-scheduler.ts";
 
 export interface ModuleState { module: string; name: string; engineering: "implemented" | "partial" | "stub"; dataState: string; noteZh: string; /** R6-CLOSE: the third, business-acceptance layer — engineering PASS never inherits here. */
   business: string }
 
 /** The 12-module honest status board (engineering vs data vs permission, never conflated). */
 export async function moduleStates(): Promise<ModuleState[]> {
-  const inputs = await marketOverviewInputs();
+  const [inputs, safetyEventsList] = await Promise.all([marketOverviewInputs(), loadProductSafetyEvents()]);
   const latestKw = inputs.keywordSnapshots > 0;
   const multiPeriodKw = inputs.keywordSnapshots >= 2;
   const multiPeriodChart = inputs.chartSnapshots.some((c) => c.chartId) && new Set(inputs.chartSnapshots.map((c) => c.chartId + c.periodKey)).size >= 2;
+  const safetyEvents = safetyEventsList.length;
   return [
     {
       module: "01", name: "搜索需求雷达", engineering: "implemented",
@@ -71,9 +73,9 @@ export async function moduleStates(): Promise<ModuleState[]> {
     },
     {
       module: "09", name: "创新与替代品雷达", engineering: "implemented",
-      dataState: "已打通 CPSC 消费品安全数据流",
-      noteZh: "已接入官方 CPSC 消费品安全与召回开放数据流，自动提炼缺陷反证与结构防呆线索；众筹/专利自动接入 BLOCKED",
-      business: "CPSC 官方数据流自动运行就绪；众筹/专利自动接入 BLOCKED",
+      dataState: safetyEvents > 0 ? `已打通 CPSC 消费品安全数据流（${safetyEvents} 起通告入库）` : "已打通 CPSC 消费品安全数据流",
+      noteZh: safetyEvents > 0 ? `已接入官方 CPSC 消费品安全与召回开放数据流，自动提炼 ${safetyEvents} 起缺陷反证与结构防呆线索；众筹/专利自动接入 BLOCKED` : "已接入官方 CPSC 消费品安全与召回开放数据流，自动提炼缺陷反证与结构防呆线索；众筹/专利自动接入 BLOCKED",
+      business: safetyEvents > 0 ? `CPSC 官方数据流自动运行就绪（${safetyEvents} 起安全事件）；众筹/专利自动接入 BLOCKED` : "CPSC 官方数据流自动运行就绪；众筹/专利自动接入 BLOCKED",
     },
     {
       module: "10", name: "供需缺口雷达", engineering: "implemented",
@@ -98,24 +100,46 @@ export async function moduleStates(): Promise<ModuleState[]> {
 
 export interface MarketOverviewResponse {
   modules: ModuleState[];
-  sources: Array<{ id: string; label: string; producer: string; enabled: boolean; automation: string; uses: string[]; evidence: string; notes?: string; unverifiedUses?: string[]; revokedAt?: string; revokeReason?: string; permissionBasis: string }>;
-  counts: { keywordSnapshots: number; keywordRows: number; chartSnapshots: number; products: number; signals: number; opportunities: number; alerts: number };
+  sources: Array<{
+    id: string; label: string; producer: string; enabled: boolean; automation: string;
+    uses: string[]; evidence: string; notes?: string; unverifiedUses?: string[];
+    revokedAt?: string; revokeReason?: string; permissionBasis: string;
+    cadenceHours?: number; lastRunAt?: string | null; nextRunAt?: string | null;
+    lastError?: string | null; runCount?: number;
+  }>;
+  counts: {
+    keywordSnapshots: number; keywordRows: number; chartSnapshots: number;
+    products: number; signals: number; opportunities: number; alerts: number;
+    safetyEvents: number;
+  };
   gaps: string[];
   budgetZh: string;
+  scheduler: MarketSchedulerStatus;
 }
 
 export async function loadMarketOverview(): Promise<MarketOverviewResponse> {
-  const [modules, sources, opps, alerts, inputs] = await Promise.all([moduleStates(), loadMarketSources(), loadMarketOpportunities(), loadMarketAlerts(), marketOverviewInputs()]);
+  const [modules, sources, opps, alerts, inputs, safetyEventsList, scheduler] = await Promise.all([
+    moduleStates(), loadMarketSources(), loadMarketOpportunities(), loadMarketAlerts(),
+    marketOverviewInputs(), loadProductSafetyEvents(), getMarketSchedulerStatus(),
+  ]);
   return {
     modules,
-    sources: sources.map((s) => ({ id: s.id, label: s.label, producer: s.producer, enabled: s.enabled, automation: s.automation, uses: [...sourceUses(s)], evidence: s.permission.evidence, notes: s.notes, unverifiedUses: s.unverifiedUses, revokedAt: s.revokedAt, revokeReason: s.revokeReason, permissionBasis: s.permission.basis })),
+    sources: sources.map((s) => ({
+      id: s.id, label: s.label, producer: s.producer, enabled: s.enabled, automation: s.automation,
+      uses: [...sourceUses(s)], evidence: s.permission.evidence, notes: s.notes,
+      unverifiedUses: s.unverifiedUses, revokedAt: s.revokedAt, revokeReason: s.revokeReason,
+      permissionBasis: s.permission.basis, cadenceHours: s.cadenceHours, lastRunAt: s.lastRunAt,
+      nextRunAt: s.nextRunAt, lastError: s.lastError, runCount: s.runCount,
+    })),
     counts: {
       keywordSnapshots: inputs.keywordSnapshots, keywordRows: inputs.keywordRows,
       chartSnapshots: inputs.chartSnapshots.length, products: inputs.products.length,
       signals: inputs.signals.length, opportunities: opps.length, alerts: alerts.filter((a) => a.status === "new").length,
+      safetyEvents: safetyEventsList.length,
     },
     gaps: inputs.gaps,
     budgetZh: "第四主线模型预算 ¥0（未建窗口）；本轮全部计算为确定性规则，零模型调用",
+    scheduler,
   };
 }
 

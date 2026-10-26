@@ -11,7 +11,7 @@ import { after, before, test } from "node:test";
 process.env.RADAR_RUN_DIR = mkdtempSync(path.join(tmpdir(), "market-lane-"));
 
 const { sql, closeDb } = await import("@aihot/backend/db");
-const { saveMarketSource, sourceAllows, loadMarketSources, loadMarketOpportunities, saveMarketAlertRule, loadMarketAlerts, revokeMarketSource, saveMarketOpportunity, saveMarketExternalRecord, loadMarketExternalRecords, saveMarketInnovationCue, loadMarketInnovationCues } = await import("@aihot/backend/market/market-model");
+const { saveMarketSource, sourceAllows, loadMarketSources, loadMarketOpportunities, saveMarketAlertRule, loadMarketAlerts, revokeMarketSource, saveMarketOpportunity, saveMarketExternalRecord, loadMarketExternalRecords, saveMarketInnovationCue, loadMarketInnovationCues, loadProductSafetyEvents, loadProductSafetyEvent } = await import("@aihot/backend/market/market-model");
 const {
   applyChartSnapshot, applyKeywordSnapshot, applyCsvImport, parseAmz123KeywordCapture, parseAmazonChartCapture,
   seedMarketSources, defaultMarketSources,
@@ -29,13 +29,14 @@ const {
   retireUnqualifiedAlerts, reviewOpportunity, scoreOpportunity,
 } = await import("@aihot/backend/market/market-opportunity");
 const { loadMarketOverview, loadKeywordView, loadProductView } = await import("@aihot/backend/market/market-read");
-const { parseCpscRssXml, fetchAndIngestCpscRecalls, isSourceDue, runDueMarketSources } = await import("@aihot/backend/market/market-scheduler");
+const { parseCpscRssXml, fetchAndIngestCpscRecalls, isSourceDue, runDueMarketSources, getMarketSchedulerStatus, MARKET_EXECUTION_LOCK_KEY, MARKET_WORKER_LOCK_KEY, CPSC_FEED_URL } = await import("@aihot/backend/market/market-scheduler");
 
 const KW_SOURCE = "test-amz123";
 const CHART_SOURCE = "test-amz-chart";
 
 before(async () => {
-  await sql`DELETE FROM settings WHERE key LIKE 'market.opp.%' OR key LIKE 'market.alert.%' OR key LIKE 'market.source.test-%'`;
+  await sql`SELECT pg_advisory_unlock_all()`.catch(() => {});
+  await sql`DELETE FROM settings WHERE key LIKE 'market.opp.%' OR key LIKE 'market.alert.%' OR key LIKE 'market.source.test-%' OR key LIKE 'market.innovation.%' OR key LIKE 'market.safety-event.%'`;
   await sql`DELETE FROM articles WHERE source_id IN ('market-keywords', 'market-charts', 'market-products')`;
   await saveMarketSource({
     id: KW_SOURCE, kind: "amz123-keywords", label: "测试关键词源", producer: "Amazon ABA（测试二手展示）", marketplace: "US",
@@ -660,4 +661,154 @@ test("12 模块原契约与业务名称完整性校验（无擅自更名）", as
   assert.equal(names[10], "商业可行性雷达");
   assert.equal(names[11], "机会发现与预警");
   assert.equal(names.length, 12, "exactly 12 modules, no 13th module");
+});
+
+/* -------------------------------------------------- AUTO-RUN Autonomous Operation */
+
+test("CPSC 产品安全事件 (ProductSafetyEvent) 标准化、时间戳分离、非 Browse Node 约束与商机隔离", async () => {
+  const testXml = `<rss version="2.0"><channel><item>
+    <title>VQQQ Gas Patio Heaters Recalled Due to Risk of Serious Injury or Death from Fire and Burn Hazards</title>
+    <link>https://www.cpsc.gov/Recalls/2026/VQQQ-Patio-Heaters</link>
+    <description>Malfunctioning valve causes gas leak, posing fire and burn hazards.</description>
+    <pubDate>October 22, 2026</pubDate>
+    <guid>cpsc-autorun-test-001</guid>
+  </item></channel></rss>`;
+
+  const sourceId = "cpsc-autorun-source";
+  await saveMarketSource({
+    id: sourceId,
+    kind: "cpsc-recalls",
+    label: "CPSC 自主运行测试源",
+    producer: "U.S. CPSC",
+    marketplace: "US",
+    permission: { uses: ["fetch", "store", "compute", "display"], basis: "test", evidence: "L3" },
+    enabled: true,
+    automation: "authorized-periodic",
+    cadenceHours: 24,
+  });
+
+  const res1 = await fetchAndIngestCpscRecalls({
+    sourceId,
+    xmlOverride: testXml,
+  });
+
+  assert.equal(res1.totalParsed, 1);
+  assert.equal(res1.newEvents, 1);
+  assert.equal(res1.duplicatesSkipped, 0);
+
+  const events = await loadProductSafetyEvents();
+  const event = events.find((e) => e.officialUrl.includes("VQQQ"));
+  assert.ok(event, "ProductSafetyEvent created and persisted");
+
+  // 1. Time semantics: pubDate separated from observedAt & ingestedAt
+  assert.equal(event!.sourcePublishedAt.slice(0, 10), "2026-10-22");
+  assert.ok(event!.observedAt);
+  assert.ok(event!.ingestedAt);
+
+  // 2. Category candidate: browseNodeId is explicitly null
+  assert.equal(event!.categoryCandidate.browseNodeId, null, "text inference is NEVER an official Amazon Browse Node ID");
+  assert.equal(event!.categoryCandidate.humanConfirmed, false);
+  assert.match(event!.categoryCandidate.normalizedCategoryZh, /取暖/);
+
+  // 3. Explanation: 7 parts present with explicit Amazon unverified notice
+  assert.ok(event!.explanation.officialAnnouncementZh);
+  assert.match(event!.explanation.amazonIdentityVerificationZh, /未与特定 Amazon ASIN 建立身份映射/);
+  assert.ok(event!.explanation.unsupportedConclusionsZh.length >= 3);
+
+  // 4. Boundary verification: CPSC recall NEVER creates commercial demand opportunities
+  const opps = await loadMarketOpportunities();
+  const fakeOpp = opps.find((o) => o.title.includes("VQQQ") || o.id.includes("VQQQ"));
+  assert.equal(fakeOpp, undefined, "CPSC safety recall strictly isolated from commercial demand opportunities");
+
+  // 5. Idempotent re-run skips duplicate
+  const res2 = await fetchAndIngestCpscRecalls({
+    sourceId,
+    xmlOverride: testXml,
+  });
+  assert.equal(res2.newEvents, 0);
+  assert.equal(res2.duplicatesSkipped, 1, "identical guid skipped idempotently");
+});
+
+test("调度器并发互斥锁：MARKET_EXECUTION_LOCK_KEY 阻止多进程/多请求同时执行", async () => {
+  const connection = await sql.reserve();
+  try {
+    // Acquire the execution advisory lock directly
+    const [row] = await connection<{ locked: boolean }[]>`SELECT pg_try_advisory_lock(${MARKET_EXECUTION_LOCK_KEY}::bigint) AS locked`;
+    assert.equal(row?.locked, true, "acquired advisory lock");
+
+    // Call scheduler concurrently
+    const result = await runDueMarketSources({ forceAll: true });
+    assert.equal(result.executed, 0);
+    assert.equal(result.results.length, 1);
+    assert.equal(result.results[0]!.id, "scheduler-exec-guard");
+    assert.equal(result.results[0]!.status, "blocked");
+    assert.match(result.results[0]!.reason!, /互斥保护生效/);
+  } finally {
+    await connection`SELECT pg_advisory_unlock(${MARKET_EXECUTION_LOCK_KEY}::bigint)`.catch(() => {});
+    connection.release();
+  }
+
+  // After release, execution proceeds normally
+  const normalResult = await runDueMarketSources({ dryRun: true });
+  assert.ok(normalResult.results.every((r) => r.id !== "scheduler-exec-guard"));
+});
+
+test("调度器状态探针 (getMarketSchedulerStatus)：正确感知 Worker 运行状态与下期计划", async () => {
+  // When no worker is holding the lock
+  const status1 = await getMarketSchedulerStatus();
+  assert.equal(typeof status1.isRunning, "boolean");
+  assert.equal(typeof status1.sourcesDueCount, "number");
+  assert.equal(typeof status1.activeSourcesCount, "number");
+
+  // Simulate worker holding the advisory lock
+  const conn = await sql.reserve();
+  try {
+    await conn`SELECT pg_try_advisory_lock(${MARKET_WORKER_LOCK_KEY}::bigint)`;
+    const statusRunning = await getMarketSchedulerStatus();
+    assert.equal(statusRunning.isRunning, true, "correctly reports worker is running when advisory lock is held");
+  } finally {
+    await conn`SELECT pg_advisory_unlock(${MARKET_WORKER_LOCK_KEY}::bigint)`.catch(() => {});
+    conn.release();
+  }
+});
+
+test("CPSC 真实只读端点有限连通与字段验收 (bounded real fetch)", async () => {
+  const liveSourceId = "cpsc-real-verify-source";
+  await saveMarketSource({
+    id: liveSourceId,
+    kind: "cpsc-recalls",
+    label: "CPSC 真实连通受控验证源",
+    producer: "U.S. CPSC Official RSS",
+    marketplace: "US",
+    permission: { uses: ["fetch", "store", "compute", "display"], basis: "17 U.S.C. § 105 Public Domain", evidence: "L3" },
+    enabled: true,
+    automation: "authorized-periodic",
+    cadenceHours: 24,
+  });
+
+  const startMs = Date.now();
+  const realRes = await fetchAndIngestCpscRecalls({
+    sourceId: liveSourceId,
+    maxItems: 5,
+  });
+  const elapsedMs = Date.now() - startMs;
+
+  assert.ok(realRes.totalParsed >= 1, "parsed at least 1 real official CPSC recall item");
+  assert.ok(realRes.items.length >= 1);
+  const first = realRes.items[0]!;
+  assert.ok(first.title.length > 5);
+  assert.match(first.link, /^https:\/\/www\.cpsc\.gov/);
+  assert.ok(first.pubDate);
+
+  console.log(JSON.stringify({
+    task: "CPSC_REAL_FETCH_VERIFICATION",
+    sourceId: liveSourceId,
+    url: CPSC_FEED_URL,
+    totalParsed: realRes.totalParsed,
+    newEvents: realRes.newEvents,
+    duplicatesSkipped: realRes.duplicatesSkipped,
+    elapsedMs,
+    sampleTitle: first.title.slice(0, 60),
+    samplePubDate: first.pubDate,
+  }));
 });

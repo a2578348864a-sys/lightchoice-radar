@@ -6,9 +6,9 @@ import { adminHandler } from "./admin-auth.ts";
 import { loadMarketOverview, loadKeywordView, loadProductView, loadOpportunityView, loadAlertsView } from "@aihot/backend/market/market-read";
 import { keywordHistoryDetail, productHistoryDetail, categoryMarketSummary } from "@aihot/backend/market/market-metrics";
 import { applyChartSnapshot, applyKeywordSnapshot, applyCsvImport, parseAmz123KeywordCapture, parseAmazonChartCapture, previewMarketImport, seedMarketSources, type CsvImportInput } from "@aihot/backend/market/market-import";
-import { runDueMarketSources } from "@aihot/backend/market/market-scheduler";
+import { getMarketSchedulerStatus, runDueMarketSources } from "@aihot/backend/market/market-scheduler";
 import { buildOpportunityCandidates, computeScenarios, evaluateAlerts, propagateSourceRevocation, refreshOpportunities, retireUnqualifiedAlerts, reviewOpportunity, type ScenarioInput } from "@aihot/backend/market/market-opportunity";
-import { revokeMarketSource, saveMarketAlertRule, saveMarketSource, saveMarketExternalRecord, loadMarketExternalRecords, saveMarketInnovationCue, loadMarketInnovationCues, type MarketSource, type MarketExternalRecord, type MarketInnovationCue } from "@aihot/backend/market/market-model";
+import { revokeMarketSource, saveMarketAlertRule, saveMarketSource, saveMarketExternalRecord, loadMarketExternalRecords, saveMarketInnovationCue, loadMarketInnovationCues, loadProductSafetyEvents, type MarketSource, type MarketExternalRecord, type MarketInnovationCue } from "@aihot/backend/market/market-model";
 
 export function registerMarket(app: FastifyInstance) {
   const noStore = { "Cache-Control": "no-store" } as const;
@@ -83,12 +83,14 @@ export function registerMarket(app: FastifyInstance) {
     return reply.headers(noStore).send({ ok: true });
   }));
 
-  // Automated scheduler execution — runs all due periodic sources and auto-triggers downstream analysis.
+  // Automated scheduler execution & status — runs all due periodic sources and auto-triggers downstream analysis.
+  app.get("/api/market/scheduler/status", adminHandler(async (_req, reply) => reply.headers(noStore).send(await getMarketSchedulerStatus())));
   app.post("/api/market/scheduler/run-due", adminHandler(async (req, reply) => {
     const body = (req.body ?? {}) as { forceAll?: boolean; dryRun?: boolean };
     const res = await runDueMarketSources({ forceAll: body.forceAll, dryRun: body.dryRun });
     return reply.headers(noStore).send(res);
   }));
+  app.get("/api/market/safety-events", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadProductSafetyEvents())));
   app.get("/api/market/import/preview", adminHandler(async (req, reply) => {
     const q = req.query as Record<string, string | undefined>;
     if (!q.sourceId || (q.kind !== "keywords" && q.kind !== "chart")) return reply.status(400).send({ error: "kind 与 sourceId 必填" });

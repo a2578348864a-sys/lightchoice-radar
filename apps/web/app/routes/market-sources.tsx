@@ -30,6 +30,34 @@ interface SourceItem {
   permissionBasis: string;
 }
 
+interface SafetyEventItem {
+  id: string;
+  sourceId: string;
+  officialUrl: string;
+  recallTitle: string;
+  productName: string;
+  hazardType: string;
+  hazardDescriptionZh: string;
+  categoryCandidate: {
+    rawCategory: string;
+    normalizedCategoryZh: string;
+    mappingBasis: string;
+    confidence: string;
+    browseNodeId: null;
+  };
+  sourcePublishedAt: string;
+  observedAt: string;
+  explanation: {
+    officialAnnouncementZh: string;
+    productScopeZh: string;
+    safetyRiskZh: string;
+    whyResearchWorthyZh: string;
+    developmentCautionZh: string;
+    amazonIdentityVerificationZh: string;
+    unsupportedConclusionsZh: string[];
+  };
+}
+
 interface SourcesOverview {
   sources: SourceItem[];
   counts?: {
@@ -40,16 +68,31 @@ interface SourcesOverview {
     signals: number;
     opportunities: number;
     alerts: number;
+    safetyEvents: number;
   };
   gaps?: string[];
+  scheduler?: {
+    isRunning: boolean;
+    pid?: number;
+    startedAt?: string;
+    lastHeartbeat?: string;
+    sourcesDueCount: number;
+    nextDueAt: string | null;
+    activeSourcesCount: number;
+  };
 }
 
 export async function loader({ request }: { request: Request }) {
-  const data = await marketGet<SourcesOverview>(request, "/api/market/overview").catch(() => null);
+  const [data, safetyEvents] = await Promise.all([
+    marketGet<SourcesOverview>(request, "/api/market/overview").catch(() => null),
+    marketGet<SafetyEventItem[]>(request, "/api/market/safety-events").catch(() => []),
+  ]);
   return {
     sources: data?.sources ?? [],
     counts: data?.counts ?? null,
     gaps: data?.gaps ?? [],
+    scheduler: data?.scheduler ?? null,
+    safetyEvents: Array.isArray(safetyEvents) ? safetyEvents : [],
   };
 }
 
@@ -70,7 +113,7 @@ const autoBadgeMap: Record<string, { label: string; tone: "ok" | "hot" | "amber"
 };
 
 export default function MarketSources() {
-  const { sources, counts, gaps } = useLoaderData<typeof loader>();
+  const { sources, counts, gaps, scheduler, safetyEvents } = useLoaderData<typeof loader>();
   const [running, setRunning] = useState(false);
   const [runReport, setRunReport] = useState<{
     executed: number;
@@ -127,9 +170,22 @@ export default function MarketSources() {
       <section className="mt-3 card p-3.5" aria-label="调度执行与操作">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-[13px] font-semibold text-ink">全自动调度状态</h2>
-            <p className="text-[11.5px] text-ink-4">
-              当前获准自动来源按计划自主执行；支持在需要时即时触发一次检查与增量计算。
+            <div className="flex items-center gap-2">
+              <h2 className="text-[13px] font-semibold text-ink">全自动调度状态</h2>
+              {scheduler?.isRunning ? (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-ok/10 text-ok border border-ok/30">
+                  ● 后台调度器在线 {scheduler.pid ? `(PID ${scheduler.pid})` : ""}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber/10 text-amber border border-amber/30">
+                  ○ 后台调度器未运行
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-[11.5px] text-ink-4">
+              {scheduler?.isRunning
+                ? "后台守护进程（radar-market）正在自主按周期轮询获准来源，无需保持浏览器打开，无需手动点击。"
+                : "当前未检测到后台独立调度进程，任务仅在手动诊断时触发；可在本机运行 start market 启动后台自主守护。"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -217,10 +273,69 @@ export default function MarketSources() {
               <span className="block text-[10.5px] text-ink-4">确定性规则匹配</span>
             </div>
             <div className="rounded bg-paper-2 p-2">
-              <span className="block text-[11px] text-ink-3">机会候选与预警</span>
-              <span className="text-[16px] font-bold text-ink">{counts.opportunities} 个</span>
-              <span className="block text-[10.5px] text-ink-4">{counts.alerts} 条站内预警</span>
+              <span className="block text-[11px] text-ok">CPSC 安全风险事件</span>
+              <span className="text-[16px] font-bold text-ok">{counts.safetyEvents ?? safetyEvents.length} 起</span>
+              <span className="block text-[10.5px] text-ink-4">官方召回反证线索</span>
             </div>
+          </div>
+        </section>
+      )}
+
+      {/* CPSC Product Safety Events List */}
+      {safetyEvents.length > 0 && (
+        <section className="card mt-4 p-3.5" aria-label="产品安全风险事件">
+          <div className="flex flex-wrap items-baseline justify-between gap-1 pb-1">
+            <h2 className="text-[12px] font-semibold uppercase tracking-wide text-ink">
+              CPSC 官方公开产品安全召回通报（模块 09 · 创新与安全反证）
+            </h2>
+            <span className="text-[11px] text-ok font-medium">已入库 {safetyEvents.length} 起官方通报</span>
+          </div>
+          <div className="mt-1 text-[11.5px] text-ink-4 rounded bg-paper-2 p-2.5">
+            <strong>【反证与避坑边界说明】</strong> 此通告由美国 CPSC 官方公开数据流自动获取并清洗。
+            <strong>CPSC 召回的产品不等于特定 Amazon ASIN</strong>；目前未与在售商品建立直接身份映射，仅作为品类缺陷反证、强制标准参考与防呆结构优化线索，
+            <span className="text-hot font-medium">严禁推断为需求暴利商机</span>。
+          </div>
+
+          <div className="mt-3 space-y-2.5">
+            {safetyEvents.slice(0, 10).map((evt) => (
+              <div key={evt.id} className="rounded border border-border p-3 text-[12px] bg-paper">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 rounded text-[10.5px] font-medium bg-hot/10 text-hot border border-hot/20">
+                      {evt.hazardType}
+                    </span>
+                    <a
+                      href={evt.officialUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-semibold text-ink hover:underline"
+                    >
+                      {evt.recallTitle}
+                    </a>
+                  </div>
+                  <span className="text-[11px] font-mono text-ink-4">
+                    官方通报: {evt.sourcePublishedAt.slice(0, 10)}
+                  </span>
+                </div>
+
+                <div className="mt-2 grid grid-cols-1 gap-1 text-[11.5px] text-ink-3 sm:grid-cols-2">
+                  <div>
+                    <span className="text-ink-4">涉及品类推断：</span>
+                    <span className="text-ink font-medium">{evt.categoryCandidate.normalizedCategoryZh}</span>
+                    <span className="text-[10px] text-ink-4">（非官方 Browse Node ID）</span>
+                  </div>
+                  <div>
+                    <span className="text-ink-4">安全缺陷分析：</span>
+                    <span className="text-ink-2">{evt.hazardDescriptionZh}</span>
+                  </div>
+                </div>
+
+                <div className="mt-2 text-[11px] text-ink-3 rounded bg-paper-2 p-2 leading-relaxed space-y-1">
+                  <p><strong>避坑与研发提醒：</strong>{evt.explanation.developmentCautionZh}</p>
+                  <p className="text-ink-4"><strong>身份核实：</strong>{evt.explanation.amazonIdentityVerificationZh}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </section>
       )}

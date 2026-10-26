@@ -44,7 +44,7 @@ import {
 
 const RUN_DIR = path.join(REPO_ROOT, ".data", "_diag");
 /** Must match the keys in apps/worker/src/instance-lock.ts. */
-const LOCK_KEYS: Record<string, number> = { "ads-policy": 7_204_229_002, "radar-announcements": 7_204_229_001, "amz123-leads": 7_204_229_003, "radar-translate": TRANSLATE_LOCK_KEY, "radar-industry": INDUSTRY_LOCK_KEY };
+const LOCK_KEYS: Record<string, number> = { "ads-policy": 7_204_229_002, "radar-announcements": 7_204_229_001, "amz123-leads": 7_204_229_003, "radar-translate": TRANSLATE_LOCK_KEY, "radar-industry": INDUSTRY_LOCK_KEY, "radar-market": 7_204_229_008 };
 const WEB_PORT = 3000;
 const API_PORT = 3001;
 const RADAR_SOURCES = ["amazon-us-announcements", "amazon-us-fee-updates", "ads-policy-pages", "rss-cpsc-recalls", "us-federal-register-cpsc", "us-federal-register-ftc", "amz123-policy-leads"];
@@ -58,6 +58,7 @@ const TARGETS: Record<string, { worker: WorkerRole; supervisor?: WorkerRole }> =
   // The scoped content/translation worker: its own role, its own lock, its own stop request file.
   translate: { worker: "radar-translate" },
   industry: { worker: "radar-industry" },
+  market: { worker: "radar-market" },
 };
 
 const truthy = (value: string | undefined) => /^(1|true|yes|on)$/i.test(String(value ?? "").trim());
@@ -349,6 +350,21 @@ async function start(target: string | undefined, ports: { web: number; api: numb
     return 0;
   }
 
+  if (target === "market") {
+    if (await lockHeld(LOCK_KEYS["radar-market"]!) || heartbeatAlive("radar-market")) {
+      console.log("市场信号调度 Worker 已在运行，不重复启动。");
+      return 1;
+    }
+    const pid = startDetached({
+      entry: path.join(REPO_ROOT, "apps/worker/src/radar-market.ts"),
+      nodeArgs: ["--env-file-if-exists=.env"],
+      logName: "worker-market.log",
+      env: { ...process.env, RADAR_MARKET_SCHEDULER_ENABLED: process.env.RADAR_MARKET_SCHEDULER_ENABLED ?? "true" },
+    });
+    console.log(`市场信号调度 Worker pid=${pid ?? "?"} 日志 .data/_diag/worker-market.log`);
+    return 0;
+  }
+
   if (target === "industry") {
     if (await lockHeld(LOCK_KEYS["radar-industry"]!) || heartbeatAlive("radar-industry")) {
       console.log("行业 Worker 已在运行，不重复启动。");
@@ -422,7 +438,7 @@ async function start(target: string | undefined, ports: { web: number; api: numb
     console.log(`Ads 监督进程 pid=${pid ?? "?"} 日志 .data/_diag/ads-policy-daemon.log`);
     return 0;
   }
-  console.log("用法：start api | start web | start announcements | start leads | start ads");
+  console.log("用法：start api | start web | start announcements | start leads | start ads | start industry | start market");
   return 1;
 }
 

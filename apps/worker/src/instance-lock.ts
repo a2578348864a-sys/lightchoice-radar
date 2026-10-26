@@ -19,6 +19,8 @@ const LOCK_KEYS = {
   "radar-translate": 7_204_229_004,
   // The second lane's industry worker: one process, its own queues, never the first lane's.
   "radar-industry": 7_204_229_005,
+  // The fourth lane's market signals scheduler worker: dedicated advisory lock.
+  "radar-market": 7_204_229_008,
 } as const;
 
 export type WorkerRole = keyof typeof LOCK_KEYS;
