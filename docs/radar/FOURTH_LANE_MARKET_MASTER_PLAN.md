@@ -5,7 +5,8 @@
 > - **AUTO-FIRST**：彻底淘汰手工 CSV/Excel 导入方案，确立全自动监控与合规守护产品范式，固化 12 模块原始契约与定义；
 > - **AUTO-RUN**：完成后台专用调度 Worker（`radar-market`）开发，通过 PostgreSQL 顾问锁（`7204229008`）单实例排他、会话级执行互斥锁（`7204229009`）与多日停机单窗口防风暴保护；接通美国官方 CPSC 消费品安全通告流（`cpsc-product-recalls`），产出 7 段式确定性中文解释；
 > - **AUTO-ACTIVATE**：将 `radar-market` 深度整合入本机受管运维体系（`start-radar.cmd` 六步启动、`stop-radar.cmd` 七步停机、`status-radar.cmd` 锁状态探针）；单 Run ID 全链追溯实证；Amazon 核心数据源全景梳理；
-> - **AUTO-TRUTH**：严谨验真与事实纠偏收口。① 严格拆分 CPSC `SYNTHETIC_E2E`（PASS）与 `LIVE_SOURCE_E2E`（BLOCKED_BY_NETWORK），执行零合成回退策略，拒绝虚假 PASS；② 消除前端看板“虚假在线”，明确区分 Worker 进程在线与 Amazon 核心商业源受控阻断；③ Amazon 核心数据源按 7 层状态深度纠偏（推翻“全球无 API”误论，明确 SP-API 账号门禁与 PA-API 导流条款门禁，详见 [AMAZON_DATA_SOURCES_BREAKTHROUGH.md](AMAZON_DATA_SOURCES_BREAKTHROUGH.md)）；④ 全套测试与浏览器验收 100% 诚实通过。
+> - **AUTO-TRUTH**：严谨验真与事实纠偏收口。严格拆分 CPSC 双模式、消除虚假在线、全栈诚信验收；
+> - **MARKET-DATA-FIRST**：核心数据准入深度核查与最小业务决策。落实“先数据、后开发、真实验证、停止空功能建设”原则，完成五大核心维度 10 大候选来源 2026 最新官方条文和实测核验，查明 SP-API 专业卖家资质门禁（$39.99/月 + 品牌备案）、PA-API 5.0 24小时缓存与禁止商业情报库协议限制、Keepa 无免费套餐（€49/月起）等关键事实；全面停止无数据支撑的空功能建设，系统保持诚实空态，向用户提供 3 个具体现实选择。
 > - **云端部署**：`R7_CLOUD_DEPLOYMENT = DEFERRED_BY_USER`，`R8_LOCAL_NATURAL_OPERATION = NOT_STARTED`。
 > **执行边界**：前三主线业务零受扰；DeepSeek 模型调用 0 次（¥0）；外部商业数据采购 ¥0；Git 遵守本地精准提交（严禁 git push，严禁 git add .）。
 
