@@ -3,6 +3,7 @@ import { useState } from "react";
 import { marketGet } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { WorkspaceAuthGate } from "../components/shell/WorkspaceAuthGate";
 import { Badge } from "../components/ui/Badge";
 import type { Screen } from "../components/shell/screens";
 
@@ -36,8 +37,8 @@ interface ProductsResponse {
 }
 
 export async function loader({ request }: { request: Request }) {
-  const data = await marketGet<ProductsResponse>(request, "/api/market/products").catch(() => null);
-  return { data };
+  const result = await marketGet<ProductsResponse>(request, "/api/market/products");
+  return { result };
 }
 
 export function meta() {
@@ -75,7 +76,8 @@ interface ProductHistoryData {
 }
 
 export default function MarketProducts() {
-  const { data } = useLoaderData<typeof loader>();
+  const { result } = useLoaderData<typeof loader>();
+  const data = result.data;
 
   // ASIN drilldown state
   const [selectedAsin, setSelectedAsin] = useState<string | null>(null);
@@ -104,6 +106,11 @@ export default function MarketProducts() {
   return (
     <div className="pb-10">
       <PhoneBar back={{ to: "/market", label: "市场信号" }} title="商品与竞争" />
+      <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
+        <Link to="/market" className="hover:text-ink transition-colors">第四主线 · 市场信号</Link>
+        <span>/</span>
+        <span className="text-ink-2 font-medium">商品与竞争研究</span>
+      </nav>
       <header className="pb-2 pt-3 lg:pt-1">
         <h1 className="text-[22px] font-semibold leading-[1.3] text-ink">商品与竞争研究（模块 02/03/04/05/06）</h1>
         <p className="mt-1 text-[12.5px] text-ink-3">
@@ -111,17 +118,18 @@ export default function MarketProducts() {
         </p>
       </header>
 
-      {!data ? (
-        <div className="mt-4 rounded bg-paper-2 p-4 text-[12.5px] text-ink-2">
-          <p className="font-semibold">服务不可用或需要管理员会话。</p>
-          <p className="mt-1 text-[11.5px] text-ink-3">
-            商品观测依赖获准的官方商品与榜单数据流。当前 Amazon 官方反爬与 SP-API 凭据保持安全阻断守护；可在自动来源页查看状态。
-          </p>
-          <Link to="/market/sources" className="pill mt-2 inline-block bg-paper text-[12px]">
-            查看自动来源监控 →
-          </Link>
-        </div>
-      ) : (
+      <WorkspaceAuthGate error={result.error} laneName="商品与竞争研究" returnTo="/market/products">
+        {!data ? (
+          <div className="mt-4 rounded bg-paper-2 p-4 text-[12.5px] text-ink-2">
+            <p className="font-semibold">当前暂无商品观测数据。</p>
+            <p className="mt-1 text-[11.5px] text-ink-3">
+              商品观测依赖获准的官方商品与榜单数据流。当前 Amazon 官方反爬与 SP-API 凭据保持安全阻断守护；可在自动来源页查看状态。
+            </p>
+            <Link to="/market/sources" className="pill mt-2 inline-block bg-paper text-[12px]">
+              查看自动来源监控 →
+            </Link>
+          </div>
+        ) : (
         <>
           {/* Chart Snapshots Overview */}
           {data.chartMeta.length > 0 && (
@@ -250,6 +258,7 @@ export default function MarketProducts() {
           </nav>
         </>
       )}
+      </WorkspaceAuthGate>
 
       {/* ASIN History Modal */}
       {selectedAsin && (

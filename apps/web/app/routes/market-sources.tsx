@@ -4,6 +4,7 @@ import { marketPost } from "../lib/market-client";
 import { marketGet } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { WorkspaceAuthGate } from "../components/shell/WorkspaceAuthGate";
 import { Badge } from "../components/ui/Badge";
 import type { Screen } from "../components/shell/screens";
 
@@ -83,11 +84,14 @@ interface SourcesOverview {
 }
 
 export async function loader({ request }: { request: Request }) {
-  const [data, safetyEvents] = await Promise.all([
-    marketGet<SourcesOverview>(request, "/api/market/overview").catch(() => null),
-    marketGet<SafetyEventItem[]>(request, "/api/market/safety-events").catch(() => []),
+  const [dataResult, safetyEventsResult] = await Promise.all([
+    marketGet<SourcesOverview>(request, "/api/market/overview"),
+    marketGet<SafetyEventItem[]>(request, "/api/market/safety-events"),
   ]);
+  const data = dataResult.data;
+  const safetyEvents = safetyEventsResult.data ?? [];
   return {
+    error: dataResult.error,
     sources: data?.sources ?? [],
     counts: data?.counts ?? null,
     gaps: data?.gaps ?? [],
@@ -113,7 +117,7 @@ const autoBadgeMap: Record<string, { label: string; tone: "ok" | "hot" | "amber"
 };
 
 export default function MarketSources() {
-  const { sources, counts, gaps, scheduler, safetyEvents } = useLoaderData<typeof loader>();
+  const { error, sources, counts, gaps, scheduler, safetyEvents } = useLoaderData<typeof loader>();
   const [running, setRunning] = useState(false);
   const [runReport, setRunReport] = useState<{
     executed: number;
@@ -157,7 +161,11 @@ export default function MarketSources() {
   return (
     <div className="pb-10">
       <PhoneBar back={{ to: "/market", label: "市场信号" }} title="自动来源监控" />
-
+      <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
+        <Link to="/market" className="hover:text-ink transition-colors">第四主线 · 市场信号</Link>
+        <span>/</span>
+        <span className="text-ink-2 font-medium">自动来源管理与监控</span>
+      </nav>
       <header className="pb-2 pt-3 lg:pt-1">
         <h1 className="text-[22px] font-semibold leading-[1.3] text-ink">自动来源管理与调度看板</h1>
         <p className="mt-1 text-[12.5px] leading-relaxed text-ink-3">
@@ -165,6 +173,8 @@ export default function MarketSources() {
           用户只需在看板查阅情报与决策，<strong className="text-accent">无需手工下载、整理或上传任何表格文件</strong>。
         </p>
       </header>
+
+      <WorkspaceAuthGate error={error} laneName="自动来源监控" returnTo="/market/sources">
 
       {/* Top Action Bar & Health Overview */}
       <section className="mt-3 card p-3.5" aria-label="调度执行与操作">
@@ -188,13 +198,21 @@ export default function MarketSources() {
                 : "当前未检测到后台独立调度进程，任务仅在手动诊断时触发；可在本机运行 start-radar.cmd 或 radar-ops.ts start market 启动后台自主守护。"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => handleTriggerRun(true)}
+              onClick={() => handleTriggerRun(false)}
               disabled={running}
               className="btn btn-primary text-[12px] py-1.5 px-3 flex items-center gap-1.5"
             >
-              {running ? "正在执行自动抓取与分析..." : "⚡ 立即触发到期自动采集与分析"}
+              {running ? "正在执行到期采集与分析..." : "⚡ 立即触发到期自动采集与分析"}
+            </button>
+            <button
+              onClick={() => handleTriggerRun(true)}
+              disabled={running}
+              className="btn text-[12px] py-1.5 px-3 border border-line text-ink-3 hover:text-ink hover:bg-bg-sunk"
+              title="仅在调试或强制全量刷新时使用，跳过到期周期判断"
+            >
+              强制重算全部来源（诊断用）
             </button>
           </div>
         </div>
@@ -435,6 +453,7 @@ export default function MarketSources() {
           <li><strong>电脑开机即恢复</strong>：电脑关机时任务休眠；再次开机启动时系统自动感知到期任务并补跑单次窗口，绝不发起积压请求风暴。</li>
         </ul>
       </section>
+      </WorkspaceAuthGate>
     </div>
   );
 }

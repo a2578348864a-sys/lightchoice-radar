@@ -96,30 +96,40 @@ export function pageHeaders({ loaderHeaders }: HeadersArgs) {
   return loaderHeaders;
 }
 
-/** VOC loaders read /api/voc/* with the visitor's own cookie; a private workspace answers its
-    honest fallback to anonymous visitors (no redirect to a login they may not have). */
-export async function marketGet<T>(request: Request, path: string): Promise<T | null> {
+export interface ApiWorkspaceResult<T> {
+  data: T | null;
+  error?: "UNAUTHORIZED" | "SERVICE_UNAVAILABLE" | "NOT_FOUND";
+  status: number;
+}
+
+/** VOC and Market loaders read private endpoints with the visitor's own session cookie;
+    answers transparent status (UNAUTHORIZED / SERVICE_UNAVAILABLE / OK data). */
+export async function marketGet<T>(request: Request, path: string): Promise<ApiWorkspaceResult<T>> {
   try {
     const res = await fetch(`${API_BASE_URL}${path}`, {
       headers: { accept: "application/json", cookie: request.headers.get("cookie") ?? "", "user-agent": request.headers.get("user-agent") ?? "" },
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(15_000)]),
     });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
+    if (res.status === 401) return { data: null, error: "UNAUTHORIZED", status: 401 };
+    if (res.status === 404) return { data: null, error: "NOT_FOUND", status: 404 };
+    if (!res.ok) return { data: null, error: "SERVICE_UNAVAILABLE", status: res.status };
+    return { data: (await res.json()) as T, status: res.status };
   } catch {
-    return null;
+    return { data: null, error: "SERVICE_UNAVAILABLE", status: 503 };
   }
 }
 
-export async function vocGet<T>(request: Request, path: string): Promise<T | null> {
+export async function vocGet<T>(request: Request, path: string): Promise<ApiWorkspaceResult<T>> {
   try {
     const res = await fetch(`${API_BASE_URL}${path}`, {
       headers: { accept: "application/json", cookie: request.headers.get("cookie") ?? "", "user-agent": request.headers.get("user-agent") ?? "" },
       signal: AbortSignal.any([request.signal, AbortSignal.timeout(15_000)]),
     });
-    if (!res.ok) return null;
-    return (await res.json()) as T;
+    if (res.status === 401) return { data: null, error: "UNAUTHORIZED", status: 401 };
+    if (res.status === 404) return { data: null, error: "NOT_FOUND", status: 404 };
+    if (!res.ok) return { data: null, error: "SERVICE_UNAVAILABLE", status: res.status };
+    return { data: (await res.json()) as T, status: res.status };
   } catch {
-    return null;
+    return { data: null, error: "SERVICE_UNAVAILABLE", status: 503 };
   }
 }

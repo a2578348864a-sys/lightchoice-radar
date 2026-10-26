@@ -8,7 +8,7 @@ import { EmptyState } from "../components/ui/Page";
 import type { Screen } from "../components/shell/screens";
 import { PhoneBar } from "../components/shell/PhoneBar";
 
-export const handle: Screen = { name: "行业动态" };
+export const handle: Screen = { tab: "industry", name: "行业动态" };
 
 const KIND_LABEL: Record<string, string> = {
   "official-data": "官方数据",

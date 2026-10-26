@@ -4,6 +4,7 @@ import { marketGet } from "../lib/api.server";
 import { marketPost } from "../lib/market-client";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { WorkspaceAuthGate } from "../components/shell/WorkspaceAuthGate";
 import { Badge } from "../components/ui/Badge";
 import type { Screen } from "../components/shell/screens";
 
@@ -27,8 +28,8 @@ interface AlertsResponse {
 }
 
 export async function loader({ request }: { request: Request }) {
-  const data = await marketGet<AlertsResponse>(request, "/api/market/alerts").catch(() => null);
-  return { data };
+  const result = await marketGet<AlertsResponse>(request, "/api/market/alerts");
+  return { result };
 }
 
 export function meta() {
@@ -49,7 +50,8 @@ const kindZh: Record<string, string> = {
 };
 
 export default function MarketAlerts() {
-  const { data } = useLoaderData<typeof loader>();
+  const { result } = useLoaderData<typeof loader>();
+  const data = result.data;
   const [alertsList, setAlertsList] = useState<AlertItem[]>(data?.alerts ?? []);
   const [evaluating, setEvaluating] = useState(false);
   const [evalResult, setEvalResult] = useState<string | null>(null);
@@ -76,12 +78,19 @@ export default function MarketAlerts() {
   return (
     <div className="pb-10">
       <PhoneBar back={{ to: "/market", label: "市场信号" }} title="市场预警" />
+      <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
+        <Link to="/market" className="hover:text-ink transition-colors">第四主线 · 市场信号</Link>
+        <span>/</span>
+        <span className="text-ink-2 font-medium">市场预警工作台</span>
+      </nav>
       <header className="pb-2 pt-3 lg:pt-1">
         <h1 className="text-[22px] font-semibold leading-[1.3] text-ink">预警工作台（模块 12）</h1>
         <p className="mt-1 text-[12.5px] text-ink-3">
           仅限站内预警：按规则评估信号，带去重与冷却；证据修订后关联预警自动失效。<strong>不发送任何外部推送</strong>（飞书/邮件默认关闭）。
         </p>
       </header>
+
+      <WorkspaceAuthGate error={result.error} laneName="市场预警工作台" returnTo="/market/alerts">
 
       {!data ? (
         <p className="mt-4 rounded bg-paper-2 px-3 py-2 text-[12.5px] text-ink-2">服务不可用或需要管理员会话。</p>
@@ -166,6 +175,7 @@ export default function MarketAlerts() {
           </nav>
         </>
       )}
+      </WorkspaceAuthGate>
     </div>
   );
 }

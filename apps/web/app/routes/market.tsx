@@ -2,10 +2,11 @@ import { Link, useLoaderData } from "react-router";
 import { marketGet } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { WorkspaceAuthGate } from "../components/shell/WorkspaceAuthGate";
 import { Badge } from "../components/ui/Badge";
 import type { Screen } from "../components/shell/screens";
 
-export const handle: Screen = { name: "市场信号" };
+export const handle: Screen = { tab: "market", name: "市场信号" };
 
 interface Overview {
   modules: Array<{
@@ -62,11 +63,11 @@ interface CategoriesResponse {
 }
 
 export async function loader({ request }: { request: Request }) {
-  const [overview, categoriesData] = await Promise.all([
-    marketGet<Overview>(request, "/api/market/overview").catch(() => null),
-    marketGet<CategoriesResponse>(request, "/api/market/categories").catch(() => null),
+  const [overviewResult, categoriesResult] = await Promise.all([
+    marketGet<Overview>(request, "/api/market/overview"),
+    marketGet<CategoriesResponse>(request, "/api/market/categories"),
   ]);
-  return { overview, categoriesData };
+  return { overviewResult, categoriesResult };
 }
 
 export function meta() {
@@ -85,7 +86,9 @@ const engBadge: Record<string, string> = {
 };
 
 export default function MarketIndex() {
-  const { overview, categoriesData } = useLoaderData<typeof loader>();
+  const { overviewResult, categoriesResult } = useLoaderData<typeof loader>();
+  const overview = overviewResult.data;
+  const categoriesData = categoriesResult.data;
 
   return (
     <div className="pb-10">
@@ -106,17 +109,18 @@ export default function MarketIndex() {
         <Link to="/market/sources" className="pill font-medium text-accent">自动来源监控 ↗</Link>
       </nav>
 
-      {!overview ? (
-        <div className="mt-4 rounded bg-paper-2 p-4 text-[12.5px] text-ink-2">
-          <p className="font-semibold">市场信号服务不可用或未初始化。</p>
-          <p className="mt-1 text-[11.5px] text-ink-3">
-            此页面为私有研究区，需要管理员会话；可在自动来源页查看后台自动调度与准入状态。
-          </p>
-          <Link to="/market/sources" className="pill mt-2 inline-block bg-paper text-[12px]">
-            查看自动来源监控 →
-          </Link>
-        </div>
-      ) : (
+      <WorkspaceAuthGate error={overviewResult.error} laneName="市场信号工作台" returnTo="/market">
+        {!overview ? (
+          <div className="mt-4 rounded bg-paper-2 p-4 text-[12.5px] text-ink-2">
+            <p className="font-semibold">当前暂无市场信号数据。</p>
+            <p className="mt-1 text-[11.5px] text-ink-3">
+              后台自动调度正在运行中；可在自动来源页查看调度执行与准入状态。
+            </p>
+            <Link to="/market/sources" className="pill mt-2 inline-block bg-paper text-[12px]">
+              查看自动来源监控 →
+            </Link>
+          </div>
+        ) : (
         <>
           {/* Data Counters */}
           <section className="mt-4" aria-label="数据概览">
@@ -240,6 +244,7 @@ export default function MarketIndex() {
           </section>
         </>
       )}
+      </WorkspaceAuthGate>
     </div>
   );
 }

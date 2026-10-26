@@ -2,6 +2,7 @@ import { Link, useLoaderData, useSearchParams } from "react-router";
 import { vocGet } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { WorkspaceAuthGate } from "../components/shell/WorkspaceAuthGate";
 import { Badge } from "../components/ui/Badge";
 import { EmptyState } from "../components/ui/Page";
 import { fullDateTime } from "../lib/format";
@@ -23,8 +24,8 @@ export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
   const params = new URLSearchParams();
   for (const key of ["study", "category", "polarity", "q"]) if (url.searchParams.get(key)) params.set(key, url.searchParams.get(key)!);
-  const data = await vocGet<EvidenceResponse>(request, `/api/voc/evidence?${params}`).catch(() => null);
-  return { data };
+  const result = await vocGet<EvidenceResponse>(request, `/api/voc/evidence?${params}`);
+  return { result };
 }
 
 export function meta() {
@@ -43,15 +44,23 @@ const RESOLUTION_LABEL: Record<string, string> = {
 };
 
 export default function VocEvidence() {
-  const { data } = useLoaderData<typeof loader>();
+  const { result } = useLoaderData<typeof loader>();
+  const data = result.data;
   const [params] = useSearchParams();
   return (
     <div className="pb-10">
       <PhoneBar back={{ to: "/voc", label: "消费者原声" }} title="反馈证据库" />
+      <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
+        <Link to="/voc" className="hover:text-ink transition-colors">第三主线 · 消费者原声</Link>
+        <span>/</span>
+        <span className="text-ink-2 font-medium">反馈证据库</span>
+      </nav>
       <header className="pb-2 pt-3 lg:pt-1">
         <h1 className="text-[24px] font-semibold leading-[1.3] text-ink">反馈证据库</h1>
         <p className="mt-1.5 text-[13px] text-ink-3">原始材料与讨论上下文。每条带许可用途、独立性与审核状态；撤销材料不显示。</p>
       </header>
+
+      <WorkspaceAuthGate error={result.error} laneName="消费者原声证据库" returnTo="/voc/evidence">
 
       <form method="get" action="/voc/evidence" className="mt-3 flex flex-wrap items-center gap-2 text-[12px]" aria-label="证据筛选">
         <select name="study" defaultValue={params.get("study") ?? ""} aria-label="研究任务" className="rounded border border-line bg-paper px-2 py-1 text-[12px]">
@@ -113,7 +122,8 @@ export default function VocEvidence() {
             </li>
           ))}
         </ul>
-      )}
+        )}
+      </WorkspaceAuthGate>
       <p className="mt-6 text-[11px] text-ink-2">
         记录数不等于独立消费者人数；同一讨论串作为一个整体材料保留。授权导入入口与管理操作通过 API 受管理员会话保护。
         <Link to="/voc" className="ml-1 underline-offset-2 hover:underline">返回总览</Link>

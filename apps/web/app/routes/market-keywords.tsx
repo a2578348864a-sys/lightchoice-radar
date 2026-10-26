@@ -3,6 +3,7 @@ import { useState } from "react";
 import { marketGet } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { WorkspaceAuthGate } from "../components/shell/WorkspaceAuthGate";
 import { Badge } from "../components/ui/Badge";
 import type { Screen } from "../components/shell/screens";
 
@@ -44,8 +45,8 @@ export async function loader({ request }: { request: Request }) {
   if (url.searchParams.get("direction")) qs.set("direction", url.searchParams.get("direction")!);
   if (url.searchParams.get("q")) qs.set("q", url.searchParams.get("q")!);
   if (url.searchParams.get("periodStart")) qs.set("periodStart", url.searchParams.get("periodStart")!);
-  const data = await marketGet<KeywordsResponse>(request, `/api/market/keywords${qs.size ? `?${qs}` : ""}`).catch(() => null);
-  return { data };
+  const result = await marketGet<KeywordsResponse>(request, `/api/market/keywords${qs.size ? `?${qs}` : ""}`);
+  return { result };
 }
 
 export function meta() {
@@ -87,7 +88,8 @@ interface KeywordHistoryData {
 }
 
 export default function MarketKeywords() {
-  const { data } = useLoaderData<typeof loader>();
+  const { result } = useLoaderData<typeof loader>();
+  const data = result.data;
   const [params] = useSearchParams();
 
   // Keyword detail drilldown state
@@ -117,12 +119,19 @@ export default function MarketKeywords() {
   return (
     <div className="pb-10">
       <PhoneBar back={{ to: "/market", label: "市场信号" }} title="搜索需求" />
+      <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
+        <Link to="/market" className="hover:text-ink transition-colors">第四主线 · 市场信号</Link>
+        <span>/</span>
+        <span className="text-ink-2 font-medium">搜索需求分析</span>
+      </nav>
       <header className="pb-2 pt-3 lg:pt-1">
         <h1 className="text-[22px] font-semibold leading-[1.3] text-ink">搜索需求分析（模块 01/07/10）</h1>
         <p className="mt-1 text-[12.5px] text-ink-3">
           支持多期关键词快照对比与名次位移追踪。排名前进<strong>不等于</strong>搜索量增长百分比（C1 原则）。
         </p>
       </header>
+
+      <WorkspaceAuthGate error={result.error} laneName="搜索需求分析" returnTo="/market/keywords">
 
       {/* Filter bar */}
       <Form method="get" className="mt-2.5 flex flex-wrap items-center gap-2 text-[12.5px]">
@@ -238,6 +247,7 @@ export default function MarketKeywords() {
           </nav>
         </>
       )}
+      </WorkspaceAuthGate>
 
       {/* Multi-period Keyword History Modal / Drawer */}
       {selectedKw && (

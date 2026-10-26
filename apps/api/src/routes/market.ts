@@ -5,7 +5,7 @@ import type { FastifyInstance } from "fastify";
 import { adminHandler } from "./admin-auth.ts";
 import { loadMarketOverview, loadKeywordView, loadProductView, loadOpportunityView, loadAlertsView } from "@aihot/backend/market/market-read";
 import { keywordHistoryDetail, productHistoryDetail, categoryMarketSummary } from "@aihot/backend/market/market-metrics";
-import { applyChartSnapshot, applyKeywordSnapshot, applyCsvImport, parseAmz123KeywordCapture, parseAmazonChartCapture, previewMarketImport, seedMarketSources, type CsvImportInput } from "@aihot/backend/market/market-import";
+import { seedMarketSources } from "@aihot/backend/market/market-import";
 import { getMarketSchedulerStatus, runDueMarketSources } from "@aihot/backend/market/market-scheduler";
 import { buildOpportunityCandidates, computeScenarios, evaluateAlerts, propagateSourceRevocation, refreshOpportunities, retireUnqualifiedAlerts, reviewOpportunity, type ScenarioInput } from "@aihot/backend/market/market-opportunity";
 import { revokeMarketSource, saveMarketAlertRule, saveMarketSource, saveMarketExternalRecord, loadMarketExternalRecords, saveMarketInnovationCue, loadMarketInnovationCues, loadProductSafetyEvents, type MarketSource, type MarketExternalRecord, type MarketInnovationCue } from "@aihot/backend/market/market-model";
@@ -91,37 +91,6 @@ export function registerMarket(app: FastifyInstance) {
     return reply.headers(noStore).send(res);
   }));
   app.get("/api/market/safety-events", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadProductSafetyEvents())));
-  app.get("/api/market/import/preview", adminHandler(async (req, reply) => {
-    const q = req.query as Record<string, string | undefined>;
-    if (!q.sourceId || (q.kind !== "keywords" && q.kind !== "chart")) return reply.status(400).send({ error: "kind 与 sourceId 必填" });
-    return reply.headers(noStore).send(await previewMarketImport({ kind: q.kind, sourceId: q.sourceId }));
-  }));
-
-  // Keyword snapshot import — accepts the R0-DATA capture shape; permission-gated inside.
-  app.post("/api/market/import/keywords", adminHandler(async (req, reply) => {
-    const body = req.body as Parameters<typeof parseAmz123KeywordCapture>[0] & { producer?: string };
-    if (!body?.sourceId || !Array.isArray(body.rows) || !body.periodStart) return reply.status(400).send({ error: "sourceId/periodStart/rows[] 必填" });
-    const snap = parseAmz123KeywordCapture(body, body.producer ?? "Amazon ABA（AMZ123 二手展示）");
-    return reply.headers(noStore).send(await applyKeywordSnapshot(snap));
-  }));
-
-  // Chart snapshot import — accepts the R0-DATA manual-observation shape.
-  app.post("/api/market/import/chart", adminHandler(async (req, reply) => {
-    const body = req.body as Parameters<typeof parseAmazonChartCapture>[0];
-    if (!body?.sourceId || !body?.chartId || !Array.isArray(body.rows) || !body.observedAt) return reply.status(400).send({ error: "sourceId/chartId/observedAt/rows[] 必填" });
-    const snap = parseAmazonChartCapture(body);
-    return reply.headers(noStore).send(await applyChartSnapshot(snap));
-  }));
-
-  // Generic CSV file import workbench endpoint.
-  app.post("/api/market/import/csv", adminHandler(async (req, reply) => {
-    const body = req.body as CsvImportInput;
-    if (!body?.kind || !body?.csvText || !body?.sourceId || !body?.mapping) {
-      return reply.status(400).send({ error: "kind, csvText, sourceId 和 mapping 映射必填" });
-    }
-    const res = await applyCsvImport(body);
-    return reply.headers(noStore).send(res);
-  }));
 
   // Area 7 — External platforms (module 08) & Innovations (module 09) private manual records.
   app.get("/api/market/externals", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadMarketExternalRecords())));

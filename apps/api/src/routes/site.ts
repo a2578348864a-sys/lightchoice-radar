@@ -119,11 +119,12 @@ export function registerSite(app: FastifyInstance) {
     const discoveredToday = q.discoveredToday === "1";
     const dateBasis = radarDateBasis(q.dateBasis);
     const sourceId = radarSourceId(q.source);
-    return sendJsonWithEtag(req, reply, await loadPool({ ...filters, q: search, tab, page, discoveredToday, discoveredFrom: from, discoveredTo: to, dateBasis, sourceId }), { etagPrefix: "pool", cacheControl: "public, max-age=60, s-maxage=60" });
+    return sendJsonWithEtag(req, reply, await loadPool({ ...filters, q: search, tab, page, discoveredToday, discoveredFrom: from, discoveredTo: to, dateBasis, sourceId, lane: q.lane }), { etagPrefix: "pool", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   app.get("/api/site/pool/sources", siteHandler(async (req, reply) => {
-    return sendJsonWithEtag(req, reply, await loadPoolSources(), { etagPrefix: "pool-sources", cacheControl: "public, max-age=60, s-maxage=60" });
+    const q = looseQuery(req);
+    return sendJsonWithEtag(req, reply, await loadPoolSources(new Date(), q.lane), { etagPrefix: "pool-sources", cacheControl: "public, max-age=60, s-maxage=60" });
   }));
 
   app.get("/api/site/radar/export", siteHandler(async (req, reply) => {

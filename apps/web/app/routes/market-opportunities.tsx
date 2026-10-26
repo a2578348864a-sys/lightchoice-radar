@@ -1,9 +1,10 @@
-import { useLoaderData } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import { useState } from "react";
 import { marketGet } from "../lib/api.server";
 import { marketPost } from "../lib/market-client";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { WorkspaceAuthGate } from "../components/shell/WorkspaceAuthGate";
 import { Badge } from "../components/ui/Badge";
 import type { Screen } from "../components/shell/screens";
 
@@ -29,8 +30,8 @@ interface OpportunitiesResponse {
 }
 
 export async function loader({ request }: { request: Request }) {
-  const data = await marketGet<OpportunitiesResponse>(request, "/api/market/opportunities").catch(() => null);
-  return { data };
+  const result = await marketGet<OpportunitiesResponse>(request, "/api/market/opportunities");
+  return { result };
 }
 
 export function meta() {
@@ -52,7 +53,8 @@ const reviewActions = [
 ] as const;
 
 export default function MarketOpportunities() {
-  const { data } = useLoaderData<typeof loader>();
+  const { result } = useLoaderData<typeof loader>();
+  const data = result.data;
   const [filterTab, setFilterTab] = useState<string>("all");
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildResult, setBuildResult] = useState<string | null>(null);
@@ -90,12 +92,19 @@ export default function MarketOpportunities() {
   return (
     <div className="pb-10">
       <PhoneBar back={{ to: "/market", label: "市场信号" }} title="机会研究" />
+      <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
+        <Link to="/market" className="hover:text-ink transition-colors">第四主线 · 市场信号</Link>
+        <span>/</span>
+        <span className="text-ink-2 font-medium">市场机会研究</span>
+      </nav>
       <header className="pb-2 pt-3 lg:pt-1">
         <h1 className="text-[22px] font-semibold leading-[1.3] text-ink">机会研究（模块 10/11/12）</h1>
         <p className="mt-1 text-[12.5px] text-ink-3">
           机会=研究候选，<strong>不是已验证商机</strong>。评分仅代表当前研究优先级（v1 设计假设权重）；关键证据缺失时拒绝评分。
         </p>
       </header>
+
+      <WorkspaceAuthGate error={result.error} laneName="市场机会研究" returnTo="/market/opportunities">
 
       {/* Action bar */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
@@ -182,6 +191,7 @@ export default function MarketOpportunities() {
         </p>
         <ScenarioCalculator />
       </section>
+      </WorkspaceAuthGate>
     </div>
   );
 }

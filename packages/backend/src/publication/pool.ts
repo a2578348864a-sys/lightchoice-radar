@@ -136,10 +136,28 @@ function sourceCondition(sourceId?: string | null) {
   return sourceId ? sql`AND p.source_id = ${sourceId}` : sql``;
 }
 
-export async function loadPoolSources(now = new Date()): Promise<PoolSourceOption[]> {
+export const RADAR_POLICY_SOURCES = [
+  "amazon-us-announcements",
+  "amazon-us-fee-updates",
+  "ads-policy-pages",
+  "amazon-us-accelerate-updates",
+  "rss-cpsc-recalls",
+  "us-federal-register-cpsc",
+  "us-federal-register-ftc",
+] as const;
+
+function policyCondition(lane?: string | null) {
+  if (lane === "policy") {
+    return sql`AND p.source_id = ANY(${RADAR_POLICY_SOURCES}::text[])`;
+  }
+  // Exclude community discussions from the pool by default
+  return sql`AND p.source_id NOT IN ('rss-home-assistant-community', 'rss-wyze-community')`;
+}
+
+export async function loadPoolSources(now = new Date(), lane?: string | null): Promise<PoolSourceOption[]> {
   return sql<PoolSourceOption[]>`
     SELECT DISTINCT s.id, s.name FROM publications p JOIN sources s ON s.id = p.source_id
-    WHERE ${listedCondition(now)} ORDER BY s.name, s.id`;
+    WHERE ${listedCondition(now)} ${policyCondition(lane)} ORDER BY s.name, s.id`;
 }
 
 async function listedCount(
@@ -150,20 +168,21 @@ async function listedCount(
   to?: string | null,
   sourceId?: string | null,
   dateBasis: "collected" | "published" = "collected",
+  lane?: string | null,
 ): Promise<number> {
   return Number(one(await sql<{ n: number }[]>`
-    SELECT count(*) AS n FROM (SELECT 1 FROM publications p WHERE ${listedCondition(now)}
+    SELECT count(*) AS n FROM (SELECT 1 FROM publications p WHERE ${listedCondition(now)} ${policyCondition(lane)}
       ${discoveredTodayCondition(now, discoveredToday)} ${dateRangeCondition(from, to, dateBasis)} ${sourceCondition(sourceId)}
       ${channelCondition(f.channel)} ${categoryCondition(f.category)} ${tagCondition(f.tag)} LIMIT ${POOL_MAX_PAGES * POOL_PAGE_SIZE}) t`).n);
 }
 
 /** Without a search the total only sets the page count: it is reused for 30 seconds per filter. */
 const poolTotal = cachedByKey(
-  (key: { filters: TimelineFilters; discoveredToday: boolean; from?: string | null; to?: string | null; sourceId?: string | null; dateBasis?: "collected" | "published" }) => JSON.stringify([
-    key.filters.channel, key.filters.category, key.filters.tag, key.discoveredToday, key.from ?? null, key.to ?? null, key.sourceId ?? null, key.dateBasis ?? "collected",
+  (key: { filters: TimelineFilters; discoveredToday: boolean; from?: string | null; to?: string | null; sourceId?: string | null; dateBasis?: "collected" | "published"; lane?: string | null }) => JSON.stringify([
+    key.filters.channel, key.filters.category, key.filters.tag, key.discoveredToday, key.from ?? null, key.to ?? null, key.sourceId ?? null, key.dateBasis ?? "collected", key.lane ?? null,
     key.discoveredToday ? beijingDate(new Date()) : null,
   ]),
-  (key) => listedCount(key.filters, new Date(), key.discoveredToday, key.from, key.to, key.sourceId, key.dateBasis),
+  (key) => listedCount(key.filters, new Date(), key.discoveredToday, key.from, key.to, key.sourceId, key.dateBasis, key.lane),
   { freshMs: 30_000, maxStaleMs: 30_000, maxKeys: 200 },
 );
 
@@ -179,12 +198,13 @@ export interface PoolQuery extends TimelineFilters {
   dateBasis?: "collected" | "published";
   /** Exact public source identity. */
   sourceId?: string | null;
+  lane?: string | null;
   now?: Date;
 }
 
 // Identical searches share their read before taking search capacity.
 const searchPool = sharedSearch(
-  (q: PoolQuery) => JSON.stringify([q.channel, q.category, q.tag, q.q, q.tab, q.page, q.discoveredToday, q.discoveredFrom ?? null, q.discoveredTo ?? null, q.dateBasis ?? "collected", q.sourceId ?? null]),
+  (q: PoolQuery) => JSON.stringify([q.channel, q.category, q.tag, q.q, q.tab, q.page, q.discoveredToday, q.discoveredFrom ?? null, q.discoveredTo ?? null, q.dateBasis ?? "collected", q.sourceId ?? null, q.lane ?? null]),
   queryPool, (q) => !!q.q?.trim(),
 );
 
@@ -200,7 +220,7 @@ async function queryPool(query: PoolQuery, now: Date): Promise<PoolResponse> {
   const terms = q ? searchTerms(q) : [];
   const entityTag = q ? queryEntityTag(q) : null;
   const filters = sql`${discoveredTodayCondition(now, !!query.discoveredToday)} ${dateRangeCondition(query.discoveredFrom, query.discoveredTo, dateBasis)}
-    ${sourceCondition(query.sourceId)} ${channelCondition(query.channel)} ${categoryCondition(query.category)} ${tagCondition(query.tag)}`;
+    ${sourceCondition(query.sourceId)} ${policyCondition(query.lane)} ${channelCondition(query.channel)} ${categoryCondition(query.category)} ${tagCondition(query.tag)}`;
   const orderAt = query.discoveredToday
     ? sql`p.discovered_at`
     : query.discoveredFrom || query.discoveredTo
@@ -226,8 +246,8 @@ async function queryPool(query: PoolQuery, now: Date): Promise<PoolResponse> {
       return {
         rows,
         total: query.now
-          ? await listedCount(query, now, !!query.discoveredToday, query.discoveredFrom, query.discoveredTo, query.sourceId, dateBasis)
-          : await poolTotal({ filters: query, discoveredToday: !!query.discoveredToday, from: query.discoveredFrom, to: query.discoveredTo, sourceId: query.sourceId, dateBasis }),
+          ? await listedCount(query, now, !!query.discoveredToday, query.discoveredFrom, query.discoveredTo, query.sourceId, dateBasis, query.lane)
+          : await poolTotal({ filters: query, discoveredToday: !!query.discoveredToday, from: query.discoveredFrom, to: query.discoveredTo, sourceId: query.sourceId, dateBasis, lane: query.lane }),
       };
     }
     if (tab === "relevance") {

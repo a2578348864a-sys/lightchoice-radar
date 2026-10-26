@@ -2,6 +2,7 @@ import { Link, useLoaderData } from "react-router";
 import { vocGet } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
+import { WorkspaceAuthGate } from "../components/shell/WorkspaceAuthGate";
 import { EmptyState } from "../components/ui/Page";
 import { relativeTime } from "../lib/format";
 import type { Screen } from "../components/shell/screens";
@@ -16,11 +17,15 @@ interface SourcesResponse {
 }
 
 export async function loader({ request }: { request: Request }) {
-  const [history, sources] = await Promise.all([
-    vocGet<HistoryResponse>(request, "/api/voc/history").catch(() => null),
-    vocGet<SourcesResponse>(request, "/api/voc/sources").catch(() => null),
+  const [historyResult, sourcesResult] = await Promise.all([
+    vocGet<HistoryResponse>(request, "/api/voc/history"),
+    vocGet<SourcesResponse>(request, "/api/voc/sources"),
   ]);
-  return { history, sources };
+  return {
+    history: historyResult.data,
+    sources: sourcesResult.data,
+    error: sourcesResult.error || historyResult.error,
+  };
 }
 
 export function meta() {
@@ -28,13 +33,20 @@ export function meta() {
 }
 
 export default function VocSystem() {
-  const { history, sources } = useLoaderData<typeof loader>();
+  const { history, sources, error } = useLoaderData<typeof loader>();
   return (
     <div className="pb-10">
       <PhoneBar back={{ to: "/voc", label: "消费者原声" }} title="系统" />
+      <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
+        <Link to="/voc" className="hover:text-ink transition-colors">第三主线 · 消费者原声</Link>
+        <span>/</span>
+        <span className="text-ink-2 font-medium">来源 · 批次 · 历史</span>
+      </nav>
       <header className="pb-2 pt-3 lg:pt-1">
         <h1 className="text-[24px] font-semibold leading-[1.3] text-ink">来源 · 批次 · 历史</h1>
       </header>
+
+      <WorkspaceAuthGate error={error} laneName="消费者原声系统管理" returnTo="/voc/system">
 
       <section className="mt-3" aria-label="来源状态">
         <h2 className="pb-1 text-[12px] font-semibold uppercase tracking-wide text-ink-3">来源</h2>
@@ -91,6 +103,7 @@ export default function VocSystem() {
       </section>
 
       <p className="mt-6 text-[11px] text-ink-2">统计口径：到达=材料首次入库；撤销=批次许可失效传播；审核=人工决定变更。<Link to="/voc" className="ml-1 underline-offset-2 hover:underline">返回总览</Link></p>
+      </WorkspaceAuthGate>
     </div>
   );
 }

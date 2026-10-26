@@ -17,7 +17,7 @@ import { isPhone, type Screen } from "../components/shell/screens";
 import { openSearch } from "../features/search/SearchOverlay";
 import { addRecentSearch } from "../lib/local-state";
 
-export const handle: Screen = { tab: "featured", name: "全部" };
+export const handle: Screen = { tab: "policy", name: "平台政策" };
 export { pageHeaders as headers } from "../lib/api.server";
 export const { clientLoader, shouldRevalidate } = pageReuse<typeof loader>();
 
@@ -53,11 +53,11 @@ export async function loader({ request }: Route.LoaderArgs) {
   const page = Math.min(Math.max(Number.parseInt(url.searchParams.get("page") ?? "1", 10) || 1, 1), 50);
   const [data, sourceOptions] = await Promise.all([
     loadOr404<PoolResponse>(
-      listPath("/api/site/pool", { ...filterParams(readFilters(url.searchParams)), q, tab, page: page > 1 ? page : null, from, to, source: sourceId, dateBasis }),
+      listPath("/api/site/pool", { ...filterParams(readFilters(url.searchParams)), q, tab, page: page > 1 ? page : null, from, to, source: sourceId, dateBasis, lane: "policy" }),
       // The busy page keeps the search, so it can be tried again as it was.
       { signal: request.signal, busyRedirect: `/all/search-busy${url.search}` },
     ),
-    SITE.name === "LightChoice Radar" ? loadOr404<PoolSourceOption[]>("/api/site/pool/sources", { signal: request.signal }) : Promise.resolve([]),
+    SITE.name === "LightChoice Radar" ? loadOr404<PoolSourceOption[]>("/api/site/pool/sources?lane=policy", { signal: request.signal }) : Promise.resolve([]),
   ]);
   // Past the last page of what there is: the last page, with the same search and filters.
   if (data.total > 0 && data.page > data.pageCount) throw redirect(pageHref(url.searchParams, data.pageCount));

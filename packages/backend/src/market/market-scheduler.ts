@@ -422,9 +422,20 @@ export async function runDueMarketSources(opts: RunDueOptions = {}): Promise<Run
           downstreamTriggered: { opportunitiesBuilt: 0, alertsEvaluated: false },
         };
       }
-    } catch {
+    } catch (err) {
       if (lockConn) lockConn.release();
       lockConn = null;
+      return {
+        executed: 0,
+        skipped: 0,
+        results: [{
+          id: "scheduler-exec-guard",
+          label: "调度互斥守护",
+          status: "blocked",
+          reason: `获取调度互斥锁异常，已安全阻断本次执行: ${err instanceof Error ? err.message : String(err)}`,
+        }],
+        downstreamTriggered: { opportunitiesBuilt: 0, alertsEvaluated: false },
+      };
     }
   }
 
