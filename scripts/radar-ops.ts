@@ -155,13 +155,16 @@ async function status(): Promise<number> {
   const adsLock = await lockHeld(LOCK_KEYS["ads-policy"]!);
   const workerLock = await lockHeld(LOCK_KEYS["radar-announcements"]!);
   const leadLock = await lockHeld(LOCK_KEYS["amz123-leads"]!);
+  const marketLock = await lockHeld(LOCK_KEYS["radar-market"]!);
   const adsRecord = readRunRecord("ads-policy");
   const workerRecord = readRunRecord("radar-announcements");
   const leadRecord = readRunRecord("amz123-leads");
+  const marketRecord = readRunRecord("radar-market");
   const supervisorRecord = readRunRecord("ads-policy-supervisor");
   const adsAlive = heartbeatAlive("ads-policy");
   const workerAlive = heartbeatAlive("radar-announcements");
   const leadAlive = heartbeatAlive("amz123-leads");
+  const marketAlive = heartbeatAlive("radar-market");
   const supervisorAlive = heartbeatAlive("ads-policy-supervisor");
   const translation = await readTranslationState();
 
@@ -203,6 +206,7 @@ async function status(): Promise<number> {
     : supervisorRecord && pidAlive(supervisorRecord.pid) ? `进程在但无心跳 · pid ${supervisorRecord.pid}` : "未运行");
   line("公告 Worker", `${workerLock || workerAlive ? "运行中" : "未运行"}${workerRecord && pidAlive(workerRecord.pid) ? ` · pid ${workerRecord.pid}` : ""}`);
   line("线索 Worker", `${leadLock || leadAlive ? "运行中" : "未运行"}${leadRecord && pidAlive(leadRecord.pid) ? ` · pid ${leadRecord.pid}` : ""}`);
+  line("市场信号 Worker", `${marketLock || marketAlive ? "运行中" : "未运行"}${marketRecord && pidAlive(marketRecord.pid) ? ` · pid ${marketRecord.pid}` : ""}`);
   // Automatic Chinese translation: the state is the worker's own lock/heartbeat plus stored rows —
   // never "the switch is set" alone, and never "the last job succeeded" as proof it is healthy now.
   // The session lock is the strong signal: PostgreSQL drops it the moment the process dies. A fresh
@@ -227,7 +231,7 @@ async function status(): Promise<number> {
   // Whether `stop --force` can prove a PID at all: without the OS answer it refuses rather than risks.
   const osProbe = await queryWindowsProcess(process.pid);
   line("强杀身份校验（OS 级）", osProbe ? "可用" : "不可用（此时 --force 一律拒绝，需人工处理）");
-  line("停止请求", `${stopRequested("ads-policy") ? "Ads 有待处理停止请求 " : ""}${stopRequested("radar-announcements") ? "公告有待处理停止请求 " : ""}${stopRequested("amz123-leads") ? "线索有待处理停止请求" : ""}`.trim() || "无");
+  line("停止请求", `${stopRequested("ads-policy") ? "Ads 有待处理停止请求 " : ""}${stopRequested("radar-announcements") ? "公告有待处理停止请求 " : ""}${stopRequested("amz123-leads") ? "线索有待处理停止请求 " : ""}${stopRequested("radar-market") ? "市场信号有待处理停止请求" : ""}`.trim() || "无");
   console.log("");
   line("记录数量", counts.map((c) => `${c.family}=${c.n}`).join(" · "));
   console.log("");
@@ -355,9 +359,10 @@ async function start(target: string | undefined, ports: { web: number; api: numb
       console.log("市场信号调度 Worker 已在运行，不重复启动。");
       return 1;
     }
+    clearControlState("radar-market");
     const pid = startDetached({
       entry: path.join(REPO_ROOT, "apps/worker/src/radar-market.ts"),
-      nodeArgs: ["--env-file-if-exists=.env"],
+      nodeArgs: [`--env-file-if-exists=${path.join(REPO_ROOT, ".env")}`],
       logName: "worker-market.log",
       env: { ...process.env, RADAR_MARKET_SCHEDULER_ENABLED: process.env.RADAR_MARKET_SCHEDULER_ENABLED ?? "true" },
     });
@@ -485,7 +490,7 @@ async function forceStopRole(role: WorkerRole, maxAgeMs: number): Promise<boolea
 async function stop(target: string | undefined, force: boolean, timeoutSeconds: number): Promise<number> {
   const entry = target ? TARGETS[target] : undefined;
   if (!entry) {
-    console.log("用法：stop ads | stop announcements | stop leads [--force] [--timeout=180]");
+    console.log("用法：stop ads | stop announcements | stop leads | stop market [--force] [--timeout=180]");
     return 1;
   }
   const roles: WorkerRole[] = [entry.worker, ...(entry.supervisor ? [entry.supervisor] : [])];

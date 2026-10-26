@@ -4,7 +4,7 @@ setlocal
 cd /d "%~dp0"
 set "NODE_EXE=C:\Users\a2578\AppData\Local\Programs\nodejs\node.exe"
 if not exist "%NODE_EXE%" set "NODE_EXE=node"
-rem 不带参数：只补起数据库 / API / 网页 / 两个采集 Worker，不调用任何付费翻译。
+rem 不带参数：只补起数据库 / API / 网页 / 三个专用 Worker（线索、公告监管、市场信号），不调用任何付费翻译。
 rem 带 translate：额外启动受控的自动中文翻译 Worker（需要用户已单独授权持续付费）。
 echo.
 echo  LightChoice Radar - start

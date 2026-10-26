@@ -39,6 +39,7 @@ const API_PORT = 3001;
 const LEADS_LOCK = 7_204_229_003;
 const LOCK_ANNOUNCEMENTS = 7_204_229_001;
 const LOCK_ADS = 7_204_229_002;
+const LOCK_MARKET = 7_204_229_008;
 
 const API_ENTRY = path.join(REPO_ROOT, "apps", "api", "src", "main.ts");
 const WEB_ENTRY = path.join(REPO_ROOT, "node_modules", "@react-router", "dev", "bin.cjs");
@@ -228,7 +229,7 @@ function nodeBin(): string {
   return existsSync(preferred) ? preferred : process.execPath;
 }
 
-async function startViaOps(target: "api" | "web" | "leads" | "announcements" | "translate"): Promise<void> {
+async function startViaOps(target: "api" | "web" | "leads" | "announcements" | "translate" | "market"): Promise<void> {
   await new Promise<void>((resolve) => {
     const child = spawn(nodeBin(), ["--env-file-if-exists=.env", RADAR_OPS, "start", target], {
       cwd: REPO_ROOT, stdio: "inherit", windowsHide: true,
@@ -316,10 +317,13 @@ async function status(): Promise<number> {
   const lead = dbUp ? await readSource("amz123-policy-leads") : null;
   const announcementsLock = dbUp ? await lockHeld(LOCK_ANNOUNCEMENTS) : null;
   const adsLock = dbUp ? await lockHeld(LOCK_ADS) : null;
+  const marketLock = dbUp ? await lockHeld(LOCK_MARKET) : null;
   console.log(`AMZ123 Worker      ${leadLock === null ? "无法确认（数据库未运行）" : leadLock ? "运行中" : "未运行"}`);
   if (leadLock === false) problems.push("AMZ123 Worker 未运行：6 小时自动采集不会发生，start-radar.cmd 会补起它");
   console.log(`公告/监管 Worker    ${announcementsLock === null ? "无法确认（数据库未运行）" : announcementsLock ? "运行中（公告+费用+监管五来源）" : "未运行"}`);
   if (announcementsLock === false) problems.push("公告/监管 Worker 未运行：官方来源不会自动采集，start-radar.cmd 会补起它");
+  console.log(`市场信号 Worker    ${marketLock === null ? "无法确认（数据库未运行）" : marketLock ? "运行中（第四主线自动调度）" : "未运行"}`);
+  if (marketLock === false) problems.push("市场信号 Worker 未运行：第四主线不会自动调度，start-radar.cmd 会补起它");
 
   if (lead) {
     console.log(`线索来源           ${lead.enabled ? "已启用" : "已停用"} · health=${lead.health} · 每 ${lead.interval_minutes} 分钟`);
@@ -411,7 +415,7 @@ async function status(): Promise<number> {
  * cannot answer. Using one definition in both places is what keeps "already running" from being
  * reported as a failed start.
  */
-async function workerRunning(lockKey: number, role: "amz123-leads" | "radar-announcements"): Promise<boolean | null> {
+async function workerRunning(lockKey: number, role: "amz123-leads" | "radar-announcements" | "radar-market"): Promise<boolean | null> {
   const held = await lockHeld(lockKey);
   if (held === null) return null;
   if (held) return true;
@@ -471,15 +475,15 @@ async function start(target?: string): Promise<number> {
 
   // 1. Database: the only service every other step depends on.
   if (await pgReady()) {
-    console.log(`[1/5] 数据库 5544      已运行，跳过`);
+    console.log(`[1/6] 数据库 5544      已运行，跳过`);
   } else if (await portOpen(PG_PORT)) {
-    console.log(`[1/5] 数据库 5544      端口被占用但连不上，未启动任何服务`);
+    console.log(`[1/6] 数据库 5544      端口被占用但连不上，未启动任何服务`);
     const owner = await portOwner(PG_PORT);
     if (owner) console.log(`      占用进程 PID ${owner.pid}：${owner.commandLine.slice(0, 120)}`);
     console.log("      请先确认该进程是什么，本工具不会结束它。");
     return 1;
   } else {
-    console.log(`[1/5] 数据库 5544      未运行，启动中…`);
+    console.log(`[1/6] 数据库 5544      未运行，启动中…`);
     if (!(await startPg())) {
       console.log("      ✗ 数据库没有在 30 秒内就绪；后续服务不启动。");
       console.log("        看 .data/_diag/postgres-5544.log，常见原因：数据目录被占用、端口被占用、数据目录损坏。");
@@ -491,14 +495,14 @@ async function start(target?: string): Promise<number> {
   // 2. API.
   const apiUp = await waitReady(apiReady, 2);
   if (apiUp) {
-    console.log(`[2/5] API 3001         已运行，跳过`);
+    console.log(`[2/6] API 3001         已运行，跳过`);
   } else if (await portOpen(API_PORT)) {
     const owner = await portOwner(API_PORT);
-    console.log(`[2/5] API 3001         端口被其他程序占用（PID ${owner?.pid ?? "?"}），未启动`);
+    console.log(`[2/6] API 3001         端口被其他程序占用（PID ${owner?.pid ?? "?"}），未启动`);
     if (owner) console.log(`      ${owner.commandLine.slice(0, 120)}`);
     ok = false;
   } else {
-    console.log(`[2/5] API 3001         未运行，启动中…`);
+    console.log(`[2/6] API 3001         未运行，启动中…`);
     await startViaOps("api");
     const ready = await waitUntil(apiReady, 30_000);
     console.log(ready ? "      就绪" : "      ✗ 30 秒内没有就绪，看 .data/_diag/api-3001.log");
@@ -508,14 +512,14 @@ async function start(target?: string): Promise<number> {
   // 3. Web.
   const webUp = await waitReady(webReady, 2);
   if (webUp) {
-    console.log(`[3/5] Web 3000          已运行，跳过`);
+    console.log(`[3/6] Web 3000          已运行，跳过`);
   } else if (await portOpen(WEB_PORT)) {
     const owner = await portOwner(WEB_PORT);
-    console.log(`[3/5] Web 3000          端口被其他程序占用（PID ${owner?.pid ?? "?"}），未启动`);
+    console.log(`[3/6] Web 3000          端口被其他程序占用（PID ${owner?.pid ?? "?"}），未启动`);
     if (owner) console.log(`      ${owner.commandLine.slice(0, 120)}`);
     ok = false;
   } else {
-    console.log(`[3/5] Web 3000          未运行，启动中（首次编译需要几秒）…`);
+    console.log(`[3/6] Web 3000          未运行，启动中（首次编译需要几秒）…`);
     await startViaOps("web");
     const ready = await waitUntil(webReady, 90_000);
     console.log(ready ? "      就绪" : "      ✗ 90 秒内没有就绪，看 .data/_diag/web-3000.log");
@@ -523,40 +527,51 @@ async function start(target?: string): Promise<number> {
   }
 
   // 4. The dedicated lead worker.
-  // "Running" must be judged exactly the way `radar-ops start` judges it — the lock OR a heartbeat the
-  // live process is still writing. Checking only the lock here made a start report a failure while the
-  // delegated command was correctly saying "already running, not starting a second one".
   const leadRunning = await workerRunning(LEADS_LOCK, "amz123-leads");
   if (leadRunning) {
-    console.log(`[4/5] AMZ123 Worker    已运行（实例锁被占用或进程仍在写心跳），跳过`);
+    console.log(`[4/6] AMZ123 Worker    已运行（实例锁被占用或进程仍在写心跳），跳过`);
   } else if (leadRunning === null) {
-    console.log(`[4/5] AMZ123 Worker    无法确认（数据库不可用），未启动`);
+    console.log(`[4/6] AMZ123 Worker    无法确认（数据库不可用），未启动`);
     ok = false;
   } else {
-    console.log(`[4/5] AMZ123 Worker    未运行，启动中…`);
+    console.log(`[4/6] AMZ123 Worker    未运行，启动中…`);
     await startViaOps("leads");
     const ready = await waitUntil(async () => (await workerRunning(LEADS_LOCK, "amz123-leads")) === true, 25_000);
     console.log(ready ? "      就绪（只消费 AMZ123 两条私有队列）" : "      ✗ 25 秒内没有拿到实例锁，看 .data/_diag/worker-amz123-leads.log");
     ok = ok && ready;
   }
 
-  // 5. The announcements/regulatory family worker: Amazon announcements, fee updates, CPSC and the
-  // two Federal Register feeds — six private queues of its own, never the lead queues.
+  // 5. The announcements/regulatory family worker.
   const annRunning = await workerRunning(LOCK_ANNOUNCEMENTS, "radar-announcements");
   if (annRunning) {
-    console.log(`[5/5] 公告/监管 Worker 已运行（实例锁被占用或进程仍在写心跳），跳过`);
+    console.log(`[5/6] 公告/监管 Worker 已运行（实例锁被占用或进程仍在写心跳），跳过`);
   } else if (annRunning === null) {
-    console.log(`[5/5] 公告/监管 Worker 无法确认（数据库不可用），未启动`);
+    console.log(`[5/6] 公告/监管 Worker 无法确认（数据库不可用），未启动`);
     ok = false;
   } else {
-    console.log(`[5/5] 公告/监管 Worker 未运行，启动中…`);
+    console.log(`[5/6] 公告/监管 Worker 未运行，启动中…`);
     await startViaOps("announcements");
     const ready = await waitUntil(async () => (await workerRunning(LOCK_ANNOUNCEMENTS, "radar-announcements")) === true, 25_000);
     console.log(ready ? "      就绪（只消费公告/费用/监管六条专属队列）" : "      ✗ 25 秒内没有拿到实例锁，看 .data/_diag/worker-announcements.log");
     ok = ok && ready;
   }
 
-  console.log(ok ? "\n完成。打开 http://127.0.0.1:3000/all 与 http://127.0.0.1:3000/leads" : "\n有服务没有就绪，见上面的提示。");
+  // 6. The market signals worker: fourth lane dedicated scheduler worker.
+  const marketRunning = await workerRunning(LOCK_MARKET, "radar-market");
+  if (marketRunning) {
+    console.log(`[6/6] 市场信号 Worker  已运行（实例锁被占用或进程仍在写心跳），跳过`);
+  } else if (marketRunning === null) {
+    console.log(`[6/6] 市场信号 Worker  无法确认（数据库不可用），未启动`);
+    ok = false;
+  } else {
+    console.log(`[6/6] 市场信号 Worker  未运行，启动中…`);
+    await startViaOps("market");
+    const ready = await waitUntil(async () => (await workerRunning(LOCK_MARKET, "radar-market")) === true, 25_000);
+    console.log(ready ? "      就绪（第四主线自动调度与安全反证，不影响前三主线）" : "      ✗ 25 秒内没有拿到实例锁，看 .data/_diag/worker-market.log");
+    ok = ok && ready;
+  }
+
+  console.log(ok ? "\n完成。打开 http://127.0.0.1:3000/all 、 http://127.0.0.1:3000/leads 与 http://127.0.0.1:3000/market" : "\n有服务没有就绪，见上面的提示。");
   console.log("自动中文翻译默认未启动（不调用 DeepSeek）。获得授权后：start-radar.cmd translate；查看状态：status-radar.cmd。");
   return ok ? 0 : 1;
 }
@@ -639,51 +654,63 @@ async function stop(target?: string): Promise<number> {
     return ok ? 0 : 1;
   }
 
-  console.log("[1/5] 自动翻译 Worker（付费的排在最前，先停）");
+  console.log("[1/7] 自动翻译 Worker（付费的排在最前，先停）");
   ok = (await stopTranslate()) && ok;
 
-  const annHeld = await lockHeld(LOCK_ANNOUNCEMENTS);
-  if (annHeld === true) {
-    const industryHeld = await lockHeld(7_204_229_005);
+  const industryHeld = await lockHeld(7_204_229_005);
   if (industryHeld === true) {
-    console.log("[2/6] 行业 Worker 发送停止请求（第二主线，当前轮先收尾）…");
+    console.log("[2/7] 行业 Worker 发送停止请求（第二主线，当前轮先收尾）…");
     const r = await runAsync(nodeBin(), ["--env-file-if-exists=.env", RADAR_OPS, "stop", "industry", "--timeout=120"], 150_000);
     process.stdout.write(r.out);
     if (r.code !== 0) { ok = false; console.log("      没有完全停止，可稍后重试。"); }
   } else if (industryHeld === null) {
-    console.log("[2/6] 行业 Worker 无法确认（数据库未运行），跳过");
+    console.log("[2/7] 行业 Worker 无法确认（数据库未运行），跳过");
   } else {
-    console.log("[2/6] 行业 Worker 未运行，跳过");
+    console.log("[2/7] 行业 Worker 未运行，跳过");
   }
 
-  console.log("[3/6] 公告/监管 Worker 发送停止请求（当前采集会先收尾）…");
+  const annHeld = await lockHeld(LOCK_ANNOUNCEMENTS);
+  if (annHeld === true) {
+    console.log("[3/7] 公告/监管 Worker 发送停止请求（当前采集会先收尾）…");
     const r = await runAsync(nodeBin(), ["--env-file-if-exists=.env", RADAR_OPS, "stop", "announcements", "--timeout=120"], 150_000);
     process.stdout.write(r.out);
     if (r.code !== 0) { ok = false; console.log("      没有完全停止，可稍后重试。"); }
   } else if (annHeld === null) {
-    console.log("[3/6] 公告/监管 Worker 无法确认（数据库未运行），跳过");
+    console.log("[3/7] 公告/监管 Worker 无法确认（数据库未运行），跳过");
   } else {
-    console.log("[3/6] 公告/监管 Worker 未运行，跳过");
+    console.log("[3/7] 公告/监管 Worker 未运行，跳过");
   }
 
   const held = await lockHeld(LEADS_LOCK);
   if (held === true) {
-    console.log("[4/6] AMZ123 Worker    发送停止请求（当前采集会先收尾）…");
+    console.log("[4/7] AMZ123 Worker    发送停止请求（当前采集会先收尾）…");
     const r = await runAsync(nodeBin(), ["--env-file-if-exists=.env", RADAR_OPS, "stop", "leads", "--timeout=120"], 150_000);
     process.stdout.write(r.out);
     if (r.code !== 0) { ok = false; console.log("      没有完全停止，可稍后重试；不要用 taskkill /IM node.exe。"); }
   } else if (held === null) {
-    console.log("[4/6] AMZ123 Worker    无法确认（数据库未运行），跳过");
+    console.log("[4/7] AMZ123 Worker    无法确认（数据库未运行），跳过");
   } else {
-    console.log("[4/6] AMZ123 Worker    未运行，跳过");
+    console.log("[4/7] AMZ123 Worker    未运行，跳过");
   }
 
-  console.log("[5/6] Web / API");
+  const marketHeld = await lockHeld(LOCK_MARKET);
+  if (marketHeld === true) {
+    console.log("[5/7] 市场信号 Worker  发送停止请求（当前调度先收尾）…");
+    const r = await runAsync(nodeBin(), ["--env-file-if-exists=.env", RADAR_OPS, "stop", "market", "--timeout=120"], 150_000);
+    process.stdout.write(r.out);
+    if (r.code !== 0) { ok = false; console.log("      没有完全停止，可稍后重试。"); }
+  } else if (marketHeld === null) {
+    console.log("[5/7] 市场信号 Worker  无法确认（数据库未运行），跳过");
+  } else {
+    console.log("[5/7] 市场信号 Worker  未运行，跳过");
+  }
+
+  console.log("[6/7] Web / API");
   ok = (await killVerified(WEB_PORT, WEB_ENTRY, "Web 3000")) && ok;
   ok = (await killVerified(API_PORT, API_ENTRY, "API 3001")) && ok;
 
   if (target === "all") {
-    console.log("[6/6] 数据库 5544      按 fast 模式关闭…");
+    console.log("[7/7] 数据库 5544      按 fast 模式关闭…");
     if (!(await pgReady())) console.log("      未运行，跳过");
     else {
       const r = await runAsync(pgCtlExe, ["stop", "-D", PG_DATA, "-m", "fast", "-w"], 60_000);
@@ -692,7 +719,7 @@ async function stop(target?: string): Promise<number> {
       ok = ok && stopped;
     }
   } else {
-    console.log("[6/6] 数据库 5544      保留运行（要一起关：stop-radar.cmd all）");
+    console.log("[7/7] 数据库 5544      保留运行（要一起关：stop-radar.cmd all）");
   }
 
   console.log(ok ? "\n完成。" : "\n有项目没有停干净，见上面的提示。");

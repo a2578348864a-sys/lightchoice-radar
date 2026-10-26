@@ -21,12 +21,17 @@ let stopping = false;
 async function tick(): Promise<void> {
   if (isTickRunning || stopping || stopRequested("radar-market")) return;
   isTickRunning = true;
+  const runId = `run-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   try {
-    const res = await runDueMarketSources();
+    const res = await runDueMarketSources({
+      runId,
+      workerPid: process.pid,
+    });
     if (res.executed > 0) {
       console.log(JSON.stringify({
         level: "info",
         msg: "market scheduler cycle finished",
+        runId,
         executed: res.executed,
         skipped: res.skipped,
         results: res.results,
@@ -65,6 +70,17 @@ const shutdown = async (): Promise<void> => {
   await closeDb();
   process.exit(0);
 };
+
+process.on("exit", (code) => {
+  console.log(JSON.stringify({ level: "info", msg: "PROCESS EXIT CALLED", code, pid: process.pid }));
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error(JSON.stringify({ level: "error", msg: "unhandled rejection in market worker", error: String(err), pid: process.pid }));
+});
+process.on("uncaughtException", (err) => {
+  console.error(JSON.stringify({ level: "error", msg: "uncaught exception in market worker", error: String(err), pid: process.pid }));
+});
 
 process.on("SIGINT", () => void shutdown());
 process.on("SIGTERM", () => void shutdown());

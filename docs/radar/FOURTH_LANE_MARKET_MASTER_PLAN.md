@@ -1,9 +1,12 @@
-# 第四主线「市场信号」权威工程主计划（R0 设计冻结版）
+# 第四主线「市场信号」权威工程主计划（AUTO-ACTIVATE 落地版）
 
-> **文档身份**：第四主线唯一工程主计划。本文件取代此前一切关于第四主线的分散草案与补丁编号（V2.x 系列不再引用），后续修订直接改写本文件对应章节并在 CURRENT.md 记录。
-> **冻结状态**：R0 设计冻结（Gate A）于 2026-10-26 交付。设计基于 L1/L2 证据与已有合法真实样本；**L3 缺口全部显式标注，不宣称已接通**。
-> **执行边界**：本计划授权范围 = 设计与文档。R1~R8 的业务开发、数据迁移、正式采集与云端部署均未随本文件授权。
-> **上游依据**：README.md（四主线顺序与项目边界）、AGENTS.md（工程规则）、docs/radar/CURRENT.md（一至三线工程基线，HEAD `4f373d2`）、本文件 §9 复用映射中列出的源码事实。
+> **文档身份**：第四主线唯一工程主计划。本文件取代此前一切关于第四主线的分散草案与补丁编号，后续修订直接改写本文件对应章节并在 CURRENT.md 记录。
+> **工程落地状态**：
+> - **AUTO-FIRST**：彻底淘汰手工 CSV/Excel 导入方案，确立全自动监控与合规守护产品范式，固化 12 模块原始契约与定义；
+> - **AUTO-RUN**：完成后台专用调度 Worker（`radar-market`）开发，通过 PostgreSQL 顾问锁（`7204229008`）单实例排他、会话级执行互斥锁（`7204229009`）与多日停机单窗口防风暴保护；接通美国官方 CPSC 消费品安全通告流（`cpsc-product-recalls`），产出 7 段式确定性中文解释；
+> - **AUTO-ACTIVATE**：将 `radar-market` 深度整合入本机受管运维体系（`start-radar.cmd` 六步启动、`stop-radar.cmd` 七步停机、`status-radar.cmd` 锁状态探针）；单 Run ID 全链追溯实证（Worker PID -> Run ID -> HTTP 200 -> Ingest -> ProductSafetyEvent -> Downstream -> API）；Amazon 核心数据源 14 维度深度调查与真实只读探测（确认核心商业数据除 CPSC 外暂无合法免费 API，门禁受控关闭，标准模型就绪，详见 [AMAZON_DATA_SOURCES_BREAKTHROUGH.md](AMAZON_DATA_SOURCES_BREAKTHROUGH.md)）。
+> - **云端部署**：`R7_CLOUD_DEPLOYMENT = DEFERRED_BY_USER`，`R8_LOCAL_NATURAL_OPERATION = NOT_STARTED`。
+> **执行边界**：前三主线业务零受扰；DeepSeek 模型调用 0 次（¥0）；外部商业数据采购 ¥0；Git 遵守本地精准提交（严禁 git push，严禁 git add .）。
 
 ---
 

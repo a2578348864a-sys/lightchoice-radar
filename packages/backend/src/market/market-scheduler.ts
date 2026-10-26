@@ -153,6 +153,8 @@ export interface FetchCpscOptions {
   xmlOverride?: string;
   sourceId?: string;
   maxItems?: number;
+  runId?: string;
+  workerPid?: number;
 }
 
 export interface FetchCpscResult {
@@ -163,6 +165,10 @@ export interface FetchCpscResult {
   duplicatesSkipped: number;
   events: ProductSafetyEvent[];
   items: CpscRecallItem[];
+  httpStatus?: number;
+  httpDurationMs?: number;
+  runId?: string;
+  workerPid?: number;
 }
 
 /**
@@ -179,14 +185,21 @@ export async function fetchAndIngestCpscRecalls(opts: FetchCpscOptions = {}): Pr
   }
 
   let xml: string;
+  let httpStatus: number | undefined;
+  let httpDurationMs: number | undefined;
   const observedAt = new Date().toISOString();
   if (opts.xmlOverride) {
     xml = opts.xmlOverride;
+    httpStatus = 200;
+    httpDurationMs = 0;
   } else {
+    const t0 = Date.now();
     const res = await fetch(CPSC_FEED_URL, {
       headers: { "User-Agent": "LightChoiceRadar/4.0 (Consumer Product Safety Research; +https://lightchoice.dev)" },
       signal: AbortSignal.timeout(12_000),
     });
+    httpDurationMs = Date.now() - t0;
+    httpStatus = res.status;
     if (!res.ok) {
       throw new Error(`CPSC RSS Feed 请求失败：HTTP ${res.status} ${res.statusText}`);
     }
@@ -268,6 +281,8 @@ export async function fetchAndIngestCpscRecalls(opts: FetchCpscOptions = {}): Pr
       observedAt,
       ingestedAt: new Date().toISOString(),
       explanation,
+      runId: opts.runId,
+      workerPid: opts.workerPid,
     };
 
     await saveProductSafetyEvent(safetyEvent);
@@ -314,6 +329,10 @@ export async function fetchAndIngestCpscRecalls(opts: FetchCpscOptions = {}): Pr
     duplicatesSkipped,
     events: createdEvents,
     items,
+    httpStatus,
+    httpDurationMs,
+    runId: opts.runId,
+    workerPid: opts.workerPid,
   };
 }
 
@@ -343,9 +362,13 @@ export interface RunDueOptions {
   dryRun?: boolean;
   /** When true, bypasses the PostgreSQL advisory execution lock (useful for in-test simulations). */
   skipAdvisoryLock?: boolean;
+  runId?: string;
+  workerPid?: number;
 }
 
 export interface RunDueResult {
+  runId?: string;
+  workerPid?: number;
   executed: number;
   skipped: number;
   results: Array<{
@@ -356,6 +379,10 @@ export interface RunDueResult {
     itemsFetched?: number;
     newEvents?: number;
     duplicatesSkipped?: number;
+    httpStatus?: number;
+    httpDurationMs?: number;
+    runId?: string;
+    workerPid?: number;
   }>;
   downstreamTriggered: {
     opportunitiesBuilt: number;
@@ -448,15 +475,21 @@ export async function runDueMarketSources(opts: RunDueOptions = {}): Promise<Run
         let itemsFetched = 0;
         let newEvents = 0;
         let duplicatesSkipped = 0;
+        let httpStatus: number | undefined;
+        let httpDurationMs: number | undefined;
 
         if (source.kind === "cpsc-recalls" || source.id === "cpsc-product-recalls") {
           const cpscRes = await fetchAndIngestCpscRecalls({
             xmlOverride: opts.xmlOverride,
             sourceId: source.id,
+            runId: opts.runId,
+            workerPid: opts.workerPid,
           });
           itemsFetched = cpscRes.totalParsed;
           newEvents = cpscRes.newEvents;
           duplicatesSkipped = cpscRes.duplicatesSkipped;
+          httpStatus = cpscRes.httpStatus;
+          httpDurationMs = cpscRes.httpDurationMs;
         } else if (source.kind === "synthetic-test") {
           itemsFetched = 10;
         } else {
@@ -481,6 +514,10 @@ export async function runDueMarketSources(opts: RunDueOptions = {}): Promise<Run
           itemsFetched,
           newEvents,
           duplicatesSkipped,
+          httpStatus,
+          httpDurationMs,
+          runId: opts.runId,
+          workerPid: opts.workerPid,
         });
         executedCount++;
       } catch (err: unknown) {
@@ -498,6 +535,8 @@ export async function runDueMarketSources(opts: RunDueOptions = {}): Promise<Run
           label: source.label,
           status: "error",
           reason: errMsg,
+          runId: opts.runId,
+          workerPid: opts.workerPid,
         });
       }
     }
@@ -521,6 +560,8 @@ export async function runDueMarketSources(opts: RunDueOptions = {}): Promise<Run
     }
 
     return {
+      runId: opts.runId,
+      workerPid: opts.workerPid,
       executed: executedCount,
       skipped: skippedCount,
       results,

@@ -357,6 +357,8 @@ export interface ProductSafetyEvent {
   observedAt: string; // time Radar fetched it
   ingestedAt: string; // time saved to database
   explanation: ProductSafetyEventExplanation;
+  runId?: string;
+  workerPid?: number;
 }
 
 export async function saveProductSafetyEvent(event: ProductSafetyEvent): Promise<void> {
