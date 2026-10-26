@@ -123,7 +123,7 @@
 3. 明确声明局限：关键词热度 ≠ 销量，排名 ≠ 利润，样本 ≠ 全市场。
 4. 不购买商业数据服务、不使用付费代理、不调用付费 API。
 
-**当前状态：第四主线 AUTO-ACTIVATE 本机自动运行落地 + Amazon 核心数据来源突破完成（2026-10-26）。** 权威工程主计划见 **[docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md](docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md)**，核心数据源调研与实测见 **[docs/radar/AMAZON_DATA_SOURCES_BREAKTHROUGH.md](docs/radar/AMAZON_DATA_SOURCES_BREAKTHROUGH.md)**。实现专用后台调度 Worker（`radar-market`，PID/顾问锁守护，原生整合入 `start-radar.cmd` 六步启动与 `stop-radar.cmd` 七步优雅停机流水线）、单 Run ID 全链追溯实证（Worker PID -> Run ID -> HTTP 200 -> Ingest -> ProductSafetyEvent -> Downstream -> API）、并发互斥锁（7204229009）、CPSC 官方公开产品安全通报清洗入库与反证隔离（直通 M09 创新反证与 M12 风险预警，严禁误报商业商机，Browse Node ID 显式为 null）、14 维度 Amazon 数据源深度调查（确认除 CPSC 官方公开流外，核心商业数据暂无合法免费 API，门禁受控关闭等待官方凭证激活）。工作台入口 `/market`（管理员登录）。模型预算保持 ¥0。
+**当前状态：第四主线 AUTO-TRUTH 真实自动化验真、Amazon 数据源突破与本机工程收口完成（2026-10-27）。** 权威工程主计划见 **[docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md](docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md)**，核心数据源调研与实测见 **[docs/radar/AMAZON_DATA_SOURCES_BREAKTHROUGH.md](docs/radar/AMAZON_DATA_SOURCES_BREAKTHROUGH.md)**。实现专用后台调度 Worker（`radar-market`，PID/顾问锁守护，原生整合入 `start-radar.cmd` 六步启动与 `stop-radar.cmd` 七步优雅停机流水线）、单 Run ID 全链追溯实证（Worker PID -> Run ID -> HTTP 200 -> Ingest -> ProductSafetyEvent -> Downstream -> API）、并发互斥锁（7204229009）、CPSC 官方公开产品安全通报清洗入库与反证隔离（直通 M09 创新反证与 M12 风险预警，严禁误报商业商机，Browse Node ID 显式为 null）、14 维度 Amazon 数据源深度调查（确认除 CPSC 官方公开流外，核心商业数据暂无合法免费 API，门禁受控关闭等待官方凭证激活）。工作台入口 `/market`（管理员登录）。模型预算保持 ¥0。
 
 ### 主线状态总表
 
@@ -132,7 +132,7 @@
 | 1 | 平台政策 | **进行中（Amazon 平台政策 2 条 + 美国监管 20 条已真实入库；监管来源已进入专用 Worker 定时调度并实测跑通；回测 10/10、公告门禁召回 3/3；但 Amazon 平台政策只有 2 条、登录后自动恢复未验证）** | 补充 Amazon 官方政策来源，提高平台政策真实覆盖；完成注销登录后的自动恢复验证 |
 | 2 | 行业动态 | 未开始 | 等主线 1 验收通过 |
 | 3 | 消费者原声 | 部分具备（社区 RSS 已通，评论/Reddit/YouTube 未接） | 等主线 1、2 通过后补齐来源 |
-| 4 | 市场信号 | **AUTO-ACTIVATE 本机自动运行落地 + Amazon 核心数据来源突破完成（[主计划](docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md) / [数据源突破](docs/radar/AMAZON_DATA_SOURCES_BREAKTHROUGH.md)）；后台 Worker 受管启停闭环、单 Run ID 全链追溯、CPSC 安全流接入、调度探针与前端看板全闭环** | 开机随 `start-radar.cmd` 自动拉起全自动运行；核心商业数据等待官方合规凭据激活（如 SP-API）；云端部署按用户决定暂缓 |
+| 4 | 市场信号 | **AUTO-TRUTH 真实自动化验真、Amazon 数据源突破与本机工程收口完成（[主计划](docs/radar/FOURTH_LANE_MARKET_MASTER_PLAN.md) / [数据源突破](docs/radar/AMAZON_DATA_SOURCES_BREAKTHROUGH.md)）；后台 Worker 受管启停闭环、单 Run ID 全链追溯、CPSC 安全流接入、调度探针与前端看板全闭环** | 开机随 `start-radar.cmd` 自动拉起全自动运行；核心商业数据等待官方合规凭据激活（如 SP-API）；云端部署按用户决定暂缓 |
 
 ---
 

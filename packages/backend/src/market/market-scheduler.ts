@@ -9,6 +9,7 @@ import path from "node:path";
 import { REPO_ROOT } from "../config.ts";
 import { sql } from "../db.ts";
 import { sha256 } from "../lib/ids.ts";
+import { guardedFetch } from "../lib/http-fetch.ts";
 import {
   loadMarketAlerts, loadMarketAlertRules, loadMarketSource, loadMarketSources,
   loadProductSafetyEvents, loadProductSafetyEvent,
@@ -194,16 +195,16 @@ export async function fetchAndIngestCpscRecalls(opts: FetchCpscOptions = {}): Pr
     httpDurationMs = 0;
   } else {
     const t0 = Date.now();
-    const res = await fetch(CPSC_FEED_URL, {
-      headers: { "User-Agent": "LightChoiceRadar/4.0 (Consumer Product Safety Research; +https://lightchoice.dev)" },
-      signal: AbortSignal.timeout(12_000),
+    const res = await guardedFetch(CPSC_FEED_URL, {
+      headers: { "user-agent": "LightChoiceRadar/4.0 (Consumer Product Safety Research; +https://lightchoice.dev)" },
+      timeoutMs: 12_000,
     });
     httpDurationMs = Date.now() - t0;
     httpStatus = res.status;
-    if (!res.ok) {
-      throw new Error(`CPSC RSS Feed 请求失败：HTTP ${res.status} ${res.statusText}`);
+    if (res.status !== 200) {
+      throw new Error(`CPSC RSS Feed 请求失败：HTTP ${res.status}`);
     }
-    xml = await res.text();
+    xml = res.text();
   }
 
   const items = parseCpscRssXml(xml).slice(0, opts.maxItems || 25);

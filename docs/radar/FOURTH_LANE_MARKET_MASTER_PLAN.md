@@ -1,10 +1,11 @@
-# 第四主线「市场信号」权威工程主计划（AUTO-ACTIVATE 落地版）
+# 第四主线「市场信号」权威工程主计划（AUTO-TRUTH 真实收口版）
 
 > **文档身份**：第四主线唯一工程主计划。本文件取代此前一切关于第四主线的分散草案与补丁编号，后续修订直接改写本文件对应章节并在 CURRENT.md 记录。
 > **工程落地状态**：
 > - **AUTO-FIRST**：彻底淘汰手工 CSV/Excel 导入方案，确立全自动监控与合规守护产品范式，固化 12 模块原始契约与定义；
 > - **AUTO-RUN**：完成后台专用调度 Worker（`radar-market`）开发，通过 PostgreSQL 顾问锁（`7204229008`）单实例排他、会话级执行互斥锁（`7204229009`）与多日停机单窗口防风暴保护；接通美国官方 CPSC 消费品安全通告流（`cpsc-product-recalls`），产出 7 段式确定性中文解释；
-> - **AUTO-ACTIVATE**：将 `radar-market` 深度整合入本机受管运维体系（`start-radar.cmd` 六步启动、`stop-radar.cmd` 七步停机、`status-radar.cmd` 锁状态探针）；单 Run ID 全链追溯实证（Worker PID -> Run ID -> HTTP 200 -> Ingest -> ProductSafetyEvent -> Downstream -> API）；Amazon 核心数据源 14 维度深度调查与真实只读探测（确认核心商业数据除 CPSC 外暂无合法免费 API，门禁受控关闭，标准模型就绪，详见 [AMAZON_DATA_SOURCES_BREAKTHROUGH.md](AMAZON_DATA_SOURCES_BREAKTHROUGH.md)）。
+> - **AUTO-ACTIVATE**：将 `radar-market` 深度整合入本机受管运维体系（`start-radar.cmd` 六步启动、`stop-radar.cmd` 七步停机、`status-radar.cmd` 锁状态探针）；单 Run ID 全链追溯实证；Amazon 核心数据源全景梳理；
+> - **AUTO-TRUTH**：严谨验真与事实纠偏收口。① 严格拆分 CPSC `SYNTHETIC_E2E`（PASS）与 `LIVE_SOURCE_E2E`（BLOCKED_BY_NETWORK），执行零合成回退策略，拒绝虚假 PASS；② 消除前端看板“虚假在线”，明确区分 Worker 进程在线与 Amazon 核心商业源受控阻断；③ Amazon 核心数据源按 7 层状态深度纠偏（推翻“全球无 API”误论，明确 SP-API 账号门禁与 PA-API 导流条款门禁，详见 [AMAZON_DATA_SOURCES_BREAKTHROUGH.md](AMAZON_DATA_SOURCES_BREAKTHROUGH.md)）；④ 全套测试与浏览器验收 100% 诚实通过。
 > - **云端部署**：`R7_CLOUD_DEPLOYMENT = DEFERRED_BY_USER`，`R8_LOCAL_NATURAL_OPERATION = NOT_STARTED`。
 > **执行边界**：前三主线业务零受扰；DeepSeek 模型调用 0 次（¥0）；外部商业数据采购 ¥0；Git 遵守本地精准提交（严禁 git push，严禁 git add .）。
 

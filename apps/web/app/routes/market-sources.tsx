@@ -174,7 +174,7 @@ export default function MarketSources() {
               <h2 className="text-[13px] font-semibold text-ink">全自动调度状态</h2>
               {scheduler?.isRunning ? (
                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-ok/10 text-ok border border-ok/30">
-                  ● 后台调度器在线 {scheduler.pid ? `(PID ${scheduler.pid})` : ""}
+                  ● 后台调度器在线 {scheduler.pid ? `(PID ${scheduler.pid})` : ""} · Amazon 核心源未启用
                 </span>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-amber/10 text-amber border border-amber/30">
@@ -184,8 +184,8 @@ export default function MarketSources() {
             </div>
             <p className="mt-1 text-[11.5px] text-ink-4">
               {scheduler?.isRunning
-                ? "后台守护进程（radar-market）正在自主按周期轮询获准来源，无需保持浏览器打开，无需手动点击。"
-                : "当前未检测到后台独立调度进程，任务仅在手动诊断时触发；可在本机运行 start market 启动后台自主守护。"}
+                ? "后台守护进程（radar-market）正常在线，周期轮询已获准来源（当前仅 CPSC 官方公共安全通告流）；Amazon 美国站核心商业数据因账号资质门禁保持受控阻断，未开启自动抓取。"
+                : "当前未检测到后台独立调度进程，任务仅在手动诊断时触发；可在本机运行 start-radar.cmd 或 radar-ops.ts start market 启动后台自主守护。"}
             </p>
           </div>
           <div className="flex items-center gap-2">
