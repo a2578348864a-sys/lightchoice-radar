@@ -207,7 +207,9 @@ export default function MarketSources() {
               {running ? "正在执行到期采集与分析..." : "⚡ 立即触发到期自动采集与分析"}
             </button>
             <button
-              onClick={() => handleTriggerRun(true)}
+              onClick={() => {
+                if (confirm("强制重算会跳过到期周期判断，立即执行全部已授权的周期来源（含真实网络采集）。日常巡检请用左侧「立即触发到期自动采集」。确认继续？")) handleTriggerRun(true);
+              }}
               disabled={running}
               className="btn text-[12px] py-1.5 px-3 border border-line text-ink-3 hover:text-ink hover:bg-bg-sunk"
               title="仅在调试或强制全量刷新时使用，跳过到期周期判断"
