@@ -22,8 +22,14 @@ export function stripBom(text: string): string {
 
 export function sanitizeCsvFormula(value: string): string {
   if (!value) return value;
+  if (/^[+-]?\d+(?:\.\d+)?%?$/.test(value.trim())) {
+    return value;
+  }
   const first = value.charAt(0);
-  if (first === "=" || first === "+" || first === "-" || first === "@" || first === "\t" || first === "\r") {
+  if (first === "=" || first === "@" || first === "\t" || first === "\r") {
+    return "'" + value;
+  }
+  if ((first === "+" || first === "-") && /[a-zA-Z(]/.test(value)) {
     return "'" + value;
   }
   return value;

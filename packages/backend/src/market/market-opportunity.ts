@@ -34,16 +34,37 @@ export async function buildOpportunityCandidates(opts: { minRise?: number; /** O
   for (const sig of kwSignals) {
     const kwMatch = /关键词「(.+?)」/.exec(sig.subjectZh);
     const kw = kwMatch ? kwMatch[1]! : sig.id;
-    const cleanKwId = kw.toLowerCase().replace(/[^a-z0-9_-]/gi, "").slice(0, 40) || "kw";
-    const oppId = `opp-kw-${cleanKwId}`;
+    const cleanKwId = kw.toLowerCase().replace(/[^a-z0-9_-]/gi, "-").replace(/-+/g, "-").slice(0, 40) || "kw";
+    // Structured stable identity (master plan §3.2 + Auto-First): marketplace:type:identifier
+    const oppId = `opp:US:keyword:${cleanKwId}`;
+    const legacyId = `opp-kw-${cleanKwId}`;
     const title = `研究线索（待补证）：关键词「${kw}」需求上升`;
-    const prev = byKey.get(oppId) || existing.find((o) => o.title === title || o.id === "opp-" + sig.id.replace(/[^a-z0-9-]/gi, "").slice(0, 60));
+    const prev = byKey.get(oppId) || byKey.get(legacyId) || existing.find((o) => o.title === title || o.id === "opp-" + sig.id.replace(/[^a-z0-9-]/gi, "").slice(0, 60));
+
+    const explanation = {
+      whatHappenedZh: `监测到关键词「${kw}」搜索排名较前序观测发生正向位移（+${sig.strength} 位）。`,
+      changeAnalysisZh: `排名从前序状态上升至当前最新观测，展现阶段性买家主动搜索需求热度提升。`,
+      supportingEvidenceZh: [sig.detailZh, "来源依据：Amazon ABA 搜索词快照序列（按周统计）"],
+      counterEvidenceZh: [
+        "排名上升仅代表搜索排位相对靠前，不代表全网绝对搜索量或订单增长（C1 规则）。",
+        "尚未取得目标类目商品层面的真实供给分布与头部垄断程度证据（需 M03/M05）。",
+      ],
+      whyAttentionNeededZh: `短期位移迅速通常伴随潜在季节性或爆款发酵，值得作为利基市场研究候选跟进。`,
+      whyNotInstantSilverBulletZh: `缺少真实采购成本、FBA 费率、退货率及广告竞价 CPC 数据，绝不能直接认定为可盈利商机。`,
+      unverifiedInformationGapsZh: [
+        "商品级在售规格与平均客单价（M03 缺）",
+        "类目退货率与消费者主要缺陷痛点（VOC 缺）",
+        "专利侵权或安全认证准入门槛（M12 缺）",
+      ],
+    };
+
     if (prev) {
-      const refreshed = {
+      const refreshed: MarketOpportunity = {
         ...prev,
         basisVersion: sig.basisVersions.join("+"),
         evidence: dedupeEvidence(prev.evidence, evidenceOf(sig)),
         review: reviewAfterBasisChange(prev.review, sig.basisVersions.join("+")),
+        explanation,
       };
       await saveMarketOpportunity(refreshed);
       byKey.set(prev.id, refreshed);
@@ -62,6 +83,7 @@ export async function buildOpportunityCandidates(opts: { minRise?: number; /** O
       dataGaps: ["无商品级供给证据（M03 单期样本）", "无跨期价格/竞争历史（M04/M06）", "无消费者原声交叉证据（三线材料外发受限）"],
       score: null, review: { status: "pending" },
       basisVersion: sig.basisVersions.join("+"), createdAt: new Date().toISOString(),
+      explanation,
     };
     await saveMarketOpportunity(opp);
     byKey.set(opp.id, opp);

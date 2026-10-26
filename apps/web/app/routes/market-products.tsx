@@ -115,10 +115,10 @@ export default function MarketProducts() {
         <div className="mt-4 rounded bg-paper-2 p-4 text-[12.5px] text-ink-2">
           <p className="font-semibold">服务不可用或需要管理员会话。</p>
           <p className="mt-1 text-[11.5px] text-ink-3">
-            商品观测需先导入榜单快照（来源页）。支持人工观察 CSV 或 JSON 导入。
+            商品观测依赖获准的官方商品与榜单数据流。当前 Amazon 官方反爬与 SP-API 凭据保持安全阻断守护；可在自动来源页查看状态。
           </p>
           <Link to="/market/sources" className="pill mt-2 inline-block bg-paper text-[12px]">
-            前往数据导入工作台 →
+            查看自动来源监控 →
           </Link>
         </div>
       ) : (
@@ -214,7 +214,7 @@ export default function MarketProducts() {
               ))}
               {data.products.length === 0 && (
                 <div className="rounded bg-paper-2 p-4 text-center text-[12.5px] text-ink-3">
-                  暂无商品观测记录。请前往「来源与数据导入」工作台上传商品或榜单数据。
+                  暂无商品观测记录。当前 Amazon 商品级自动采集保持安全阻断，可在自动来源页查看合规准入。
                 </div>
               )}
             </div>
@@ -246,7 +246,7 @@ export default function MarketProducts() {
 
           <nav className="mt-4 flex flex-wrap gap-1.5 text-[12px]">
             <Link to="/market/opportunities" className="pill">进入机会研究 →</Link>
-            <Link to="/market/sources" className="pill">导入新榜单快照 →</Link>
+            <Link to="/market/sources" className="pill">查看自动来源监控 →</Link>
           </nav>
         </>
       )}

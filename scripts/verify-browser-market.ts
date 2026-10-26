@@ -67,15 +67,17 @@ async function run() {
     console.log("--- 4. Keyword Demand Page ---");
     await page.goto(`${BASE_URL}/market/keywords`, { waitUntil: "networkidle" });
     const kwTitle = await page.textContent("h1");
-    const hasKwEmptyState = await page.locator("text=暂无获准关键词数据").isVisible();
-    await logResult("4. 搜索需求页：多期快照筛选器与诚实空态正常", Boolean(kwTitle?.includes("搜索需求") && hasKwEmptyState));
+    const hasKwContent = await page.locator('section[aria-label="数据来源说明"]').isVisible() || await page.locator("text=当前没有已获准的自动数据来源").isVisible();
+    const hasNoManualUploadPrompt = !(await page.locator("text=上传 CSV").isVisible());
+    await logResult("4. 搜索需求页：多期快照筛选器与诚实空态正常，无手工上传引导", Boolean(kwTitle?.includes("搜索需求") && hasKwContent && hasNoManualUploadPrompt));
 
     // 5. Products Page (/market/products)
     console.log("--- 5. Products Page ---");
     await page.goto(`${BASE_URL}/market/products`, { waitUntil: "networkidle" });
     const prodTitle = await page.textContent("h1");
-    const hasProdEmptyState = await page.locator("text=服务不可用或需要管理员会话").isVisible() || await page.locator("text=暂无商品观测记录").isVisible() || await page.locator('section[aria-label="商品观测"]').isVisible();
-    await logResult("5. 商品与竞争页：观测看板与诚实空态正常，无虚构排名", Boolean(prodTitle?.includes("商品与竞争") && hasProdEmptyState));
+    const hasProdContent = await page.locator('section[aria-label="榜单快照"]').isVisible() || await page.locator("text=当前 Amazon 商品级自动采集保持安全阻断").isVisible() || await page.locator("text=商品观测依赖获准的官方商品").isVisible();
+    const hasNoProdUploadPrompt = !(await page.locator("text=上传商品或榜单数据").isVisible());
+    await logResult("5. 商品与竞争页：观测看板与安全阻断空态正常，无手工上传提示", Boolean(prodTitle?.includes("商品与竞争") && hasProdContent && hasNoProdUploadPrompt));
 
     // 6. Opportunity Research & Commercial Scenario Calculator (/market/opportunities)
     console.log("--- 6. Opportunity Research & Calculator ---");
@@ -112,25 +114,28 @@ async function run() {
       Boolean(alertTitle?.includes("预警工作台") && hasRules && hasEvalBtn)
     );
 
-    // 8. Sources Management & CSV Import Workbench (/market/sources)
-    console.log("--- 8. Sources & CSV Import Workbench ---");
+    // 8. Auto Source Governance & Scheduler Dashboard (/market/sources)
+    console.log("--- 8. Auto Source Governance & Scheduler Dashboard ---");
     await page.goto(`${BASE_URL}/market/sources`, { waitUntil: "networkidle" });
     const sourceTitle = await page.textContent("h1");
-    const hasWorkbench = await page.locator('section[aria-label="市场数据导入工作台"]').isVisible();
-    const hasCsvTab = await page.locator('button:has-text("本地 CSV 文件导入")').isVisible();
-    const hasJsonTab = await page.locator('button:has-text("粘贴 JSON 快照")').isVisible();
-    
-    // Test tab switch to JSON & input validation
-    await page.locator('button:has-text("粘贴 JSON 快照")').click();
-    const textarea = page.locator("textarea");
-    await textarea.fill("invalid-non-json-test");
-    const importBtn = page.locator('button:has-text("确认导入数据库")');
-    await importBtn.click();
-    await page.waitForTimeout(500);
-    const hasJsonError = await page.locator("text=❌ JSON 语法错误").isVisible();
-    
-    await logResult("8. 来源管理与数据导入工作台：CSV/JSON模式切换、用途许可确认与格式校验正常",
-      Boolean(sourceTitle?.includes("来源管理") && hasWorkbench && hasCsvTab && hasJsonTab && hasJsonError)
+    const hasScheduleSection = await page.locator('section[aria-label="调度执行与操作"]').isVisible();
+    const triggerBtn = page.locator('button:has-text("立即触发到期自动采集与分析")');
+    const hasTriggerBtn = await triggerBtn.isVisible();
+    const hasSourceLedger = await page.locator('section[aria-label="来源台账"]').isVisible();
+
+    // Verify completely ZERO file upload elements exist
+    const fileInputCount = await page.locator('input[type="file"]').count();
+    const hasDragDropZone = await page.locator("text=点击或拖拽 CSV 文件至此处").isVisible();
+    const hasExcelGuide = await page.locator("text=Excel (.xlsx)").isVisible();
+
+    // Trigger auto scheduler
+    await triggerBtn.click();
+    await page.waitForTimeout(1500);
+    const hasRunFeedback = await page.locator("text=自动调度执行完成").isVisible();
+
+    await logResult("8. 自动来源管理与调度看板：周期状态、一键触发自动调度、零文件上传残留",
+      Boolean(sourceTitle?.includes("自动来源") && hasScheduleSection && hasTriggerBtn && hasSourceLedger && fileInputCount === 0 && !hasDragDropZone && !hasExcelGuide && hasRunFeedback),
+      `fileInputs=${fileInputCount}, triggerExecuted=${hasRunFeedback}`
     );
 
     // 9. Mobile Viewport (390px) Check

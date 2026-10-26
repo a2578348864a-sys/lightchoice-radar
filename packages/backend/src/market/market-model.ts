@@ -31,7 +31,7 @@ export interface MarketPermissionBasis {
 /** One registered market source: the adapter kind plus its per-use permission state. */
 export interface MarketSource {
   id: string;
-  kind: "amz123-keywords" | "amazon-chart-manual" | "generic-import" | "api-pending" | "external-pending";
+  kind: "amz123-keywords" | "amazon-chart-manual" | "generic-import" | "api-pending" | "external-pending" | "cpsc-recalls" | "google-trends" | "synthetic-test";
   label: string;
   /** The original data producer (e.g. "Amazon ABA via AMZ123 display") — never the re-publisher alone. */
   producer: string;
@@ -41,6 +41,12 @@ export interface MarketSource {
   enabled: boolean;
   /** Adapter state machine (master plan §5.2), kept as an honest record. */
   automation: "manual-import-only" | "authorized-periodic" | "blocked-no-license" | "pending-credentials";
+  /** Automated execution cadence in hours (default 24h). */
+  cadenceHours?: number;
+  lastRunAt?: string | null;
+  nextRunAt?: string | null;
+  lastError?: string | null;
+  runCount?: number;
   /** Uses whose grant by the SOURCE SITE is not verified — operator-private-research use never
       silently upgrades into a site licence (R6-CLOSE task 2). */
   unverifiedUses?: MarketUse[];
@@ -162,6 +168,16 @@ export interface MarketOpportunityEvidence {
   evidenceGroup: string;
 }
 
+export interface MarketOpportunityExplanation {
+  whatHappenedZh: string;
+  changeAnalysisZh: string;
+  supportingEvidenceZh: string[];
+  counterEvidenceZh: string[];
+  whyAttentionNeededZh: string;
+  whyNotInstantSilverBulletZh: string;
+  unverifiedInformationGapsZh: string[];
+}
+
 export interface MarketOpportunity {
   id: string;
   title: string;
@@ -176,6 +192,7 @@ export interface MarketOpportunity {
   review: MarketReview;
   basisVersion: string;
   createdAt: string;
+  explanation?: MarketOpportunityExplanation;
 }
 
 export interface MarketAlertRule {

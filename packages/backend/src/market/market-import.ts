@@ -15,6 +15,7 @@ import {
 import {
   parseCsv, mapAndValidateKeywordRows, mapAndValidateProductRows, type RowValidationError,
 } from "./csv-parser.ts";
+import { buildOpportunityCandidates, evaluateAlerts } from "./market-opportunity.ts";
 
 /* ------------------------------------------------------------------ adapters */
 
@@ -348,32 +349,43 @@ export async function applyCsvImport(input: CsvImportInput): Promise<CsvImportRe
 
 /* ------------------------------------------------------------- source seeding */
 
-/** The two R0-DATA real sources, registered with their honest current permission state. */
+/** The registered market sources with their honest permission and automation tiers. */
 export function defaultMarketSources(): MarketSource[] {
   return [
+    {
+      id: "cpsc-product-recalls", kind: "cpsc-recalls", label: "CPSC 官方消费品安全与召回开放数据流",
+      producer: "美国消费品安全委员会 (U.S. CPSC 官方公开 RSS Feed)", marketplace: "US",
+      permission: {
+        uses: ["fetch", "store", "compute", "display"],
+        basis: "美国联邦政府公开机器可读开放数据流（Public Domain / RSS 2.0），无需 API Key，官方支持自动化读取，用于消费品安全与缺陷研究。",
+        evidence: "L3",
+      },
+      enabled: true, automation: "authorized-periodic", cadenceHours: 24,
+      notes: "按日更新；覆盖消费品安全缺陷、火灾、电击、误食、跌落及强制标准违规事件；支撑模块 09 创新线索、模块 10 缺陷反证及模块 12 预警。",
+    },
     {
       id: "amz123-us-keywords", kind: "amz123-keywords", label: "AMZ123 美国站热搜词（ABA 二手展示）",
       producer: "Amazon ABA（经 AMZ123 页面二次展示）", marketplace: "US",
       permission: {
         uses: ["store", "compute", "display"],
-        basis: "操作员授权（operator grant）：对自己以人工等价方式合法读取的公开页面样本，授予本项目私有研究用途（存储/计算/站内展示）。这不等同于 AMZ123 或 Amazon 授予数据使用权。",
+        basis: "操作员授权（operator grant）：对人工合法读取的公开页面样本授予私有研究用途。未获得站点长期自动化抓取许可。",
         evidence: "L3",
       },
       unverifiedUses: ["fetch", "modelSend", "export"],
-      enabled: true, automation: "manual-import-only",
-      notes: "周更；「涨跌幅度」为两周排名绝对位移（R0-DATA 100/100 验证），方向须由两周排名推导；无搜索量列。",
+      enabled: false, automation: "blocked-no-license",
+      notes: "未取得自动化周期抓取或二次分发使用许可，自动调度保持阻断（BLOCKED_BY_SOURCE_POLICY）。历史已有观测保留供比较。",
     },
     {
-      id: "amazon-chart-manual", kind: "amazon-chart-manual", label: "Amazon 官方榜单·受管人工观察",
-      producer: "Amazon（官方 Best Sellers 页面，真实浏览器人工等价观察）", marketplace: "US",
+      id: "amazon-chart-manual", kind: "amazon-chart-manual", label: "Amazon 官方榜单",
+      producer: "Amazon（官方 Best Sellers 页面）", marketplace: "US",
       permission: {
         uses: ["store", "compute", "display"],
-        basis: "操作员授权（operator grant）：对自己以真实浏览器人工观察取得的公开页面事实，授予私有研究用途。Amazon 未授予任何自动化采集或再分发许可。",
+        basis: "操作员授权（operator grant）：对人工观察取得的公开页面事实授予私有研究用途。Amazon 未授予自动化采集许可。",
         evidence: "L3",
       },
       unverifiedUses: ["fetch", "modelSend", "export"],
-      enabled: true, automation: "manual-import-only",
-      notes: "榜单名次≠销量；榜单自身周期未在页面声明（periodKey=观察日）；无父子/变体信息。",
+      enabled: false, automation: "blocked-no-license",
+      notes: "Amazon 官方反爬限制且未获公开自动化授权，禁止无头浏览器后台循环抓取（BLOCKED_BY_SOURCE_POLICY）。历史已有观测保留供比较。",
     },
     {
       id: "sp-api", kind: "api-pending", label: "Amazon SP-API（Catalog Items）",
@@ -381,6 +393,13 @@ export function defaultMarketSources(): MarketSource[] {
       permission: { uses: [], basis: "R0-FINAL：无开发者应用与卖家授权（L2 负面）——所有用途关闭", evidence: "L1" },
       enabled: false, automation: "pending-credentials",
       notes: "资格缺口：注册开发者应用+卖家授权（Product Listing 角色）。",
+    },
+    {
+      id: "google-trends-us", kind: "google-trends", label: "Google Trends 搜索趋势",
+      producer: "Google LLC（官方公开趋势网页/数据集）", marketplace: "US",
+      permission: { uses: [], basis: "官方公开网页/公共数据集；本机直连超时（国内网络受限，需代理或 BigQuery 公共数据集授权）", evidence: "L1" },
+      enabled: false, automation: "blocked-no-license",
+      notes: "网络不可达或需额外配置代理；相对指数归一化不可与 Amazon 搜索量强行拼接（C10 规则）。",
     },
     {
       id: "external-platforms", kind: "external-pending", label: "eBay/Etsy/Walmart 外部平台",

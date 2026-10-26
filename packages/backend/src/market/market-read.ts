@@ -24,8 +24,8 @@ export async function moduleStates(): Promise<ModuleState[]> {
     {
       module: "01", name: "搜索需求雷达", engineering: "implemented",
       dataState: multiPeriodKw ? `多期连续（${inputs.keywordSnapshots} 期快照，${inputs.keywordRows} 行）` : latestKw ? "真实数据（单期快照）" : "无数据",
-      noteZh: multiPeriodKw ? `已入库 ${inputs.keywordSnapshots} 期快照；支持多期排名趋势对比；排名前进≠搜索量增长` : latestKw ? `已入库 ${inputs.keywordRows} 行关键词快照；C1 排名变化可算；排名≠搜索量` : "等待获准导入",
-      business: multiPeriodKw ? "多期趋势可用（C1/C7 规则生效）" : latestKw ? "样本级可用（单期）；多期趋势需第二期" : "NOT_RUN（无数据）",
+      noteZh: multiPeriodKw ? `已入库 ${inputs.keywordSnapshots} 期快照；支持多期排名趋势对比；排名前进≠搜索量增长；外部站点自动抓取保持阻断守护` : latestKw ? `已入库 ${inputs.keywordRows} 行关键词快照；C1 排名变化可算；排名前进≠搜索量；外部站点自动抓取保持阻断守护` : "等待获准自动来源或历史数据",
+      business: multiPeriodKw ? "多期趋势可用（C1/C7 规则生效）" : latestKw ? "样本级可用（单期）；自动采集 BLOCKED" : "NOT_RUN（无获准自动来源）",
     },
     {
       module: "02", name: "类目市场雷达", engineering: "implemented",
@@ -36,8 +36,8 @@ export async function moduleStates(): Promise<ModuleState[]> {
     {
       module: "03", name: "商品与新品雷达", engineering: "implemented",
       dataState: `真实样本 ${inputs.products.length} 个（人工观察级）`,
-      noteZh: "ASIN 身份+四分首次观察已实现；首次上榜≠新品上架（C4）；支持商品观测历史时间线",
-      business: inputs.products.length ? `样本级可用（${inputs.products.length} 个商品历史已通）；变体研究 BLOCKED` : "NOT_RUN（无数据）",
+      noteZh: "ASIN 身份+四分首次观察已实现；首次上榜≠新品上架（C4）；支持商品观测历史时间线；Amazon 自动抓取保持安全阻断",
+      business: inputs.products.length ? `样本级可用（${inputs.products.length} 个商品历史已通）；自动采集 BLOCKED` : "NOT_RUN（无数据）",
     },
     {
       module: "04", name: "销售热度雷达", engineering: "implemented",
@@ -65,15 +65,15 @@ export async function moduleStates(): Promise<ModuleState[]> {
     },
     {
       module: "08", name: "外部平台雷达", engineering: "implemented",
-      dataState: "支持人工导入记录",
-      noteZh: "支持录入 eBay/Etsy/Walmart 商品记录与跨平台候选匹配（C11 不相加）；无获准自动爬虫",
-      business: "人工导入与匹配就绪；自动采集 BLOCKED",
+      dataState: "支持结构化私有记录",
+      noteZh: "支持录入与读取 eBay/Etsy/Walmart 商品记录与跨平台候选匹配（C11 不相加）；无获准自动爬虫",
+      business: "结构化记录就绪；自动采集 BLOCKED",
     },
     {
       module: "09", name: "创新与替代品雷达", engineering: "implemented",
-      dataState: "支持人工记录线索",
-      noteZh: "支持记录创新功能差异点与痛点替代方案；无获准自动专利/众筹接入",
-      business: "人工线索记录就绪；自动接入 BLOCKED",
+      dataState: "已打通 CPSC 消费品安全数据流",
+      noteZh: "已接入官方 CPSC 消费品安全与召回开放数据流，自动提炼缺陷反证与结构防呆线索；众筹/专利自动接入 BLOCKED",
+      business: "CPSC 官方数据流自动运行就绪；众筹/专利自动接入 BLOCKED",
     },
     {
       module: "10", name: "供需缺口雷达", engineering: "implemented",

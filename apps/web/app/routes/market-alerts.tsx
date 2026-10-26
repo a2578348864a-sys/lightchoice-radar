@@ -132,7 +132,7 @@ export default function MarketAlerts() {
             </h2>
             {alertsList.length === 0 ? (
               <div className="mt-1 rounded bg-paper-2 p-4 text-center text-[12.5px] text-ink-3">
-                暂无触发的预警记录。导入数据后可点击上方「⚡ 立即触发规则评估」进行扫描。
+                暂无触发的预警记录。新观测到达时系统将自动评估；亦可点击上方「⚡ 立即触发规则评估」就地刷新。
               </div>
             ) : (
               <ul className="mt-1 space-y-1.5 text-[12.5px]">
@@ -162,7 +162,7 @@ export default function MarketAlerts() {
 
           <nav className="mt-4 flex flex-wrap gap-1.5 text-[12px]">
             <Link to="/market/opportunities" className="pill">查看机会研究 →</Link>
-            <Link to="/market/sources" className="pill">导入新数据 →</Link>
+            <Link to="/market/sources" className="pill">查看自动来源监控 →</Link>
           </nav>
         </>
       )}

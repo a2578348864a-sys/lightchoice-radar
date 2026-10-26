@@ -29,11 +29,14 @@ const {
   retireUnqualifiedAlerts, reviewOpportunity, scoreOpportunity,
 } = await import("@aihot/backend/market/market-opportunity");
 const { loadMarketOverview, loadKeywordView, loadProductView } = await import("@aihot/backend/market/market-read");
+const { parseCpscRssXml, fetchAndIngestCpscRecalls, isSourceDue, runDueMarketSources } = await import("@aihot/backend/market/market-scheduler");
 
 const KW_SOURCE = "test-amz123";
 const CHART_SOURCE = "test-amz-chart";
 
 before(async () => {
+  await sql`DELETE FROM settings WHERE key LIKE 'market.opp.%' OR key LIKE 'market.alert.%' OR key LIKE 'market.source.test-%'`;
+  await sql`DELETE FROM articles WHERE source_id IN ('market-keywords', 'market-charts', 'market-products')`;
   await saveMarketSource({
     id: KW_SOURCE, kind: "amz123-keywords", label: "测试关键词源", producer: "Amazon ABA（测试二手展示）", marketplace: "US",
     permission: { uses: ["store", "compute", "display", "export"], basis: "test", evidence: "L3" },
@@ -331,7 +334,7 @@ test("SP-API 种子：全用途关闭，无凭据不授权任何操作", async (
   const spapi = sources.find((s) => s.id === "sp-api")!;
   assert.equal(spapi.enabled, false);
   assert.equal(sourceAllows(spapi, "store"), false);
-  assert.equal(defaultMarketSources().length, 4);
+  assert.equal(defaultMarketSources().length, 6);
 });
 
 /* -------------------------------------------------- cross-period series (D gate) */
@@ -512,4 +515,149 @@ test("外部平台与创新线索 (M08/M09)：私有记录存储与读取", asyn
   });
   const cues = await loadMarketInnovationCues();
   assert.ok(cues.some((c) => c.id === "cue-1" && c.cueType === "feature-diff"));
+});
+
+/* -------------------------------------------------- AUTO-FIRST automated pipeline */
+
+test("CPSC 官方公开 RSS XML 解析与隐患类型自动归类", () => {
+  const sampleXml = `<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0">
+  <channel>
+    <title>CPSC Recalls</title>
+    <item>
+      <title>VQQQ Gas Patio Heaters Recalled Due to Risk of Serious Injury or Death from Fire and Burn Hazards</title>
+      <link>https://www.cpsc.gov/Recalls/2026/VQQQ-Heaters</link>
+      <description>&lt;p&gt;Components can malfunction causing fire and burn hazards.&lt;/p&gt;</description>
+      <pubDate>October 22, 2026</pubDate>
+      <guid isPermaLink="true">https://www.cpsc.gov/_recall_001</guid>
+    </item>
+    <item>
+      <title>Children Light-Up Costumes Recalled Due to Battery Ingestion</title>
+      <link>https://www.cpsc.gov/Recalls/2026/Costumes</link>
+      <description>Violate mandatory standard for toys with coin batteries.</description>
+      <pubDate>October 20, 2026</pubDate>
+      <guid>https://www.cpsc.gov/_recall_002</guid>
+    </item>
+  </channel>
+</rss>`;
+
+  const items = parseCpscRssXml(sampleXml);
+  assert.equal(items.length, 2);
+  assert.equal(items[0]!.productKeyword, "VQQQ Gas Patio Heaters");
+  assert.match(items[0]!.hazard, /fire/i);
+  assert.match(items[1]!.hazard, /battery/i);
+});
+
+test("自动调度器：到期判定、单次补偿与防风暴（多日关机不发风暴）", () => {
+  const now = new Date("2026-10-26T12:00:00Z");
+  // 1. Source not enabled -> not due
+  assert.equal(isSourceDue({
+    id: "src-1", kind: "cpsc-recalls", label: "t", producer: "p", marketplace: "US",
+    permission: { uses: ["fetch", "store"], basis: "t", evidence: "L3" },
+    enabled: false, automation: "authorized-periodic",
+  }, now), false);
+
+  // 2. Source blocked-no-license -> not due
+  assert.equal(isSourceDue({
+    id: "src-2", kind: "amz123-keywords", label: "t", producer: "p", marketplace: "US",
+    permission: { uses: ["store"], basis: "t", evidence: "L3" },
+    enabled: true, automation: "blocked-no-license",
+  }, now), false);
+
+  // 3. Source never run -> due immediately
+  assert.equal(isSourceDue({
+    id: "src-3", kind: "cpsc-recalls", label: "t", producer: "p", marketplace: "US",
+    permission: { uses: ["fetch", "store"], basis: "t", evidence: "L3" },
+    enabled: true, automation: "authorized-periodic", cadenceHours: 24, lastRunAt: null,
+  }, now), true);
+
+  // 4. Source run 1 hour ago (cadence 24h) -> not due
+  assert.equal(isSourceDue({
+    id: "src-4", kind: "cpsc-recalls", label: "t", producer: "p", marketplace: "US",
+    permission: { uses: ["fetch", "store"], basis: "t", evidence: "L3" },
+    enabled: true, automation: "authorized-periodic", cadenceHours: 24,
+    lastRunAt: "2026-10-26T11:00:00Z",
+  }, now), false);
+
+  // 5. Source run 5 days ago (offline machine recovery) -> due for single cycle
+  assert.equal(isSourceDue({
+    id: "src-5", kind: "cpsc-recalls", label: "t", producer: "p", marketplace: "US",
+    permission: { uses: ["fetch", "store"], basis: "t", evidence: "L3" },
+    enabled: true, automation: "authorized-periodic", cadenceHours: 24,
+    lastRunAt: "2026-10-21T12:00:00Z",
+  }, now), true);
+});
+
+test("CPSC 自动采集到 M09 创新线索与安全反证全链路（隔离 XML 驱动）", async () => {
+  // Register CPSC source in test DB
+  await saveMarketSource({
+    id: "cpsc-test-source",
+    kind: "cpsc-recalls",
+    label: "CPSC 官方消费品召回测试源",
+    producer: "U.S. CPSC",
+    marketplace: "US",
+    permission: { uses: ["fetch", "store", "compute", "display"], basis: "test", evidence: "L3" },
+    enabled: true,
+    automation: "authorized-periodic",
+    cadenceHours: 24,
+  });
+
+  const testXml = `<rss version="2.0"><channel><item>
+    <title>Baby High Chairs Recalled Due to Fall and Entrapment Hazards</title>
+    <link>https://www.cpsc.gov/Recalls/HighChairs</link>
+    <description>Faulty buckle latch poses fall hazards.</description>
+    <pubDate>2026-10-26T00:00:00Z</pubDate>
+    <guid>cpsc-test-guid-001</guid>
+  </item></channel></rss>`;
+
+  const ingestRes = await fetchAndIngestCpscRecalls({
+    sourceId: "cpsc-test-source",
+    xmlOverride: testXml,
+  });
+  assert.equal(ingestRes.totalParsed, 1);
+  assert.equal(ingestRes.newCues, 1);
+
+  const cues = await loadMarketInnovationCues();
+  const chairCue = cues.find((c) => c.title.includes("Baby High Chairs"));
+  assert.ok(chairCue, "CPSC recall stored as M09 innovation/counter-evidence cue");
+  assert.match(chairCue!.differenceSummaryZh, /安全警示.*fall/i);
+
+  // Run due scheduler
+  const schedulerRes = await runDueMarketSources({
+    xmlOverride: testXml,
+    dryRun: false,
+  });
+  assert.ok(schedulerRes.executed >= 1);
+});
+
+test("机会候选 7 段式确定性中文解释与稳定身份契约", async () => {
+  // Ingest rising keyword
+  await applyKeywordSnapshot(parseAmz123KeywordCapture(kwInput("2026-11-15", [["stainless-french-press", 8, 45]]), "p"));
+  const opps = await buildOpportunityCandidates({ minRise: 10 });
+  const pressOpp = opps.find((o) => o.title.includes("stainless-french-press"));
+  assert.ok(pressOpp, "candidate generated");
+  assert.match(pressOpp!.id, /^opp:US:keyword:stainless-french-press$/, "stable structured identity opp:marketplace:type:identifier");
+  assert.ok(pressOpp!.explanation, "7-element explanation populated");
+  assert.match(pressOpp!.explanation!.whatHappenedZh, /正向位移/);
+  assert.match(pressOpp!.explanation!.whyNotInstantSilverBulletZh, /绝不能直接认定为可盈利商机/);
+  assert.ok(pressOpp!.explanation!.counterEvidenceZh.length >= 2);
+  assert.ok(pressOpp!.explanation!.unverifiedInformationGapsZh.length >= 2);
+});
+
+test("12 模块原契约与业务名称完整性校验（无擅自更名）", async () => {
+  const overview = await loadMarketOverview();
+  const names = overview.modules.map((m) => m.name);
+  assert.equal(names[0], "搜索需求雷达");
+  assert.equal(names[1], "类目市场雷达");
+  assert.equal(names[2], "商品与新品雷达");
+  assert.equal(names[3], "销售热度雷达");
+  assert.equal(names[4], "竞争格局雷达");
+  assert.equal(names[5], "价格与促销雷达");
+  assert.equal(names[6], "趋势与季节雷达");
+  assert.equal(names[7], "外部平台雷达");
+  assert.equal(names[8], "创新与替代品雷达");
+  assert.equal(names[9], "供需缺口雷达");
+  assert.equal(names[10], "商业可行性雷达");
+  assert.equal(names[11], "机会发现与预警");
+  assert.equal(names.length, 12, "exactly 12 modules, no 13th module");
 });

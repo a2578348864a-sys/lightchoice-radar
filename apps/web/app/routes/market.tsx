@@ -97,17 +97,17 @@ export default function MarketIndex() {
         <Link to="/market/products" className="pill">商品与竞争观测</Link>
         <Link to="/market/opportunities" className="pill">商业机会与测算</Link>
         <Link to="/market/alerts" className="pill">预警工作台</Link>
-        <Link to="/market/sources" className="pill font-medium text-accent">数据导入工作台 ↗</Link>
+        <Link to="/market/sources" className="pill font-medium text-accent">自动来源监控 ↗</Link>
       </nav>
 
       {!overview ? (
         <div className="mt-4 rounded bg-paper-2 p-4 text-[12.5px] text-ink-2">
           <p className="font-semibold">市场信号服务不可用或未初始化。</p>
           <p className="mt-1 text-[11.5px] text-ink-3">
-            此页面为私有研究区，需要管理员会话；首次使用请在来源页完成来源初始化与数据导入。
+            此页面为私有研究区，需要管理员会话；可在自动来源页查看后台自动调度与准入状态。
           </p>
           <Link to="/market/sources" className="pill mt-2 inline-block bg-paper text-[12px]">
-            前往来源与导入工作台 →
+            查看自动来源监控 →
           </Link>
         </div>
       ) : (

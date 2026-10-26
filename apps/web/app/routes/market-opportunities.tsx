@@ -147,13 +147,13 @@ export default function MarketOpportunities() {
       {/* Opportunities List */}
       {!data ? (
         <p className="mt-4 rounded bg-paper-2 px-3 py-2 text-[12.5px] text-ink-2">
-          服务不可用或需要管理员会话。需先导入关键词数据并生成候选。
+          服务不可用或需要管理员会话。系统将在后台自动轮询观测并提炼候选。
         </p>
       ) : filteredOpps.length === 0 ? (
         <div className="mt-4 rounded bg-paper-2 p-4 text-center text-[12.5px] text-ink-3">
           <p>当前筛选条件下暂无机会候选。</p>
           <p className="mt-1 text-[11.5px] text-ink-4">
-            若已导入关键词快照，可点击上方「⚡ 从上升词生成研究候选」按钮聚合线索。
+            新观测到达时系统将自动生成线索；亦可点击上方「⚡ 从上升词生成研究候选」即刻重新扫描。
           </p>
         </div>
       ) : (

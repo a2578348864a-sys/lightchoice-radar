@@ -25,13 +25,20 @@ export function stripBom(text: string): string {
 }
 
 /**
- * Sanitizes a string against CSV/spreadsheet formula injection.
- * Cells starting with =, +, -, @, \t, or \r can execute commands in Excel/Sheets.
+ * Sanitizes a string against CSV/spreadsheet formula injection when exporting to spreadsheet software.
+ * Ingestion preserves raw text facts without corruption; valid signed numbers (e.g. -5, +10.5) are kept intact.
  */
 export function sanitizeCsvFormula(value: string): string {
   if (!value) return value;
+  // If it's a valid number or percentage, do not corrupt the raw numeric fact
+  if (/^[+-]?\d+(?:\.\d+)?%?$/.test(value.trim())) {
+    return value;
+  }
   const first = value.charAt(0);
-  if (first === "=" || first === "+" || first === "-" || first === "@" || first === "\t" || first === "\r") {
+  if (first === "=" || first === "@" || first === "\t" || first === "\r") {
+    return "'" + value;
+  }
+  if ((first === "+" || first === "-") && /[a-zA-Z(]/.test(value)) {
     return "'" + value;
   }
   return value;

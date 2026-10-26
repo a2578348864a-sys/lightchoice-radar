@@ -168,10 +168,10 @@ export default function MarketKeywords() {
         <div className="mt-4 rounded bg-paper-2 p-4 text-[12.5px] text-ink-2">
           <p className="font-semibold">{data ? data.noteZh : "服务不可用或需要管理员会话。"}</p>
           <p className="mt-1 text-[11.5px] text-ink-3">
-            正式数据库尚未导入关键词快照。请前往「来源与数据导入」工作台上传 CSV 数据。
+            当前没有已获准的自动数据来源，系统未产生新的市场观测。外部站点自动抓取因未获授权保持安全阻断；可在自动来源页查看调度与合规状态。
           </p>
           <Link to="/market/sources" className="pill mt-2 inline-block bg-paper text-[12px]">
-            前往数据导入工作台 →
+            查看自动来源监控 →
           </Link>
         </div>
       ) : (
@@ -234,7 +234,7 @@ export default function MarketKeywords() {
 
           <nav className="mt-3 flex flex-wrap gap-1.5 text-[12px]">
             <Link to="/market/opportunities" className="pill">从上升词查看机会候选 →</Link>
-            <Link to="/market/sources" className="pill">导入新周期数据 →</Link>
+            <Link to="/market/sources" className="pill">查看自动来源监控 →</Link>
           </nav>
         </>
       )}
