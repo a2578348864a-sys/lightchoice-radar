@@ -371,7 +371,11 @@ export default function MarketSources() {
 
         <div className="mt-2 space-y-2">
           {sources.map((s) => {
-            const autoInfo = autoBadgeMap[s.automation] || { label: s.automation, tone: "neutral" };
+            // A disabled source must never wear an automation badge that implies it still runs:
+            // the停用 state outranks the automation mode in what the operator sees.
+            const autoInfo = !s.enabled
+              ? { label: "已停用（不再自动调度）", tone: "neutral" as const }
+              : autoBadgeMap[s.automation] || { label: s.automation, tone: "neutral" as const };
             return (
               <div key={s.id} className="card p-3 text-[12px]">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
