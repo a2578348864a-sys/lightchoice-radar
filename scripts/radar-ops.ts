@@ -366,8 +366,8 @@ async function start(target: string | undefined, ports: { web: number; api: numb
       return 1;
     }
     clearControlState("radar-maintenance");
-    const pid = startDetached({
-      entry: path.join(REPO_ROOT, "apps/worker/src/main.ts"),
+    const pid = await startOnHiddenConsole({
+      entry: path.join(REPO_ROOT, "apps/worker/src/radar-maintenance.ts"),
       nodeArgs: ["--env-file-if-exists=.env"],
       logName: "worker-maintenance.log",
       env: {
@@ -376,10 +376,10 @@ async function start(target: string | undefined, ports: { web: number; api: numb
         RADAR_WORKER_SCOPE: "maintenance",
         // The pg binaries live in the private runtime dir on this machine (same default radar-local uses);
         // runBackup would otherwise fail on spawn every night.
-        RADAR_PG_BIN: process.env.RADAR_PG_BIN || "D:\Workspace\LightChoiceRadarRuntime\postgresql-17.11\pgsql\bin",
+        RADAR_PG_BIN: process.env.RADAR_PG_BIN || "D:\\Workspace\\LightChoiceRadarRuntime\\postgresql-17.11\\pgsql\\bin",
       },
     });
-    console.log(`维护 Worker（每日清理 03:30 · 备份 04:10）pid=${pid ?? "?"} 日志 .data/_diag/worker-maintenance.log`);
+    console.log(`维护 Worker（每日清理 03:30 · 备份 04:10 · 报告出刊 每半小时）pid=${pid ?? "?"} 日志 .data/_diag/worker-maintenance.log`);
     console.log("  备份落在 .data/backups/（本地保留最近 3 份；未配置云端对象存储时不上传）。");
     console.log("  停止：node --env-file=.env scripts/radar-ops.ts stop maintenance");
     return 0;

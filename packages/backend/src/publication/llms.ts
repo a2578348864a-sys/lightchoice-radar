@@ -16,9 +16,9 @@ import { TOPIC_GROUPS, TOPICS, topicPageCounts } from "./topics.ts";
 export async function loadLlmsAvailability() {
   const [[row], counts, extra] = await Promise.all([
     sql<{ hasDailies: boolean; hasWeekly: boolean; hasMonthly: boolean }[]>`
-      SELECT EXISTS (SELECT 1 FROM reports WHERE kind = 'daily') AS "hasDailies",
-             EXISTS (SELECT 1 FROM reports WHERE kind = 'weekly') AS "hasWeekly",
-             EXISTS (SELECT 1 FROM reports WHERE kind = 'monthly') AS "hasMonthly"`,
+      SELECT EXISTS (SELECT 1 FROM reports WHERE kind = 'daily' AND coalesce(content->>'status', 'published') <> 'withdrawn') AS "hasDailies",
+             EXISTS (SELECT 1 FROM reports WHERE kind = 'weekly' AND coalesce(content->>'status', 'published') <> 'withdrawn') AS "hasWeekly",
+             EXISTS (SELECT 1 FROM reports WHERE kind = 'monthly' AND coalesce(content->>'status', 'published') <> 'withdrawn') AS "hasMonthly"`,
     topicPageCounts(new Date()),
     Promise.all(serverModules().map(async (m) => (await m.llms?.()) ?? {})),
   ]);

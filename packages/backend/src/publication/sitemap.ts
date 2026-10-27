@@ -49,7 +49,7 @@ export async function loadDiscoveryEntries(at = new Date(), limits?: { stories: 
           ',' ORDER BY p.article_id)) AS revision
       FROM publications p WHERE p.article_id IN (
         SELECT value #>> '{}' FROM jsonb_path_query(r.content, '$.**.itemId') AS cited(value))
-    ) citations ON true ORDER BY r.kind, r.key DESC`;
+    ) citations ON true WHERE coalesce(r.content->>'status', 'published') <> 'withdrawn' ORDER BY r.kind, r.key DESC`;
   const reportRevision = (kind: string) => sha256(stableJson(reports.filter((r) => r.kind === kind)));
   const topics = await topicPageCounts(at, !limits);
   entries.push(

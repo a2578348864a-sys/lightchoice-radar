@@ -141,10 +141,18 @@ async function main() {
   const monthlyStatus = monthlyRes?.status() ?? 0;
   const monthlyHtml = await page.content();
   const monthlyChecks: string[] = [];
-  if (monthlyHtml.includes("月报") && !monthlyHtml.includes("暂无已发布的报告")) {
-    monthlyChecks.push("PASS: Monthly report rendered real publication");
+  if (monthlyHtml.includes("暂无已发布的") && monthlyHtml.includes("月报")) {
+    monthlyChecks.push("PASS: Monthly report shows honest empty state after logical withdrawal");
   } else {
-    monthlyChecks.push("FAIL: Monthly report shows empty or failed");
+    monthlyChecks.push("FAIL: Monthly report missing honest empty state");
+  }
+  if (!monthlyHtml.includes("2026 年 10 月月报") && !monthlyHtml.includes("2026-10-27 21:22")) {
+    monthlyChecks.push("PASS: Premature 2026-10 monthly report content is hidden from readers");
+  } else {
+    monthlyChecks.push("FAIL: Premature 2026-10 monthly report content is still visible!");
+  }
+  if (monthlyHtml.includes("已接入受管维护定时调度")) {
+    monthlyChecks.push("PASS: Schedule notice clarifies zero-cost managed schedule");
   }
   const monthlyShot = path.join(SCREENSHOT_DIR, "06_monthly_report.png");
   await page.screenshot({ path: monthlyShot, fullPage: true });

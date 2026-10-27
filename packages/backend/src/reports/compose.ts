@@ -17,6 +17,7 @@ import { completeReceipt } from "../providers/receipts.ts";
 import { shutdownSignal } from "../jobs/queue.ts";
 import { emit } from "../modules.ts";
 import { config } from "../config.ts";
+import { clearReportIndexCache } from "../publication/reports.ts";
 import { arrangeDaily, candidates, dailyEdition, periodEntries, sectionOf, SECTION_ORDER, type Candidate, type EditionEntry } from "./edition.ts";
 
 export const REPORT_VERSION = promptVersion("report-period", "report-period-sections", "report-period-no-sections");
@@ -63,18 +64,20 @@ export function isReportDue(kind: ReportKind, key: string, now = new Date()): bo
   return now.getTime() >= reportDueAt(kind, key).getTime();
 }
 
-/** How many events an issue already published carries; nothing when it does not exist yet. */
+/** How many events an issue already published carries; nothing when it does not exist yet or is withdrawn. */
 async function savedReport(kind: ReportKind, key: string) {
-  const [row] = await sql<{ entries: number }[]>`
-    SELECT coalesce(CASE WHEN kind = 'daily' THEN (content->'metrics'->>'totalEvents')::int ELSE jsonb_array_length(content->'storyOrder') END, 0) AS entries
+  const [row] = await sql<{ entries: number; status: string | null }[]>`
+    SELECT coalesce(CASE WHEN kind = 'daily' THEN (content->'metrics'->>'totalEvents')::int ELSE jsonb_array_length(content->'storyOrder') END, 0) AS entries,
+           content->>'status' AS status
     FROM reports WHERE kind = ${kind} AND key = ${key}`;
+  if (!row || row.status === "withdrawn") return undefined;
   return row;
 }
 
 /**
  * Without a reason (the scheduled run) only a missing issue is written: one already published stays as
  * it is. With a reason (an explicit regeneration) the issue is replaced and the edition it replaces is
- * kept as a revision. Says whether the issue was written.
+ * kept as a revision. A previously withdrawn issue is re-issued upon schedule or regeneration. Says whether the issue was written.
  */
 async function saveReport(
   kind: ReportKind,
@@ -91,26 +94,93 @@ async function saveReport(
     const due = reportDueAt(kind, key);
     throw new Error(`cannot save premature report ${kind}:${key}; period not due until ${due.toISOString()}`);
   }
+  const publishedContent = {
+    ...content,
+    status: "published",
+  };
   return sql.begin(async (tx) => {
-    const insert = async () => (await tx`INSERT INTO reports (kind, key, window_start, window_end, content, generated_at, model, origin)
-      VALUES (${kind}, ${key}, ${start}, ${end}, ${tx.json(content as never)}, now(), ${model}, 'model') ON CONFLICT (kind, key) DO NOTHING`).count > 0;
+    const [existing] = await tx<{ id: number; revision: number; content: any; generated_at: Date }[]>`
+      SELECT id, revision, content, generated_at FROM reports WHERE kind = ${kind} AND key = ${key} FOR UPDATE`;
     let written: boolean;
-    if (reason === undefined) written = await insert();
-    else {
-      const [existing] = await tx<{ id: number; revision: number; content: unknown; generated_at: Date }[]>`
-        SELECT id, revision, content, generated_at FROM reports WHERE kind = ${kind} AND key = ${key} FOR UPDATE`;
-      if (existing) {
-        await tx`INSERT INTO report_revisions (report_id, revision, content, generated_at, reason)
-                 VALUES (${existing.id}, ${existing.revision}, ${tx.json(existing.content as never)}, ${existing.generated_at}, ${reason}) ON CONFLICT DO NOTHING`;
-        await tx`UPDATE reports SET content = ${tx.json(content as never)}, window_start = ${start}, window_end = ${end}, generated_at = now(),
-                   model = ${model}, revision = revision + 1, origin = 'model', updated_at = now() WHERE id = ${existing.id}`;
-        written = true;
-      } else written = await insert();
+    if (!existing) {
+      written = (await tx`INSERT INTO reports (kind, key, window_start, window_end, content, generated_at, model, origin)
+        VALUES (${kind}, ${key}, ${start}, ${end}, ${tx.json(publishedContent as never)}, now(), ${model}, 'model')
+        ON CONFLICT (kind, key) DO NOTHING`).count > 0;
+    } else if (existing.content?.status === "withdrawn") {
+      const revReason = reason ?? "reissue after withdrawal";
+      await tx`INSERT INTO report_revisions (report_id, revision, content, generated_at, reason)
+               VALUES (${existing.id}, ${existing.revision}, ${tx.json(existing.content as never)}, ${existing.generated_at}, ${revReason})
+               ON CONFLICT DO NOTHING`;
+      await tx`UPDATE reports SET content = ${tx.json(publishedContent as never)}, window_start = ${start}, window_end = ${end}, generated_at = now(),
+                 model = ${model}, revision = revision + 1, origin = 'model', updated_at = now() WHERE id = ${existing.id}`;
+      written = true;
+    } else if (reason !== undefined) {
+      await tx`INSERT INTO report_revisions (report_id, revision, content, generated_at, reason)
+               VALUES (${existing.id}, ${existing.revision}, ${tx.json(existing.content as never)}, ${existing.generated_at}, ${reason})
+               ON CONFLICT DO NOTHING`;
+      await tx`UPDATE reports SET content = ${tx.json(publishedContent as never)}, window_start = ${start}, window_end = ${end}, generated_at = now(),
+                 model = ${model}, revision = revision + 1, origin = 'model', updated_at = now() WHERE id = ${existing.id}`;
+      written = true;
+    } else {
+      written = false;
     }
     // A new issue changes the latest page, the archive, its neighbours' navigation and the report feeds.
-    if (written) await emit("reportsChanged", { reason: `${kind} ${key} published` }, tx);
+    if (written) {
+      clearReportIndexCache(kind);
+      await emit("reportsChanged", { reason: `${kind} ${key} published` }, tx);
+    }
     for (const id of receiptIds) await completeReceipt(tx, id);
     return written;
+  });
+}
+
+/**
+ * Logically withdraws a report. Preserves full historical row in reports and archives
+ * the current revision in report_revisions. The formal read layer filters out withdrawn
+ * reports, and a subsequent scheduled run will re-issue the report once officially due.
+ */
+export async function withdrawReport(
+  kind: ReportKind,
+  key: string,
+  reason: string,
+  reasonZh = "2026 年 10 月完整月报尚未到正式出刊时间，历史记录保留，暂不作为正式刊物展示。",
+  actor = "system",
+): Promise<{ withdrawn: boolean; id: number; revision: number }> {
+  return sql.begin(async (tx) => {
+    const [existing] = await tx<{ id: number; revision: number; content: any; generated_at: Date }[]>`
+      SELECT id, revision, content, generated_at FROM reports WHERE kind = ${kind} AND key = ${key} FOR UPDATE`;
+    if (!existing) {
+      throw new Error(`cannot withdraw nonexistent report ${kind}:${key}`);
+    }
+    if (existing.content?.status === "withdrawn") {
+      return { withdrawn: false, id: existing.id, revision: existing.revision };
+    }
+    await tx`INSERT INTO report_revisions (report_id, revision, content, generated_at, reason)
+             VALUES (${existing.id}, ${existing.revision}, ${tx.json(existing.content as never)}, ${existing.generated_at}, ${reason})
+             ON CONFLICT DO NOTHING`;
+
+    const withdrawnContent = {
+      ...(typeof existing.content === "object" && existing.content !== null ? existing.content : {}),
+      status: "withdrawn",
+      withdrawal: {
+        status: "withdrawn",
+        withdrawn_at: new Date().toISOString(),
+        withdrawn_reason: reason,
+        withdrawn_reason_zh: reasonZh,
+        original_generated_at: existing.generated_at.toISOString(),
+        withdrawn_by: actor,
+      },
+    };
+
+    await tx`UPDATE reports
+             SET content = ${tx.json(withdrawnContent as never)},
+                 updated_at = now()
+             WHERE id = ${existing.id}`;
+
+    clearReportIndexCache(kind);
+    await emit("reportsChanged", { reason: `${kind} ${key} withdrawn: ${reason}` }, tx);
+
+    return { withdrawn: true, id: existing.id, revision: existing.revision };
   });
 }
 
@@ -384,7 +454,9 @@ export async function composeDueReports(now = new Date(), limit = 8): Promise<{ 
   // up and is not due (a site started mid-month would otherwise fail that month's issue on every run).
   const [{ first: firstDaily }] = await sql<{ first: string | null }[]>`SELECT min(key) AS first FROM reports WHERE kind = 'daily'`;
   kinds: for (const k of kinds) {
-    const have = new Set((await sql<{ key: string }[]>`SELECT key FROM reports WHERE kind = ${k.kind}`).map((r) => r.key));
+    const have = new Set(
+      (await sql<{ key: string }[]>`SELECT key FROM reports WHERE kind = ${k.kind} AND coalesce(content->>'status', 'published') <> 'withdrawn'`).map((r) => r.key)
+    );
     const first = [...have].sort()[0] ?? k.due;
     for (let key = first; key <= k.due; key = k.next(key)) {
       if (have.has(key)) continue;

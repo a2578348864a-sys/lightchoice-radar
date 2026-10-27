@@ -57,7 +57,7 @@ export default function ReportLatestPage() {
               出刊设定：<strong className="font-semibold text-ink-2">{editionTimeDesc}</strong>。
             </p>
             <p className="mt-1 text-[12.5px] leading-relaxed text-ink-4">
-              定时自动出刊调度目前处于停用/观察状态（仅在受管授权下运行，零费用不调用付费大模型）；
+              已接入受管维护定时调度（出刊时间到达后自动结算，零费用不调用付费大模型）；
               当期有合规数据生成成刊后会在此呈现，历史合订本请查阅往期归档。
             </p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
