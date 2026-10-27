@@ -107,7 +107,7 @@ export default function MarketProducts() {
     <div className="pb-10">
       <PhoneBar back={{ to: "/market", label: "市场信号" }} title="商品与竞争" />
       <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
-        <Link to="/market" className="hover:text-ink transition-colors">第四主线 · 市场信号</Link>
+        <Link to="/market" className="hover:text-ink transition-colors">市场信号</Link>
         <span>/</span>
         <span className="text-ink-2 font-medium">商品与竞争研究</span>
       </nav>

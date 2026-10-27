@@ -162,14 +162,14 @@ export default function MarketSources() {
     <div className="pb-10">
       <PhoneBar back={{ to: "/market", label: "市场信号" }} title="自动来源监控" />
       <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
-        <Link to="/market" className="hover:text-ink transition-colors">第四主线 · 市场信号</Link>
+        <Link to="/market" className="hover:text-ink transition-colors">市场信号</Link>
         <span>/</span>
         <span className="text-ink-2 font-medium">自动来源管理与监控</span>
       </nav>
       <header className="pb-2 pt-3 lg:pt-1">
         <h1 className="text-[22px] font-semibold leading-[1.3] text-ink">自动来源管理与调度看板</h1>
         <p className="mt-1 text-[12.5px] leading-relaxed text-ink-3">
-          第四主线采用 <strong className="text-ink">全自动无人值守情报管道</strong>：系统自动轮询获准来源、清洗沉淀多期历史并自动计算变化与预警。
+          市场信号采用 <strong className="text-ink">全自动无人值守情报管道</strong>：系统自动轮询获准来源、清洗沉淀多期历史并自动计算变化与预警。
           用户只需在看板查阅情报与决策，<strong className="text-accent">无需手工下载、整理或上传任何表格文件</strong>。
         </p>
       </header>

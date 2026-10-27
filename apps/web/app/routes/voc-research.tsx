@@ -29,7 +29,7 @@ export default function VocResearch() {
     <div className="pb-10">
       <PhoneBar back={{ to: "/voc", label: "消费者原声" }} title="痛点研究" />
       <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
-        <Link to="/voc" className="hover:text-ink transition-colors">第三主线 · 消费者原声</Link>
+        <Link to="/voc" className="hover:text-ink transition-colors">消费者原声</Link>
         <span>/</span>
         <span className="text-ink-2 font-medium">痛点研究</span>
       </nav>
@@ -65,7 +65,7 @@ export default function VocResearch() {
 
       <section className="mt-5 rounded bg-paper-2 px-3 py-2.5" aria-label="需求假设状态">
         <h2 className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">需求假设（L3）</h2>
-        <p className="mt-1 text-[12px] text-ink-2">第三主线模型通道当前关闭（¥0 授权）：L3 需求假设生成入口保持关闭。痛点主题的确定性归并可先于 L3 运行；候选假设出现前，本区如实为空。</p>
+        <p className="mt-1 text-[12px] text-ink-2">消费者原声模型通道当前关闭（¥0 授权）：L3 需求假设生成入口保持关闭。痛点主题的确定性归并可先于 L3 运行；候选假设出现前，本区如实为空。</p>
       </section>
 
       <p className="mt-4 text-[11px] text-ink-2">「未找到反证」不等于证明反证不存在；解决状态以提问者自述为准。<Link to="/voc/evidence" className="ml-1 underline-offset-2 hover:underline">查看证据库</Link></p>

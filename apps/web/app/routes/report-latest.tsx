@@ -1,4 +1,4 @@
-import { useLoaderData } from "react-router";
+import { Link, useLoaderData } from "react-router";
 import type { Route } from "./+types/report-latest";
 import { REPORT_NAMES, type ReportLatestPage } from "@aihot/contracts/site";
 import { REPORTS, subjectAfter, withSubject } from "@aihot/site";
@@ -6,7 +6,6 @@ import { cachedPage, loadOr404 } from "../lib/api.server";
 import { pageReuse } from "../lib/page-reuse";
 import { pageMeta, reportLd } from "../lib/seo";
 import { beijingDate } from "@aihot/contracts/time";
-import { EmptyState } from "../components/ui/Page";
 import { ReportLayout } from "../features/report/ReportLayout";
 import { ReportPaper, reportOutline } from "../features/report/ReportPaper";
 import { feedLink, kindFromPath } from "../features/report/format";
@@ -31,16 +30,47 @@ export function meta({ loaderData, location }: Route.MetaArgs) {
     description,
     path: location.pathname,
     image: `/og/pages/${kind}.png`,
-    // The latest issue, described at this page's own address (its canonical).
     jsonLd: report ? reportLd(report, location.pathname, report.lead?.leadParagraph ?? description) : undefined,
   }), feedLink(kind)];
 }
 
 export default function ReportLatestPage() {
   const { kind, report, index, today } = useLoaderData<typeof loader>();
+  const editionTimeDesc =
+    kind === "daily"
+      ? "每天 08:00（覆盖过去 24 小时政策与行业）"
+      : kind === "weekly"
+        ? "每周一 10:00（周度要闻汇编）"
+        : "每月 1 日 10:30（月度大盘总览）";
+
   return (
     <ReportLayout kind={kind} index={index} current={report?.key ?? null} today={today} outline={report ? reportOutline(report) : []}>
-      {report ? <ReportPaper report={report} index={index} /> : <EmptyState title={subjectAfter("还没有发布", REPORT_NAMES[kind])}>第一期发布后会出现在这里。</EmptyState>}
+      {report ? (
+        <ReportPaper report={report} index={index} />
+      ) : (
+        <div className="mx-auto max-w-xl py-12 text-center">
+          <div className="rounded-card border border-line bg-surface p-8 shadow-sm">
+            <h2 className="text-[18px] font-semibold text-ink">
+              {subjectAfter("暂无已发布的", REPORT_NAMES[kind])}
+            </h2>
+            <p className="mt-2 text-[13.5px] leading-relaxed text-ink-3">
+              出刊设定：<strong className="font-semibold text-ink-2">{editionTimeDesc}</strong>。
+            </p>
+            <p className="mt-1 text-[12.5px] leading-relaxed text-ink-4">
+              定时自动出刊调度目前处于停用/观察状态（仅在受管授权下运行，零费用不调用付费大模型）；
+              当期有合规数据生成成刊后会在此呈现，历史合订本请查阅往期归档。
+            </p>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <Link to="/daily/archive" className="chip">
+                查阅往期归档
+              </Link>
+              <Link to="/" className="chip">
+                返回情报首页
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </ReportLayout>
   );
 }

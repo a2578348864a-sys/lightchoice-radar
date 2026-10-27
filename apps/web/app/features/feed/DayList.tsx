@@ -17,7 +17,7 @@ export function DayList({ items, todayCount = null, headerAside, at = "timelineA
   return (
     <div>
       {days.map(({ day, entries: list }, i) => (
-        <section key={day} aria-label={day}>
+        <section key={`${day}-${i}`} aria-label={day}>
           <DayHeader day={day} today={today} count={day === today ? todayCount : null} aside={i === 0 ? headerAside : undefined} />
           <ol className="lg:pt-1">
             {list.map((it) => (

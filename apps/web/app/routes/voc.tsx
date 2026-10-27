@@ -1,81 +1,181 @@
-import { Link, useLoaderData } from "react-router";
+import { useLoaderData, useSearchParams } from "react-router";
 import { vocGet } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
 import { WorkspaceAuthGate } from "../components/shell/WorkspaceAuthGate";
-import { Badge } from "../components/ui/Badge";
+import { IntelligenceFeed } from "../features/intelligence/IntelligenceFeed";
+import { IntelligenceFilters } from "../features/intelligence/IntelligenceFilters";
+import type { IntelligenceItem } from "../features/intelligence/types";
 import type { Screen } from "../components/shell/screens";
 
 export const handle: Screen = { tab: "voc", name: "消费者原声" };
 
-interface VocOverview {
-  studies: Array<{ id: string; name: string; status: string; terms: { category: string }; materials: number; pendingReview: number; painThemes: number }>;
-  totals: { materials: number; revoked: number; chineseL1: number; chineseL2: number; modelLane: string };
+interface EvidenceItem {
+  id: string;
+  title: string;
+  url: string;
+  publishedAt: string | null;
+  sourceId: string;
+  form: string;
+  authorRole: string;
+  market: string;
+  l1Categories: string[];
+  l1Polarity: string;
+  language: string;
+  answerCount: number;
+  resolution: string;
+  excerpt: string;
+  contentLicense: string | null;
+  reviewStatus: string;
+  attribution: string | null;
+  thread?: {
+    questionId: number;
+    title: string;
+    body: string;
+    tags: string[];
+    answers: Array<{ id: number; score: number; isAccepted: boolean; body: string }>;
+    comments: Array<{ id: number; body: string }>;
+  };
+}
+
+interface EvidenceResponse {
+  items: EvidenceItem[];
+  studies: Array<{ id: string; name: string }>;
+  batches: Array<{ id: string; label: string }>;
 }
 
 export async function loader({ request }: { request: Request }) {
-  const result = await vocGet<VocOverview>(request, "/api/voc/overview");
-  return { result };
+  const url = new URL(request.url);
+  const params = new URLSearchParams();
+  for (const key of ["study", "category", "polarity", "q"]) {
+    if (url.searchParams.get(key)) params.set(key, url.searchParams.get(key)!);
+  }
+  const result = await vocGet<EvidenceResponse>(request, `/api/voc/evidence?${params}`);
+  return { result, queryParams: Object.fromEntries(params) };
 }
 
 export function meta() {
-  return pageMeta({ title: "消费者原声", description: "以商品研究为中心的消费者原声私有研究工作台。", noindex: true, path: "/voc" });
+  return pageMeta({
+    title: "消费者原声 · 轻选情报中心",
+    description: "以商品真实使用反馈与讨论为中心的消费者原声情报：原文、上下文、L1 确定性规则标签与人工审核。",
+    noindex: true,
+    path: "/voc",
+  });
 }
+
+function stripHtml(html: string | undefined | null): string {
+  if (!html) return "";
+  return html
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&rsquo;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+const POLARITY_TONE: Record<string, "ok" | "amber" | "neutral" | "hot"> = {
+  negative: "hot",
+  positive: "ok",
+  neutral: "neutral",
+  mixed: "amber",
+};
 
 export default function VocIndex() {
   const { result } = useLoaderData<typeof loader>();
-  const overview = result.data;
+  const data = result.data;
+  const [params] = useSearchParams();
+  const activeCategory = params.get("category");
+  const q = params.get("q") ?? "";
+
+  // Dynamic theme tags from L1 categories
+  const themes = [
+    { id: "使用咨询", label: "使用咨询" },
+    { id: "选购比较", label: "选购比较" },
+    { id: "清洗维护", label: "清洗维护" },
+    { id: "部件损坏", label: "部件损坏与故障" },
+  ];
+
+  // Convert evidence items into Unified Intelligence Items
+  const feedItems: IntelligenceItem[] = (data?.items ?? []).map((item) => {
+    const rawContext = item.thread?.body ? stripHtml(item.thread.body) : item.excerpt;
+    return {
+      id: item.id,
+      lane: "voc",
+      laneLabel: "消费者原声",
+      title: item.title,
+      summary: item.excerpt,
+      contextSnippet: rawContext && rawContext !== item.excerpt ? rawContext : undefined,
+      sourceName: item.sourceId === "voc-coffee-se" ? "Coffee Stack Exchange" : item.sourceId,
+      sourceType: item.form === "question" ? "消费者提问" : "讨论原帖",
+      sourceTypeTone: POLARITY_TONE[item.l1Polarity] ?? "neutral",
+      time: item.publishedAt || new Date().toISOString(),
+      timeLabel: "原声发布",
+      tags: item.l1Categories.length > 0 ? item.l1Categories : ["电动咖啡豆研磨机"],
+      statusBadge: {
+        label:
+          item.reviewStatus === "confirmed"
+            ? "人工已核"
+            : item.reviewStatus === "rejected"
+              ? "已排除"
+              : "待人工复核",
+        tone:
+          item.reviewStatus === "confirmed"
+            ? "ok"
+            : item.reviewStatus === "rejected"
+              ? "neutral"
+              : "amber",
+      },
+      identityLine: "¥0 预算硬约束 · 中文理解未开启 · 原文呈现（未调用大模型）",
+      evidenceLine: `回答数 ${item.answerCount} · 极性 ${item.l1Polarity} · 许可 ${item.contentLicense || "CC BY-SA 4.0"}`,
+      detailUrl: `/voc/evidence`,
+      externalUrl: item.url,
+      starrable: true,
+    };
+  });
+
   return (
-    <div className="pb-10">
+    <div className="space-y-5 pb-12">
       <PhoneBar back={{ to: "/", label: "情报" }} title="消费者原声" />
-      <header className="pb-2 pt-3 lg:pt-1">
-        <h1 className="text-[24px] font-semibold leading-[1.3] text-ink">消费者原声（第三主线）</h1>
+
+      {/* Header matching /all, clean title without "(第三主线)" */}
+      <header className="pb-1 pt-2 lg:pt-1">
+        <h1 className="text-[24px] font-semibold leading-[1.3] text-ink lg:text-[26px]">
+          消费者原声
+        </h1>
         <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
-          以商品与品类研究为中心的私有研究工作台：原始材料、讨论上下文、中文理解、痛点归并与人工审核。
-          <strong className="font-semibold text-ink-2">研究内容默认私有</strong>，不进入公开情报池。
+          以商品与品类真实使用讨论为中心的消费者原声信息流：包含原始原话、讨论上下文、L1 确定性标签与人工审核。
+          当前正式材料以 Coffee Stack Exchange 电动咖啡豆研磨机研究为主。
         </p>
       </header>
 
-      <nav className="mt-2 flex flex-wrap gap-1.5 text-[12px]" aria-label="原声区域">
-        <Link to="/voc/evidence" className="pill">反馈证据库</Link>
-        <Link to="/voc/research" className="pill">痛点研究</Link>
-        <Link to="/voc/system" className="pill">历史与来源</Link>
-      </nav>
+      {/* Filters matching /all */}
+      <IntelligenceFilters
+        actionUrl="/voc"
+        themes={themes}
+        activeTheme={activeCategory}
+        themeParam="category"
+        q={q}
+        searchPlaceholder="搜索原声标题或关键词…"
+        secondaryLinks={[
+          { label: "反馈证据库", to: "/voc/evidence" },
+          { label: "痛点研究", to: "/voc/research" },
+          { label: "来源与历史", to: "/voc/system" },
+        ]}
+      />
 
       <WorkspaceAuthGate error={result.error} laneName="消费者原声工作台" returnTo="/voc">
-        {!overview ? (
-          <p className="mt-4 rounded bg-paper-2 px-3 py-2 text-[12.5px] text-ink-2">尚未定义研究任务或暂无消费者原声材料。</p>
-        ) : (
-          <>
-            <section className="mt-4" aria-label="研究概览">
-              <h2 className="pb-1 text-[12px] font-semibold uppercase tracking-wide text-ink-3">研究概览</h2>
-              <dl className="mt-1 grid grid-cols-2 gap-2 text-[12.5px] sm:grid-cols-3">
-                <div className="card p-3"><dt className="text-ink-4">有效材料</dt><dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.totals.materials}</dd></div>
-                <div className="card p-3"><dt className="text-ink-4">已撤销</dt><dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.totals.revoked}</dd></div>
-                <div className="card p-3"><dt className="text-ink-4">痛点主题</dt><dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.studies.reduce((n, s) => n + s.painThemes, 0)}</dd></div>
-              </dl>
-            </section>
-
-            <section className="mt-4" aria-label="中文处理状态">
-              <h2 className="pb-1 text-[12px] font-semibold uppercase tracking-wide text-ink-3">中文处理</h2>
-              <p className="mt-1 text-[12.5px] text-ink-2">
-                L1 确定性分类 {overview.totals.chineseL1} 条 · L2 中文理解 {overview.totals.chineseL2} 条 ·
-                模型通道 <Badge tone="neutral">{overview.totals.modelLane}</Badge>
-              </p>
-              <p className="mt-1 text-[11.5px] text-ink-4">第三主线当前模型费用授权为 ¥0：L2/L3 处理入口保持关闭，已有材料以 L1 规则分类与原文呈现，不伪造中文理解。</p>
-            </section>
-
-            {overview.studies.map((study) => (
-              <section key={study.id} className="card mt-3 p-3" aria-label={`研究 ${study.name}`}>
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="text-[14px] font-semibold text-ink">{study.name}</h3>
-                  <span className="text-[11px] text-ink-4">{study.status}</span>
-                </div>
-                <p className="mt-1 text-[12px] text-ink-3">品类：{study.terms.category} · 材料 {study.materials} 条 · 待人工审核 {study.pendingReview} 条</p>
-              </section>
-            ))}
-          </>
-        )}
+        <div className="mt-6">
+          <IntelligenceFeed
+            items={feedItems}
+            showLane={false}
+            emptyTitle="暂无符合条件的消费者原声材料"
+            emptyMessage="尚未导入或采集任何符合条件的材料，或当前筛选范围内为空。系统坚持实证原声，不生成虚假痛点。"
+          />
+        </div>
       </WorkspaceAuthGate>
     </div>
   );

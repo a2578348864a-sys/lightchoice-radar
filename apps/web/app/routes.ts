@@ -29,6 +29,7 @@ export default [
   route("voc/system", "routes/voc-system.tsx"),
   // Fourth lane — market signals workbench (private research, admin session).
   route("market", "routes/market.tsx"),
+  route("market/workbench", "routes/market-workbench.tsx"),
   route("market/keywords", "routes/market-keywords.tsx"),
   route("market/products", "routes/market-products.tsx"),
   route("market/opportunities", "routes/market-opportunities.tsx"),

@@ -1,15 +1,15 @@
 import { beijingDate, beijingTime, beijingWeekday, monthDay } from "@aihot/contracts/time";
 
-/** A list cut into runs of the same Beijing day, in the list's own order. */
+/** A list cut into runs of the same Beijing day, grouped by unique date. */
 export function byBeijingDay<T>(list: readonly T[], at: (entry: T) => string): Array<{ day: string; entries: T[] }> {
-  const days: Array<{ day: string; entries: T[] }> = [];
+  const map = new Map<string, T[]>();
   for (const entry of list) {
     const day = beijingDate(at(entry));
-    const last = days.at(-1);
-    if (last?.day === day) last.entries.push(entry);
-    else days.push({ day, entries: [entry] });
+    const group = map.get(day);
+    if (group) group.push(entry);
+    else map.set(day, [entry]);
   }
-  return days;
+  return Array.from(map.entries()).map(([day, entries]) => ({ day, entries }));
 }
 
 /** "周六" of a calendar date (YYYY-MM-DD). */

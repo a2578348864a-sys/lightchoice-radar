@@ -86,7 +86,7 @@ if (maintenance) {
   if (interrupted.fetch || interrupted.job) {
     console.log(JSON.stringify({ level: "info", msg: "closed interrupted runs of unclaimed sources", ...interrupted }));
   }
-  await registerSchedules(boss, { only: ["ops.retention", "ops.backup"] });
+  await registerSchedules(boss, { only: ["ops.retention", "ops.backup", "reports.compose"] });
 } else if (scoped) {
   clearStopRequest("radar-translate");
   await requireSingleInstance("radar-translate");

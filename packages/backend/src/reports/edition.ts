@@ -111,9 +111,11 @@ export async function periodReports(start: Date, end: Date): Promise<ReportRow[]
       LEFT JOIN facts f ON f.id = p.fact_id AND ${ownFactEvidenceCondition()}
       LEFT JOIN stories st ON st.id = f.story_id
       -- Attribute each item by the later of arrival and release; either range can use its index.
-      WHERE p.visibility = 'public' AND p.selected AND NOT p.backfill
+      WHERE p.visibility = 'public' 
+        AND (p.selected OR (s.participation_mode = 'editorial' AND s.id NOT LIKE 'rss-%-community'))
+        AND NOT p.backfill
         AND (
-          (p.visible_after <= p.timeline_at AND p.timeline_at >= ${start} AND p.timeline_at < ${end})
+          (coalesce(p.visible_after, p.timeline_at) <= p.timeline_at AND p.timeline_at >= ${start} AND p.timeline_at < ${end})
           OR (p.visible_after > p.timeline_at AND p.visible_after >= ${start} AND p.visible_after < ${end})
         )
         AND p.timeline_at >= ${start}::timestamptz - interval '24 hours'`;
@@ -180,7 +182,8 @@ export async function periodEntries(startDate: string, endDate: string): Promise
     FROM publications p JOIN sources s ON s.id = p.source_id
     LEFT JOIN facts f ON f.id = p.fact_id AND ${ownFactEvidenceCondition()}
     LEFT JOIN stories st ON st.id = f.story_id
-    WHERE p.article_id = ANY(${[...new Set(carried.map((c) => c.id))]}::text[]) AND p.visibility = 'public' AND p.eligible`;
+    WHERE p.article_id = ANY(${[...new Set(carried.map((c) => c.id))]}::text[]) AND p.visibility = 'public'
+      AND (p.eligible OR (s.participation_mode = 'editorial' AND s.id NOT LIKE 'rss-%-community'))`;
   const byId = new Map(rows.map((r) => [r.id, r]));
   const events = groupBy(carried.filter((c) => byId.has(c.id)), (c) => {
     const r = byId.get(c.id)!;
@@ -275,8 +278,10 @@ async function missedFacts(start: Date, end: Date): Promise<Array<{ key: string;
 /** The window's public reports the editors scored: none means judging did not run there, not a quiet day. */
 async function judgedReports(start: Date, end: Date): Promise<number> {
   const [row] = await sql<{ n: number }[]>`
-    SELECT count(*)::int AS n FROM publications p
-    WHERE ${listedCondition(end)} AND p.score IS NOT NULL AND NOT p.backfill AND p.timeline_at >= ${start} AND p.timeline_at < ${end}`;
+    SELECT count(*)::int AS n FROM publications p JOIN sources s ON s.id = p.source_id
+    WHERE ${listedCondition(end)} 
+      AND (p.score IS NOT NULL OR (s.participation_mode = 'editorial' AND s.id NOT LIKE 'rss-%-community'))
+      AND NOT p.backfill AND p.timeline_at >= ${start} AND p.timeline_at < ${end}`;
   return row!.n;
 }
 

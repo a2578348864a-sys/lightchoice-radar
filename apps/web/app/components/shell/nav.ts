@@ -1,10 +1,10 @@
 // Site navigation in one place: the desktop sidebar's sections and the phone tab bar's tabs, the engine's
 // and the site's modules'.
 import type { ReactNode } from "react";
-import { NAV, SITE, subjectAfter, withSubject } from "@aihot/site";
+import { NAV, SITE } from "@aihot/site";
 import { webModules } from "../../site-modules";
 import {
-  IconBolt, IconBookmark, IconChart, IconDoc, IconFlame, IconGrid, IconHeart, IconHistory, IconList, IconMessage, IconPlug, IconRadar, IconUser, IconUsers,
+  IconBolt, IconBookmark, IconChart, IconDoc, IconFlame, IconGrid, IconHeart, IconHistory, IconList, IconMessage, IconPlug, IconRadar, IconUser, IconUsers, IconShield,
 } from "../icons";
 
 export interface NavItem {
@@ -19,7 +19,7 @@ export interface NavItem {
 
 const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
   {
-    title: "四条主线",
+    title: "情报中心",
     items: [
       { to: "/", label: "情报首页", icon: IconBolt, end: true },
       { to: "/all", label: "01 平台政策", icon: IconList },
@@ -29,19 +29,26 @@ const SECTIONS: Array<{ title: string; items: NavItem[] }> = [
     ],
   },
   {
-    title: "情报工具",
+    title: "情报阅读",
     items: [
-      { to: "/leads", label: "政策线索", icon: IconRadar },
-      { to: "/hot", label: "热点榜", icon: IconFlame },
-      { to: "/daily", label: withSubject("日报"), icon: IconDoc },
-      { to: "/topics", label: "主题", icon: IconGrid },
+      { to: "/leads", label: "政策线索", icon: IconShield },
+      { to: "/daily", label: "情报日报", icon: IconDoc },
+      { to: "/weekly", label: "情报周报", icon: IconDoc },
+      { to: "/monthly", label: "情报月报", icon: IconDoc },
       { to: "/starred", label: "收藏", icon: IconBookmark },
+    ],
+  },
+  {
+    title: "研究与管理",
+    items: [
+      { to: "/voc/research", label: "研究工具", icon: IconGrid },
+      { to: "/admin/sources", label: "来源监控", icon: IconRadar },
+      { to: "/agent", label: "自动化工具接入", icon: IconPlug },
     ],
   },
   {
     title: "更多",
     items: [
-      { to: "/agent", label: "自动化工具接入", icon: IconPlug },
       { to: "/about", label: "关于", icon: IconHeart },
       { to: "/changelog", label: "更新日志", icon: IconHistory, changelog: true },
       { to: "/feedback", label: "反馈", icon: IconMessage },
@@ -59,28 +66,26 @@ const UP = {
   "/industry": { name: "行业动态", back: "行业", tab: "industry" },
   "/voc": { name: "消费者原声", back: "原声", tab: "voc" },
   "/market": { name: "市场信号", back: "市场", tab: "market" },
+  "/leads": { name: "政策线索", back: "线索", tab: "leads" },
 } as const;
 
 /**
- * Where pages under a navigation entry lead back up to: the entry, or 精选 in its place while the site hides
- * it. `name` is for breadcrumbs and desktop back links (热点榜), `back` for the phone bar (热点), `tab` the
- * phone tab it sits under, `crumbs` its breadcrumb after the site's home.
+ * Where pages under a navigation entry lead back up to: the entry, or 情报 in its place.
  */
 export function navUp(entry: keyof typeof UP): { to: string; name: string; back: string; tab: TabKey; crumbs: Array<{ name: string; path: string }> } {
   if (!inNav(entry)) {
-    const home = SITE.name === "LightChoice Radar" ? "情报" : "精选";
+    const home = "情报";
     return { to: "/", name: home, back: home, tab: "featured", crumbs: [] };
   }
   return { to: entry, ...UP[entry], crumbs: [{ name: UP[entry].name, path: entry }] };
 }
 
 /**
- * The sidebar: the engine's sections with the modules' between 内容 and 更多; a module naming a section
- * that is already there adds to it.
+ * The sidebar: the engine's sections with the modules' between 内容 and 更多.
  */
 export function sidebar(): Array<{ title: string; items: NavItem[] }> {
-  const [content, tools, more] = SECTIONS;
-  const sections = [content!, tools!].map((s) => ({ ...s, items: s.items.filter((i) => inNav(i.to)) }));
+  const [content, reading, research, more] = SECTIONS;
+  const sections = [content!, reading!, research!].map((s) => ({ ...s, items: s.items.filter((i) => inNav(i.to)) }));
   for (const m of webModules()) {
     if (!m.sidebar) continue;
     const section = sections.find((s) => s.title === m.sidebar!.section);
@@ -90,17 +95,17 @@ export function sidebar(): Array<{ title: string; items: NavItem[] }> {
   return [...sections, more!];
 }
 
-/** A sidebar entry is lit on its pages; 日报 also covers weekly and monthly reports. */
+/** A sidebar entry is lit on its pages; separate daily, weekly and monthly accurately. */
 export function sidebarIsActive(item: NavItem, pathname: string): boolean {
   if (item.end) return pathname === item.to;
-  if (item.to === "/daily") return /^\/(daily|weekly|monthly)(\/|$)/.test(pathname);
+  if (item.to === "/daily") return /^\/daily(\/|$)/.test(pathname);
+  if (item.to === "/weekly") return /^\/weekly(\/|$)/.test(pathname);
+  if (item.to === "/monthly") return /^\/monthly(\/|$)/.test(pathname);
   return pathname === item.to || pathname.startsWith(`${item.to}/`);
 }
 
 /**
- * The phone tab bar: 全部 lives beside 精选 as a switch, 热点 and 日报 are tabs, and "我的" at /more holds
- * 收藏, 外观, the tools and the site's own pages. Which tab a page sits under is declared by the page
- * itself (components/shell/screens.ts).
+ * The phone tab bar: 5 clear tabs.
  */
 export type TabKey =
   | "featured"
@@ -111,6 +116,7 @@ export type TabKey =
   | "industry"
   | "voc"
   | "market"
+  | "leads"
   // A module's tab.
   | (string & {});
 
@@ -123,14 +129,14 @@ export interface Tab {
 }
 
 const ENGINE_TABS: Tab[] = [
-  { key: "featured", to: "/", label: "情报", icon: IconBolt },
+  { key: "featured", to: "/", label: "首页", icon: IconBolt },
   { key: "policy", to: "/all", label: "政策", icon: IconList },
   { key: "industry", to: "/industry", label: "行业", icon: IconRadar },
   { key: "market", to: "/market", label: "市场", icon: IconChart },
-  { key: "me", to: "/more", label: "我的", icon: IconUser, changelog: true },
+  { key: "me", to: "/more", label: "更多", icon: IconUser, changelog: true },
 ];
 
-/** The tab bar: the engine's, the modules' before 我的. */
+/** The tab bar: the engine's, the modules' before 更多. */
 export function tabs(): Tab[] {
   return [...ENGINE_TABS.slice(0, -1).filter((t) => inNav(t.to)), ...webModules().flatMap((m) => m.tabs ?? []), ENGINE_TABS.at(-1)!];
 }

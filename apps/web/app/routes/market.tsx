@@ -1,250 +1,180 @@
-import { Link, useLoaderData } from "react-router";
+import { useLoaderData, useSearchParams } from "react-router";
 import { marketGet } from "../lib/api.server";
 import { pageMeta } from "../lib/seo";
 import { PhoneBar } from "../components/shell/PhoneBar";
 import { WorkspaceAuthGate } from "../components/shell/WorkspaceAuthGate";
-import { Badge } from "../components/ui/Badge";
+import { IntelligenceFeed } from "../features/intelligence/IntelligenceFeed";
+import { IntelligenceFilters } from "../features/intelligence/IntelligenceFilters";
+import type { IntelligenceItem } from "../features/intelligence/types";
 import type { Screen } from "../components/shell/screens";
 
 export const handle: Screen = { tab: "market", name: "市场信号" };
 
-interface Overview {
-  modules: Array<{
-    module: string;
-    name: string;
-    engineering: string;
-    dataState: string;
-    noteZh: string;
-    business: string;
-  }>;
-  sources: Array<{
-    id: string;
-    label: string;
-    producer: string;
-    enabled: boolean;
-    automation: string;
-    uses: string[];
-    evidence: string;
-    notes?: string;
-  }>;
-  counts: {
-    keywordSnapshots: number;
-    keywordRows: number;
-    chartSnapshots: number;
-    products: number;
-    signals: number;
-    opportunities: number;
-    alerts: number;
-    safetyEvents?: number;
-  };
-  gaps: string[];
-  budgetZh: string;
-  scheduler?: {
-    isRunning: boolean;
-    pid?: number;
-    nextDueAt: string | null;
+interface MarketSignalItem {
+  id: string;
+  module: string;
+  kind: string;
+  subjectZh: string;
+  detailZh: string;
+  strength: number;
+  evidenceRefs: string[];
+  at: string;
+  isTest?: boolean;
+  sourceName?: string;
+  extra?: {
+    productName?: string;
+    officialUrl?: string;
+    hazardType?: string;
+    hazardDescriptionZh?: string;
+    explanation?: {
+      safetyRiskZh?: string;
+      whyResearchWorthyZh?: string;
+      developmentCautionZh?: string;
+    };
   };
 }
 
-interface CategoryCard {
-  categoryLabel: string;
-  productCount: number;
-  sampleAsins: string[];
-  topBrands: Array<{ brand: string; count: number }>;
-  priceRange: { min: string | null; max: string | null; avg: string | null };
-  associatedKeywords: string[];
-  notesZh: string;
-}
-
-interface CategoriesResponse {
-  categories: CategoryCard[];
-  totalCategories: number;
-  noteZh: string;
+interface MarketSignalsResponse {
+  signals: MarketSignalItem[];
+  total: number;
 }
 
 export async function loader({ request }: { request: Request }) {
-  const [overviewResult, categoriesResult] = await Promise.all([
-    marketGet<Overview>(request, "/api/market/overview"),
-    marketGet<CategoriesResponse>(request, "/api/market/categories"),
-  ]);
-  return { overviewResult, categoriesResult };
+  const url = new URL(request.url);
+  const q = url.searchParams.get("q") || "";
+  const moduleParam = url.searchParams.get("module") || "";
+  const includeTest = url.searchParams.get("test") === "all";
+
+  const qs = new URLSearchParams();
+  if (q) qs.set("q", q);
+  if (moduleParam) qs.set("module", moduleParam);
+  if (includeTest) qs.set("includeTest", "true");
+
+  const signalsResult = await marketGet<MarketSignalsResponse>(
+    request,
+    `/api/market/signals?${qs.toString()}`
+  );
+  return { signalsResult, currentModule: moduleParam, includeTest, q };
 }
 
 export function meta() {
   return pageMeta({
-    title: "市场信号总览",
-    description: "第四主线市场信号私有研究工作台：关键词需求、商品观测、竞争格局、价格与多期历史分析。",
+    title: "市场信号 · 轻选情报中心",
+    description: "Amazon 美国站关键词需求、榜单变化、价格与产品安全召回的确定性规则情报流。全部内容本地私有，零模型伪造。",
     noindex: true,
     path: "/market",
   });
 }
 
-const engBadge: Record<string, string> = {
-  implemented: "已实现",
-  partial: "部分实现",
-  stub: "待来源",
-};
-
 export default function MarketIndex() {
-  const { overviewResult, categoriesResult } = useLoaderData<typeof loader>();
-  const overview = overviewResult.data;
-  const categoriesData = categoriesResult.data;
+  const { signalsResult, currentModule, q } = useLoaderData<typeof loader>();
+  const [params] = useSearchParams();
+  const signals = signalsResult.data?.signals ?? [];
+
+  // Theme filters based on real supported market modules
+  const themes = [
+    { id: "01", label: "搜索需求 (ABA)" },
+    { id: "04", label: "销售热度与榜单 (BSR)" },
+    { id: "09", label: "产品安全与召回 (CPSC)" },
+  ];
+
+  // Map to Unified Intelligence Items
+  const feedItems: IntelligenceItem[] = signals.map((sig) => {
+    const isSafety = sig.module === "09";
+    const isKw = sig.module === "01";
+    return {
+      id: sig.id,
+      lane: "market",
+      laneLabel: "市场信号",
+      title: sig.subjectZh,
+      summary: sig.detailZh,
+      contextSnippet: sig.extra?.explanation?.developmentCautionZh
+        ? `【研发避坑提示】${sig.extra.explanation.developmentCautionZh}；${sig.extra.explanation.whyResearchWorthyZh ?? ""}`
+        : undefined,
+      sourceName:
+        sig.sourceName ||
+        (isKw ? "AMZ123 ABA 热搜" : isSafety ? "CPSC 官方通告" : "Amazon BSR 观察"),
+      sourceType: isSafety
+        ? "官方召回反证"
+        : isKw
+          ? "搜索需求位移"
+          : "榜单排位变动",
+      sourceTypeTone: isSafety ? "hot" : "ok",
+      time: sig.at || new Date().toISOString(),
+      timeLabel: "观测于",
+      tags: [
+        isKw ? "搜索需求" : isSafety ? "产品安全" : "销售热度",
+        sig.kind,
+      ],
+      statusBadge: {
+        label: sig.isTest ? "测试/验证样本" : "已确认观测事实",
+        tone: sig.isTest ? "amber" : "ok",
+      },
+      identityLine: "确定性规则 C1/C4/C6 驱动 · 零模型伪造 · 未经全量统计禁推断为绝对商机",
+      evidenceLine: sig.evidenceRefs[0] ? `证据来源：${sig.evidenceRefs[0]}` : undefined,
+      limitations: isSafety
+        ? "严禁推断为爆品商机，仅作为品类缺陷反证与避坑线索"
+        : "排名前进≠需求增长百分比，首次上榜≠新品上架",
+      detailUrl: isKw
+        ? "/market/keywords"
+        : sig.module === "04"
+          ? "/market/products"
+          : undefined,
+      externalUrl:
+        sig.extra?.officialUrl ||
+        (sig.evidenceRefs[0]?.startsWith("http") ? sig.evidenceRefs[0] : undefined),
+      isTest: sig.isTest,
+      starrable: true,
+    };
+  });
 
   return (
-    <div className="pb-10">
+    <div className="space-y-5 pb-12">
       <PhoneBar back={{ to: "/", label: "情报" }} title="市场信号" />
-      <header className="pb-2 pt-3 lg:pt-1">
-        <h1 className="text-[24px] font-semibold leading-[1.3] text-ink">市场信号（第四主线）</h1>
+
+      {/* Header matching /all, clean title without "(第四主线)" */}
+      <header className="pb-1 pt-2 lg:pt-1">
+        <h1 className="text-[24px] font-semibold leading-[1.3] text-ink lg:text-[26px]">
+          市场信号
+        </h1>
         <p className="mt-1.5 text-[13px] leading-relaxed text-ink-3">
-          围绕 Amazon 美国站的关键词需求、商品观测、竞争与价格变化的个人私有研究工作台。
-          <strong className="font-semibold text-ink-2"> 全部研究内容默认本地私有</strong>；零云端依赖，零付费 API 调用。
+          围绕 Amazon 美国站搜索需求、榜单商品变动与官方产品安全召回的确定性情报流。
+          <strong className="font-semibold text-ink-2"> 本地私有运行</strong>；零云端依赖，零付费 API 调用，保持事实与推断的严格隔离。
         </p>
       </header>
 
-      <nav className="mt-2.5 flex flex-wrap gap-1.5 text-[12px]" aria-label="市场信号区域">
-        <Link to="/market/keywords" className="pill">搜索需求分析</Link>
-        <Link to="/market/products" className="pill">商品与竞争观测</Link>
-        <Link to="/market/opportunities" className="pill">商业机会与测算</Link>
-        <Link to="/market/alerts" className="pill">预警工作台</Link>
-        <Link to="/market/sources" className="pill font-medium text-accent">自动来源监控 ↗</Link>
-      </nav>
+      {/* Unified Filters */}
+      <IntelligenceFilters
+        actionUrl="/market"
+        themes={themes}
+        activeTheme={currentModule}
+        themeParam="module"
+        q={q}
+        searchPlaceholder="搜索关键词或信号描述…"
+        secondaryLinks={[
+          { label: "12 模块工程矩阵", to: "/market/workbench" },
+          { label: "搜索需求分析", to: "/market/keywords" },
+          { label: "商品与竞争观测", to: "/market/products" },
+          { label: "商业机会与测算", to: "/market/opportunities" },
+          { label: "预警工作台", to: "/market/alerts" },
+          { label: "自动来源监控 ↗", to: "/market/sources" },
+        ]}
+      />
 
-      <WorkspaceAuthGate error={overviewResult.error} laneName="市场信号工作台" returnTo="/market">
-        {!overview ? (
-          <div className="mt-4 rounded bg-paper-2 p-4 text-[12.5px] text-ink-2">
-            <p className="font-semibold">当前暂无市场信号数据。</p>
-            <p className="mt-1 text-[11.5px] text-ink-3">
-              后台自动调度正在运行中；可在自动来源页查看调度执行与准入状态。
-            </p>
-            <Link to="/market/sources" className="pill mt-2 inline-block bg-paper text-[12px]">
-              查看自动来源监控 →
-            </Link>
-          </div>
-        ) : (
-        <>
-          {/* Data Counters */}
-          <section className="mt-4" aria-label="数据概览">
-            <div className="flex items-baseline justify-between pb-1">
-              <h2 className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">本地数据蓄积概览</h2>
-              <span className="text-[11px] text-ink-4">
-                {overview.counts.keywordSnapshots >= 2 ? "✅ 已建立多期观测基线" : "单期初始基线"}
-              </span>
-            </div>
-            <dl className="mt-1 grid grid-cols-2 gap-2 text-[12.5px] sm:grid-cols-5">
-              <div className="card p-3">
-                <dt className="text-ink-4">关键词快照</dt>
-                <dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.counts.keywordSnapshots} 期</dd>
-                <span className="text-[10.5px] text-ink-3">{overview.counts.keywordRows} 行关键词</span>
-              </div>
-              <div className="card p-3">
-                <dt className="text-ink-4">榜单与商品</dt>
-                <dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.counts.chartSnapshots} 期</dd>
-                <span className="text-[10.5px] text-ink-3">{overview.counts.products} 个观察商品</span>
-              </div>
-              <div className="card p-3">
-                <dt className="text-ink-4">变化信号</dt>
-                <dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.counts.signals} 条</dd>
-                <span className="text-[10.5px] text-ink-3">确定性规则匹配</span>
-              </div>
-              <div className="card p-3">
-                <dt className="text-ink-4">研究候选/预警</dt>
-                <dd className="mt-0.5 text-[18px] font-semibold text-ink">{overview.counts.opportunities} 个</dd>
-                <span className="text-[10.5px] text-ink-3">{overview.counts.alerts} 条站内预警</span>
-              </div>
-              <div className="card p-3">
-                <dt className="text-ok">CPSC 安全反证</dt>
-                <dd className="mt-0.5 text-[18px] font-semibold text-ok">{overview.counts.safetyEvents ?? 0} 起</dd>
-                <span className="text-[10.5px] text-ink-3">官方公开召回流</span>
-              </div>
-            </dl>
-            <p className="mt-2 text-[11.5px] text-ink-4">{overview.budgetZh}</p>
-          </section>
-
-          {/* Module 02 Category Aggregation Section */}
-          {categoriesData && categoriesData.categories.length > 0 && (
-            <section className="mt-4" aria-label="类目市场雷达">
-              <div className="flex items-baseline justify-between pb-1">
-                <h2 className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">
-                  类目市场雷达（模块 02 · 样本类目聚合）
-                </h2>
-                <span className="text-[11px] text-ink-4">{categoriesData.noteZh}</span>
-              </div>
-              <div className="mt-1 grid grid-cols-1 gap-2 sm:grid-cols-2 text-[12px]">
-                {categoriesData.categories.map((c) => (
-                  <div key={c.categoryLabel} className="card p-3">
-                    <div className="flex justify-between items-baseline">
-                      <h3 className="font-semibold text-ink text-[13px]">{c.categoryLabel}</h3>
-                      <Badge tone="ok">{c.productCount} 个商品</Badge>
-                    </div>
-                    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[11.5px] text-ink-3">
-                      {c.priceRange.min && (
-                        <span>价格区间: <strong className="font-mono text-ink">{c.priceRange.min} ~ {c.priceRange.max}</strong> (均价 {c.priceRange.avg})</span>
-                      )}
-                      {c.topBrands.length > 0 && (
-                        <span>主要品牌: {c.topBrands.map((b) => `${b.brand}(${b.count})`).join(", ")}</span>
-                      )}
-                    </div>
-                    {c.associatedKeywords.length > 0 && (
-                      <div className="mt-1.5 flex flex-wrap gap-1 text-[11px]">
-                        <span className="text-ink-4">关联词:</span>
-                        {c.associatedKeywords.map((kw) => (
-                          <Link
-                            key={kw}
-                            to={`/market/keywords?q=${encodeURIComponent(kw)}`}
-                            className="pill py-0 px-1.5 text-[10.5px]"
-                          >
-                            {kw}
-                          </Link>
-                        ))}
-                      </div>
-                    )}
-                    <p className="mt-1 text-[10.5px] text-ink-4">{c.notesZh}</p>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* 12-Module Capability Matrix */}
-          <section className="mt-4" aria-label="12 模块状态">
-            <h2 className="pb-1 text-[12px] font-semibold uppercase tracking-wide text-ink-3">
-              12 模块能力状态矩阵（工程能力 ≠ 数据就绪度 ≠ 业务验收）
-            </h2>
-            <div className="mt-1 space-y-1.5">
-              {overview.modules.map((m) => (
-                <div key={m.module} className="card p-2.5">
-                  <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h3 className="text-[13px] font-semibold text-ink">
-                      {m.module} · {m.name}
-                    </h3>
-                    <span className="flex items-center gap-1.5 text-[11px]">
-                      <Badge tone={m.engineering === "implemented" ? "ok" : m.engineering === "partial" ? "amber" : "neutral"}>
-                        {engBadge[m.engineering] ?? m.engineering}
-                      </Badge>
-                      <span className="text-ink-4 font-mono">{m.dataState}</span>
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[12px] leading-relaxed text-ink-3">{m.noteZh}</p>
-                  <p className="mt-0.5 text-[11.5px] text-ink-4">业务验收状态：{m.business}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Gaps List */}
-          <section className="mt-4" aria-label="数据缺口">
-            <h2 className="pb-1 text-[12px] font-semibold uppercase tracking-wide text-ink-3">
-              当前数据缺口与合规限制（诚实陈述）
-            </h2>
-            <ul className="mt-1 list-disc space-y-1 pl-5 text-[12px] text-ink-3">
-              {overview.gaps.map((g, idx) => (
-                <li key={idx}>{g}</li>
-              ))}
-            </ul>
-          </section>
-        </>
-      )}
+      <WorkspaceAuthGate error={signalsResult.error} laneName="市场信号工作台" returnTo="/market">
+        <div className="mt-6">
+          <IntelligenceFeed
+            items={feedItems}
+            showLane={false}
+            emptyTitle="暂无符合条件的市场信号"
+            emptyMessage="当前筛选下暂无新的观测信号。系统坚持实证原则：无真实观测时不伪造虚假市场新闻。"
+          />
+        </div>
       </WorkspaceAuthGate>
+
+      <p className="mt-8 text-[11.5px] leading-relaxed text-ink-4">
+        市场信号由确定性度量规则（C1 排名位移、C3 榜内可比、C4 首次观测、Cpsc 缺陷反证）计算；未经许可或缺乏多期基线时不作外推。后台工程能力详情请查看「12 模块工程矩阵」。
+      </p>
     </div>
   );
 }

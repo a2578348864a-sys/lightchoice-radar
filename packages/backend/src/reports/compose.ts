@@ -16,6 +16,7 @@ import { chatJson } from "../providers/llm.ts";
 import { completeReceipt } from "../providers/receipts.ts";
 import { shutdownSignal } from "../jobs/queue.ts";
 import { emit } from "../modules.ts";
+import { config } from "../config.ts";
 import { arrangeDaily, candidates, dailyEdition, periodEntries, sectionOf, SECTION_ORDER, type Candidate, type EditionEntry } from "./edition.ts";
 
 export const REPORT_VERSION = promptVersion("report-period", "report-period-sections", "report-period-no-sections");
@@ -92,8 +93,6 @@ export async function composeDaily(date: string, reason?: string): Promise<{ key
   const end = beijingAt(date, EDITION_TIMES.daily);
   const start = new Date(end.getTime() - 86400000);
   const edition = await dailyEdition(date, start, end);
-  // Nothing judged in the window is a failure upstream, not a quiet day: the run fails and is caught up later.
-  if (edition.entries.length === 0 && edition.stats.judgedReports === 0) throw new Error(`daily ${date}: nothing judged in its window`);
   const issue = arrangeDaily(edition.entries);
   const [lead, ...rest] = issue.main;
   const content = {
@@ -214,19 +213,22 @@ async function composePeriod(kind: "weekly" | "monthly", key: string, startDate:
     .map((label) => ({ label, items: top.filter((e) => sectionOf(e.category) === label) }))
     .filter((g) => g.items.length > 0);
   const corpus = [`${startDate} ${endDateInclusive}`, ...top.map((e) => `${e.title} ${e.summary}`)].join("\n");
-  const model = await modelFor("report");
   let written: z.infer<typeof PeriodSchema> = { overview: "", sections: {} };
   let receiptId: number | null = null;
-  try {
-    const res = await chatJson({
-      model, purpose: `report_${kind}`, subject: `report:${kind}:${key}`, promptVersion: REPORT_VERSION,
-      ...periodPrompt(kind, startDate, endDateInclusive, groups), schema: PeriodSchema, temperature: 0.3, maxTokens: 2500,
-    });
-    written = res.data;
-    receiptId = res.receiptId;
-  } catch (error) {
-    if (shutdownSignal.signal.aborted) throw error;
-    console.error(JSON.stringify({ level: "warn", msg: "period writer failed; the issue goes out with its plain overview", report: `${kind}:${key}`, error: logError(error) }));
+  let model: string | null = null;
+  if (!config.ruleOnlyMode) {
+    try {
+      model = await modelFor("report");
+      const res = await chatJson({
+        model, purpose: `report_${kind}`, subject: `report:${kind}:${key}`, promptVersion: REPORT_VERSION,
+        ...periodPrompt(kind, startDate, endDateInclusive, groups), schema: PeriodSchema, temperature: 0.3, maxTokens: 2500,
+      });
+      written = res.data;
+      receiptId = res.receiptId;
+    } catch (error) {
+      if (shutdownSignal.signal.aborted) throw error;
+      console.error(JSON.stringify({ level: "warn", msg: "period writer failed; the issue goes out with its plain overview", report: `${kind}:${key}`, error: logError(error) }));
+    }
   }
   const usable = (text: string | undefined, max: number) => {
     const fit = fitted(text ?? "", max);

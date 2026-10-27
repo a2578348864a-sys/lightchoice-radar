@@ -516,12 +516,87 @@ export interface MarketSignal {
   at: string;
 }
 
+/**
+ * Formal admission gate for market signals.
+ * Disqualifies:
+ * 1. Future dates (sig.at > now, or date in evidenceRefs > today)
+ * 2. Test/synthetic sources in basisVersions or evidenceRefs (e.g. test-amz-chart, test-amz123)
+ * 3. Synthetic/test products or titles (e.g. New Entrant Product, Historical Test Product)
+ * 4. Evidence refs containing test or mock
+ */
+export function isFormalMarketSignal(sig: MarketSignal, now: Date = new Date()): boolean {
+  if (!sig || !sig.id) return false;
+
+  const nowIso = now.toISOString();
+  const todayStr = nowIso.slice(0, 10);
+
+  // Future date check
+  if (sig.at && sig.at > nowIso) return false;
+
+  // Evidence refs check
+  for (const ref of sig.evidenceRefs || []) {
+    const dateMatch = /\b\d{4}-\d{2}-\d{2}\b/.exec(ref);
+    if (dateMatch && dateMatch[0] > todayStr) {
+      return false;
+    }
+    const rLower = ref.toLowerCase();
+    if (rLower.includes("test") || rLower.includes("synth") || rLower.includes("mock")) {
+      return false;
+    }
+  }
+
+  // Basis versions check
+  for (const basis of sig.basisVersions || []) {
+    const bLower = basis.toLowerCase();
+    if (bLower.includes("test-") || bLower.includes("synth") || bLower.startsWith("test")) {
+      return false;
+    }
+  }
+
+  // Title / subject check
+  const subLower = (sig.subjectZh || "").toLowerCase();
+  const detLower = (sig.detailZh || "").toLowerCase();
+  if (
+    subLower.includes("test product") ||
+    subLower.includes("new entrant product") ||
+    subLower.includes("historical test") ||
+    subLower.includes("apex thermal flask") ||
+    subLower.includes("测试") ||
+    detLower.includes("test product")
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
 /** Detects keyword demand signals (M01) and chart movement signals (M03/M04) from loaded data. */
-export async function detectMarketSignals(opts: { keywordRiseThreshold?: number } = {}): Promise<MarketSignal[]> {
+export async function detectMarketSignals(opts: { keywordRiseThreshold?: number; includeTest?: boolean } = {}): Promise<MarketSignal[]> {
   const rise = opts.keywordRiseThreshold ?? 5;
+  const includeTest = opts.includeTest === true;
   const signals: MarketSignal[] = [];
-  const revoked = new Set((await loadMarketSources()).filter((x) => x.revokedAt).map((x) => x.id)); // revoked sources leave the signal layer
-  const kwSnaps = (await loadKeywordSnapshots()).filter((x) => !revoked.has(x.sourceId));
+  const sources = await loadMarketSources();
+  const revoked = new Set(sources.filter((x) => x.revokedAt).map((x) => x.id));
+  const formalSourceIds = new Set(
+    sources
+      .filter((x) => x.enabled && !x.revokedAt && x.kind !== "synthetic-test" && !x.id.startsWith("test-"))
+      .map((x) => x.id)
+  );
+
+  const nowIso = new Date().toISOString();
+  const todayStr = nowIso.slice(0, 10);
+
+  let kwSnaps = (await loadKeywordSnapshots()).filter((x) => !revoked.has(x.sourceId));
+  if (!includeTest) {
+    kwSnaps = kwSnaps.filter(
+      (x) =>
+        formalSourceIds.has(x.sourceId) &&
+        !x.sourceId.startsWith("test-") &&
+        x.periodStart <= todayStr &&
+        x.observedAt <= nowIso
+    );
+  }
+
   for (const snap of kwSnaps) {
     const basis = [keywordSnapshotBasisVersion(snap)];
     for (const c of keywordChanges(snap)) {
@@ -535,7 +610,18 @@ export async function detectMarketSignals(opts: { keywordRiseThreshold?: number 
       }
     }
   }
-  const charts = (await loadChartSnapshots()).filter((x) => !revoked.has(x.sourceId));
+
+  let charts = (await loadChartSnapshots()).filter((x) => !revoked.has(x.sourceId));
+  if (!includeTest) {
+    charts = charts.filter(
+      (x) =>
+        formalSourceIds.has(x.sourceId) &&
+        !x.sourceId.startsWith("test-") &&
+        x.periodKey <= todayStr &&
+        x.observedAt <= nowIso
+    );
+  }
+
   const byChart = new Map<string, MarketChartSnapshot[]>();
   for (const c of charts) {
     const list = byChart.get(c.chartId) ?? [];
@@ -564,7 +650,7 @@ export async function detectMarketSignals(opts: { keywordRiseThreshold?: number 
       }
     }
   }
-  return signals;
+  return includeTest ? signals : signals.filter((s) => isFormalMarketSignal(s));
 }
 
 /** Current-state module dashboard inputs (M03 cards + M06 current prices + comparability marks). */

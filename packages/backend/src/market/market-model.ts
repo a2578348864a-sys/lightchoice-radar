@@ -376,6 +376,50 @@ export async function loadProductSafetyEvent(id: string): Promise<ProductSafetyE
   return row?.value ?? null;
 }
 
+/**
+ * Formal admission gate for CPSC product safety events.
+ * Disqualifies:
+ * 1. Test/synthetic sources (cpsc-test-source, cpsc-autorun-source, autonomous-test-source, etc.)
+ * 2. Synthetic runs (cpsc-synth-run-*)
+ * 3. Synthetic/test URLs (e.g. test-cpsc-test-guid)
+ * 4. Synthetic/test product names (e.g. Apex Thermal Flask, Test Product)
+ * 5. Future dates (sourcePublishedAt > now)
+ */
+export function isFormalProductSafetyEvent(evt: ProductSafetyEvent, now: Date = new Date()): boolean {
+  if (!evt || !evt.id || !evt.sourceId) return false;
+
+  const nowIso = now.toISOString();
+  if (evt.sourcePublishedAt && evt.sourcePublishedAt > nowIso) return false;
+  if (evt.observedAt && evt.observedAt > nowIso) return false;
+
+  const sid = evt.sourceId.toLowerCase();
+  if (sid.includes("test") || sid.includes("autorun") || sid.includes("verify") || sid.startsWith("synth-")) {
+    return false;
+  }
+
+  if (evt.runId) {
+    const rid = evt.runId.toLowerCase();
+    if (rid.includes("synth") || rid.includes("test") || rid.includes("mock") || rid.includes("sandbox")) {
+      return false;
+    }
+  }
+
+  if (!evt.officialUrl || !evt.officialUrl.startsWith("https://www.cpsc.gov/")) {
+    return false;
+  }
+  const urlLower = evt.officialUrl.toLowerCase();
+  if (urlLower.includes("test-cpsc") || urlLower.includes("test-guid") || urlLower.includes("mock")) {
+    return false;
+  }
+
+  const nameLower = (evt.productName || "").toLowerCase();
+  if (nameLower.includes("test product") || nameLower.includes("apex thermal flask")) {
+    return false;
+  }
+
+  return true;
+}
+
 /* ------------------------------------------------------- evidence versioning */
 
 /** Snapshot articles carry a basis version = sourceId + period + content hash; opportunities bind to it. */

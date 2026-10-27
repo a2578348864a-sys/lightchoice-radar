@@ -67,3 +67,4 @@ export const IconTrendDown = (p: P) => (<Svg {...p}><path d="M3 7l6 6 4-4 8 8" /
 export const IconMinus = (p: P) => (<Svg {...p}><path d="M5 12h14" /></Svg>);
 export const IconCheck = (p: P) => (<Svg {...p}><path d="M5 12.5l4.5 4.5L19 7.5" /></Svg>);
 export const IconCopy = (p: P) => (<Svg {...p}><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3" /></Svg>);
+export const IconShield = (p: P) => (<Svg {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></Svg>);

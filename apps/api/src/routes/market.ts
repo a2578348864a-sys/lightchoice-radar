@@ -4,11 +4,11 @@
 import type { FastifyInstance } from "fastify";
 import { adminHandler } from "./admin-auth.ts";
 import { loadMarketOverview, loadKeywordView, loadProductView, loadOpportunityView, loadAlertsView } from "@aihot/backend/market/market-read";
-import { keywordHistoryDetail, productHistoryDetail, categoryMarketSummary } from "@aihot/backend/market/market-metrics";
+import { keywordHistoryDetail, productHistoryDetail, categoryMarketSummary, detectMarketSignals, isFormalMarketSignal } from "@aihot/backend/market/market-metrics";
 import { seedMarketSources } from "@aihot/backend/market/market-import";
 import { getMarketSchedulerStatus, runDueMarketSources } from "@aihot/backend/market/market-scheduler";
 import { buildOpportunityCandidates, computeScenarios, evaluateAlerts, propagateSourceRevocation, refreshOpportunities, retireUnqualifiedAlerts, reviewOpportunity, type ScenarioInput } from "@aihot/backend/market/market-opportunity";
-import { revokeMarketSource, saveMarketAlertRule, saveMarketSource, saveMarketExternalRecord, loadMarketExternalRecords, saveMarketInnovationCue, loadMarketInnovationCues, loadProductSafetyEvents, type MarketSource, type MarketExternalRecord, type MarketInnovationCue } from "@aihot/backend/market/market-model";
+import { revokeMarketSource, saveMarketAlertRule, saveMarketSource, saveMarketExternalRecord, loadMarketExternalRecords, saveMarketInnovationCue, loadMarketInnovationCues, loadProductSafetyEvents, isFormalProductSafetyEvent, type MarketSource, type MarketExternalRecord, type MarketInnovationCue } from "@aihot/backend/market/market-model";
 
 export function registerMarket(app: FastifyInstance) {
   const noStore = { "Cache-Control": "no-store" } as const;
@@ -91,6 +91,65 @@ export function registerMarket(app: FastifyInstance) {
     return reply.headers(noStore).send(res);
   }));
   app.get("/api/market/safety-events", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadProductSafetyEvents())));
+
+  // Area 8 — unified market signals feed: search demand, chart changes, and safety recalls.
+  app.get("/api/market/signals", adminHandler(async (req, reply) => {
+    const q = req.query as Record<string, string | undefined>;
+    const includeTest = q.includeTest === "true";
+    const [rawSignals, allSafetyEvents] = await Promise.all([
+      detectMarketSignals({ includeTest }),
+      loadProductSafetyEvents(),
+    ]);
+
+    const safetyEvents = includeTest ? allSafetyEvents : allSafetyEvents.filter((evt) => isFormalProductSafetyEvent(evt));
+
+    const safetySignals = safetyEvents.map((evt) => {
+      const isFormal = isFormalProductSafetyEvent(evt);
+      return {
+        id: evt.id,
+        module: "09",
+        kind: "product-safety-recall",
+        subjectZh: `消费品安全召回反证：${evt.productName}`,
+        detailZh: `${evt.recallTitle} · 隐患：${evt.hazardDescriptionZh}。CPSC 官方通告反证，严禁推断为爆品商机。`,
+        strength: 1,
+        evidenceRefs: [evt.officialUrl],
+        basisVersions: [evt.sourceId],
+        formulaVersion: "cpsc-v1",
+        at: evt.sourcePublishedAt || evt.observedAt,
+        isTest: !isFormal,
+        sourceName: "CPSC 官方通告",
+        extra: {
+          productName: evt.productName,
+          officialUrl: evt.officialUrl,
+          hazardType: evt.hazardType,
+          hazardDescriptionZh: evt.hazardDescriptionZh,
+          explanation: evt.explanation,
+          categoryCandidate: evt.categoryCandidate,
+        },
+      };
+    });
+
+    let all = [
+      ...rawSignals.map((s) => ({
+        ...s,
+        isTest: !isFormalMarketSignal(s),
+        sourceName: s.module === "01" ? "AMZ123 ABA 热搜" : "Amazon BSR 观察",
+      })),
+      ...safetySignals,
+    ];
+
+    if (!includeTest) {
+      all = all.filter((s) => !s.isTest);
+    }
+
+    if (q.module) all = all.filter((s) => s.module === q.module);
+    if (q.q) {
+      const term = q.q.toLowerCase();
+      all = all.filter((s) => s.subjectZh.toLowerCase().includes(term) || s.detailZh.toLowerCase().includes(term));
+    }
+    all.sort((a, b) => b.at.localeCompare(a.at));
+    return reply.headers(noStore).send({ signals: all, total: all.length });
+  }));
 
   // Area 7 — External platforms (module 08) & Innovations (module 09) private manual records.
   app.get("/api/market/externals", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadMarketExternalRecords())));

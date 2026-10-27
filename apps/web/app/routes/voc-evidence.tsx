@@ -51,7 +51,7 @@ export default function VocEvidence() {
     <div className="pb-10">
       <PhoneBar back={{ to: "/voc", label: "消费者原声" }} title="反馈证据库" />
       <nav aria-label="面包屑导航" className="hidden lg:flex items-center gap-1.5 text-[12px] text-ink-4 pb-2">
-        <Link to="/voc" className="hover:text-ink transition-colors">第三主线 · 消费者原声</Link>
+        <Link to="/voc" className="hover:text-ink transition-colors">消费者原声</Link>
         <span>/</span>
         <span className="text-ink-2 font-medium">反馈证据库</span>
       </nav>
