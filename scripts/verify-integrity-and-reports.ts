@@ -71,6 +71,27 @@ async function main() {
   await page.screenshot({ path: mktShot, fullPage: true });
   results.push({ route: "/market", status: mktStatus, checks: mktChecks, screenshot: mktShot });
 
+  // 2b. /market?test=all (Verify test bypass is completely closed in UI)
+  console.log("Checking /market?test=all ...");
+  const mktTestRes = await page.goto("http://127.0.0.1:3000/market?test=all", { waitUntil: "networkidle" });
+  const mktTestStatus = mktTestRes?.status() ?? 0;
+  const mktTestHtml = await page.content();
+  const mktTestChecks: string[] = [];
+
+  if (mktTestHtml.includes("暂无符合条件的市场信号")) {
+    mktTestChecks.push("PASS: /market?test=all ignores test query and maintains honest empty state");
+  } else {
+    mktTestChecks.push("FAIL: /market?test=all exposed test data!");
+  }
+  if (!mktTestHtml.includes("New Entrant Product") && !mktTestHtml.includes("Historical Test Product") && !mktTestHtml.includes("Apex Thermal Flask")) {
+    mktTestChecks.push("PASS: No test items in /market?test=all");
+  } else {
+    mktTestChecks.push("FAIL: Found test items in /market?test=all!");
+  }
+  const mktTestShot = path.join(SCREENSHOT_DIR, "02b_market_bypass_closed.png");
+  await page.screenshot({ path: mktTestShot, fullPage: true });
+  results.push({ route: "/market?test=all", status: mktTestStatus, checks: mktTestChecks, screenshot: mktTestShot });
+
   // 3. /market/workbench
   console.log("Checking /market/workbench ...");
   const wbRes = await page.goto("http://127.0.0.1:3000/market/workbench", { waitUntil: "networkidle" });

@@ -36,7 +36,32 @@ export function dailyMetrics(main: EditionEntry[]) {
   };
 }
 
-type ReportKind = "daily" | "weekly" | "monthly";
+export type ReportKind = "daily" | "weekly" | "monthly";
+
+/** When an issue of a report kind falls due for formal publication (Beijing time). */
+export function reportDueAt(kind: ReportKind, key: string): Date {
+  if (kind === "daily") {
+    return beijingAt(key, EDITION_TIMES.daily);
+  }
+  if (kind === "weekly") {
+    const range = isoWeekRange(key);
+    if (!range) throw new Error(`bad week label ${key}`);
+    const monday = addDays(range.end, 1);
+    return beijingAt(monday, EDITION_TIMES.weekly);
+  }
+  if (kind === "monthly") {
+    const range = monthRange(key);
+    if (!range) throw new Error(`bad month label ${key}`);
+    const firstOfNextMonth = addDays(range.end, 1);
+    return beijingAt(firstOfNextMonth, EDITION_TIMES.monthly);
+  }
+  throw new Error(`unknown report kind: ${kind}`);
+}
+
+/** Whether an issue of a report kind is due by `now`. */
+export function isReportDue(kind: ReportKind, key: string, now = new Date()): boolean {
+  return now.getTime() >= reportDueAt(kind, key).getTime();
+}
 
 /** How many events an issue already published carries; nothing when it does not exist yet. */
 async function savedReport(kind: ReportKind, key: string) {
@@ -51,7 +76,21 @@ async function savedReport(kind: ReportKind, key: string) {
  * it is. With a reason (an explicit regeneration) the issue is replaced and the edition it replaces is
  * kept as a revision. Says whether the issue was written.
  */
-async function saveReport(kind: ReportKind, key: string, start: Date, end: Date, content: Record<string, unknown>, reason: string | undefined, model: string | null, receiptIds: number[]): Promise<boolean> {
+async function saveReport(
+  kind: ReportKind,
+  key: string,
+  start: Date,
+  end: Date,
+  content: Record<string, unknown>,
+  reason: string | undefined,
+  model: string | null,
+  receiptIds: number[],
+  now = new Date(),
+): Promise<boolean> {
+  if (!isReportDue(kind, key, now)) {
+    const due = reportDueAt(kind, key);
+    throw new Error(`cannot save premature report ${kind}:${key}; period not due until ${due.toISOString()}`);
+  }
   return sql.begin(async (tx) => {
     const insert = async () => (await tx`INSERT INTO reports (kind, key, window_start, window_end, content, generated_at, model, origin)
       VALUES (${kind}, ${key}, ${start}, ${end}, ${tx.json(content as never)}, now(), ${model}, 'model') ON CONFLICT (kind, key) DO NOTHING`).count > 0;
@@ -87,7 +126,17 @@ function windowPoint(at: Date): string {
  * the editors judged with nothing new in it still has its issue: no entries, and a lead that says so
  * (REPORTS.quiet).
  */
-export async function composeDaily(date: string, reason?: string): Promise<{ key: string; entries: number }> {
+export async function composeDaily(
+  date: string,
+  reason?: string,
+  now = new Date(),
+): Promise<{ key: string; entries: number; preview?: boolean; content?: Record<string, unknown> }> {
+  const dueAt = reportDueAt("daily", date);
+  if (now.getTime() < dueAt.getTime()) {
+    if (reason !== "preview") {
+      throw new Error(`daily ${date} is not yet due for publication (due at ${dueAt.toISOString()})`);
+    }
+  }
   const previous = await savedReport("daily", date);
   if (previous && reason === undefined) return { key: date, entries: previous.entries };
   const end = beijingAt(date, EDITION_TIMES.daily);
@@ -111,7 +160,10 @@ export async function composeDaily(date: string, reason?: string): Promise<{ key
     windowEnd: end.toISOString(),
     generator: { version: REPORT_VERSION, ...edition.stats, ...issue.stats },
   };
-  await saveReport("daily", date, start, end, content, reason, null, []);
+  if (reason === "preview") {
+    return { key: date, entries: issue.main.length, preview: true, content };
+  }
+  await saveReport("daily", date, start, end, content, reason, null, [], now);
   return { key: date, entries: issue.main.length };
 }
 
@@ -190,7 +242,20 @@ export function fitted(text: string, max: number): string | null {
  * Without a usable overview the issue is saved with none (see periodOverview).
  * An automatic run skips a complete period of quiet dailies without publishing an empty issue.
  */
-async function composePeriod(kind: "weekly" | "monthly", key: string, startDate: string, endDateInclusive: string, reason: string | undefined) {
+async function composePeriod(
+  kind: "weekly" | "monthly",
+  key: string,
+  startDate: string,
+  endDateInclusive: string,
+  reason: string | undefined,
+  now = new Date(),
+): Promise<{ key: string; entries: number; preview?: boolean; content?: Record<string, unknown> } | null> {
+  const dueAt = reportDueAt(kind, key);
+  if (now.getTime() < dueAt.getTime()) {
+    if (reason !== "preview") {
+      throw new Error(`${kind} ${key} is not yet due for publication (due at ${dueAt.toISOString()})`);
+    }
+  }
   const previous = await savedReport(kind, key);
   if (previous && reason === undefined) return { key, entries: previous.entries };
   // The dailies' windows run from the edition time the day before the first to that time on the last.
@@ -253,20 +318,23 @@ async function composePeriod(kind: "weekly" | "monthly", key: string, startDate:
     metrics: { totalStories: top.length, selectedCount: selected.length, reportsCovered: issues },
     generator: { version: REPORT_VERSION, model, written: overview !== null },
   };
-  await saveReport(kind, key, start, end, content, reason, model, receiptId === null ? [] : [receiptId]);
+  if (reason === "preview") {
+    return { key, entries: top.length, preview: true, content };
+  }
+  await saveReport(kind, key, start, end, content, reason, model, receiptId === null ? [] : [receiptId], now);
   return { key, entries: top.length };
 }
 
-export async function composeWeekly(label: string, reason?: string) {
+export async function composeWeekly(label: string, reason?: string, now = new Date()) {
   const range = isoWeekRange(label);
   if (!range) throw new Error(`bad week label ${label}`);
-  return composePeriod("weekly", label, range.start, range.end, reason);
+  return composePeriod("weekly", label, range.start, range.end, reason, now);
 }
 
-export async function composeMonthly(label: string, reason?: string) {
+export async function composeMonthly(label: string, reason?: string, now = new Date()) {
   const range = monthRange(label);
   if (!range) throw new Error(`bad month label ${label}`);
-  return composePeriod("monthly", label, range.start, range.end, reason);
+  return composePeriod("monthly", label, range.start, range.end, reason, now);
 }
 
 /** The newest daily due by `now`: today's from its edition time (Beijing), yesterday's before. */
@@ -308,9 +376,9 @@ export async function composeDueReports(now = new Date(), limit = 8): Promise<{ 
   const generated: string[] = [];
   const failed: string[] = [];
   const kinds: Array<{ kind: ReportKind; due: string; next: (k: string) => string; end: (k: string) => string; compose: (k: string) => Promise<unknown> }> = [
-    { kind: "daily", due: dueDaily(now), next: (k) => addDays(k, 1), end: (k) => k, compose: composeDaily },
-    { kind: "weekly", due: dueWeekly(now), next: nextWeek, end: (k) => isoWeekRange(k)!.end, compose: composeWeekly },
-    { kind: "monthly", due: dueMonthly(now), next: nextMonth, end: (k) => monthRange(k)!.end, compose: composeMonthly },
+    { kind: "daily", due: dueDaily(now), next: (k) => addDays(k, 1), end: (k) => k, compose: (k) => composeDaily(k, undefined, now) },
+    { kind: "weekly", due: dueWeekly(now), next: nextWeek, end: (k) => isoWeekRange(k)!.end, compose: (k) => composeWeekly(k, undefined, now) },
+    { kind: "monthly", due: dueMonthly(now), next: nextMonth, end: (k) => monthRange(k)!.end, compose: (k) => composeMonthly(k, undefined, now) },
   ];
   // Weeklies and monthlies sum up dailies: a period that ended before the site's first daily has nothing to sum
   // up and is not due (a site started mid-month would otherwise fail that month's issue on every run).

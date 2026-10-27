@@ -93,54 +93,50 @@ export function registerMarket(app: FastifyInstance) {
   app.get("/api/market/safety-events", adminHandler(async (_req, reply) => reply.headers(noStore).send(await loadProductSafetyEvents())));
 
   // Area 8 — unified market signals feed: search demand, chart changes, and safety recalls.
+  // P0-D: Formal business API strictly and unconditionally returns only formal intelligence.
+  // No test parameter or bypass is accepted.
   app.get("/api/market/signals", adminHandler(async (req, reply) => {
     const q = req.query as Record<string, string | undefined>;
-    const includeTest = q.includeTest === "true";
     const [rawSignals, allSafetyEvents] = await Promise.all([
-      detectMarketSignals({ includeTest }),
+      detectMarketSignals({ includeTest: false }),
       loadProductSafetyEvents(),
     ]);
 
-    const safetyEvents = includeTest ? allSafetyEvents : allSafetyEvents.filter((evt) => isFormalProductSafetyEvent(evt));
+    const safetyEvents = allSafetyEvents.filter((evt) => isFormalProductSafetyEvent(evt));
 
-    const safetySignals = safetyEvents.map((evt) => {
-      const isFormal = isFormalProductSafetyEvent(evt);
-      return {
-        id: evt.id,
-        module: "09",
-        kind: "product-safety-recall",
-        subjectZh: `消费品安全召回反证：${evt.productName}`,
-        detailZh: `${evt.recallTitle} · 隐患：${evt.hazardDescriptionZh}。CPSC 官方通告反证，严禁推断为爆品商机。`,
-        strength: 1,
-        evidenceRefs: [evt.officialUrl],
-        basisVersions: [evt.sourceId],
-        formulaVersion: "cpsc-v1",
-        at: evt.sourcePublishedAt || evt.observedAt,
-        isTest: !isFormal,
-        sourceName: "CPSC 官方通告",
-        extra: {
-          productName: evt.productName,
-          officialUrl: evt.officialUrl,
-          hazardType: evt.hazardType,
-          hazardDescriptionZh: evt.hazardDescriptionZh,
-          explanation: evt.explanation,
-          categoryCandidate: evt.categoryCandidate,
-        },
-      };
-    });
+    const safetySignals = safetyEvents.map((evt) => ({
+      id: evt.id,
+      module: "09",
+      kind: "product-safety-recall",
+      subjectZh: `消费品安全召回反证：${evt.productName}`,
+      detailZh: `${evt.recallTitle} · 隐患：${evt.hazardDescriptionZh}。CPSC 官方通告反证，严禁推断为爆品商机。`,
+      strength: 1,
+      evidenceRefs: [evt.officialUrl],
+      basisVersions: [evt.sourceId],
+      formulaVersion: "cpsc-v1",
+      at: evt.sourcePublishedAt || evt.observedAt,
+      isTest: false,
+      sourceName: "CPSC 官方通告",
+      extra: {
+        productName: evt.productName,
+        officialUrl: evt.officialUrl,
+        hazardType: evt.hazardType,
+        hazardDescriptionZh: evt.hazardDescriptionZh,
+        explanation: evt.explanation,
+        categoryCandidate: evt.categoryCandidate,
+      },
+    }));
 
     let all = [
-      ...rawSignals.map((s) => ({
+      ...rawSignals.filter((s) => isFormalMarketSignal(s)).map((s) => ({
         ...s,
-        isTest: !isFormalMarketSignal(s),
+        isTest: false,
         sourceName: s.module === "01" ? "AMZ123 ABA 热搜" : "Amazon BSR 观察",
       })),
       ...safetySignals,
     ];
 
-    if (!includeTest) {
-      all = all.filter((s) => !s.isTest);
-    }
+    all = all.filter((s) => !s.isTest && isFormalMarketSignal(s));
 
     if (q.module) all = all.filter((s) => s.module === q.module);
     if (q.q) {

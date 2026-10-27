@@ -43,18 +43,16 @@ export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
   const q = url.searchParams.get("q") || "";
   const moduleParam = url.searchParams.get("module") || "";
-  const includeTest = url.searchParams.get("test") === "all";
 
   const qs = new URLSearchParams();
   if (q) qs.set("q", q);
   if (moduleParam) qs.set("module", moduleParam);
-  if (includeTest) qs.set("includeTest", "true");
 
   const signalsResult = await marketGet<MarketSignalsResponse>(
     request,
     `/api/market/signals?${qs.toString()}`
   );
-  return { signalsResult, currentModule: moduleParam, includeTest, q };
+  return { signalsResult, currentModule: moduleParam, q };
 }
 
 export function meta() {
