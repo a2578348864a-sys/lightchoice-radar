@@ -8,7 +8,7 @@ import { proxiedImage, proxiedImageSet } from "../media/imgproxy.ts";
 import { isoWeekRange, monthRange } from "@aihot/contracts/time";
 import { dailyUrl, itemUrl, periodUrl, siteUrl } from "./links.ts";
 import { publicSourceName } from "./rules.ts";
-import { listedCondition } from "./scope.ts";
+import { reportReadableCondition } from "./scope.ts";
 
 export type { ReportKind };
 
@@ -23,31 +23,64 @@ interface ReportRow {
 
 interface Availability {
   available: boolean;
+  unavailableReason?: string;
   /** The article's public summary, for issues saved before summaries were frozen into them. */
   summary: string | null;
   firstParty: boolean;
   sourceId: string | null;
   sourceName: string | null;
   sourceIcon: string | null;
+  sourceUrl: string | null;
   publishedAt: Date | null;
 }
 
 async function availability(ids: string[]): Promise<Map<string, Availability>> {
   const out = new Map<string, Availability>();
   if (ids.length === 0) return out;
-  const rows = await sql<{ id: string; available: boolean; summary: string | null; first_party: boolean; source_id: string; source_name: string | null; icon_url: string | null; at: Date | null }[]>`
-    SELECT p.article_id AS id, (${listedCondition(new Date())}) AS available, p.summary, (s.tier = 'T1') AS first_party, p.source_id, s.name AS source_name, s.icon_url,
-      coalesce(p.published_at, p.discovered_at) AS at
-    FROM publications p LEFT JOIN sources s ON s.id = p.source_id
+  const now = new Date();
+  const rows = await sql<{
+    id: string;
+    available: boolean;
+    summary: string | null;
+    first_party: boolean;
+    source_id: string;
+    source_name: string | null;
+    icon_url: string | null;
+    source_url: string | null;
+    at: Date | null;
+    visibility: string;
+    visible_after: Date | null;
+  }[]>`
+    SELECT p.article_id AS id, (${reportReadableCondition(now)}) AS available,
+      coalesce(nullif(p.summary, ''), nullif(a.excerpt, '')) AS summary,
+      (s.tier = 'T1') AS first_party, p.source_id, s.name AS source_name, s.icon_url,
+      coalesce(nullif(p.url, ''), nullif(a.url, '')) AS source_url,
+      coalesce(p.published_at, p.discovered_at) AS at,
+      p.visibility, p.visible_after
+    FROM publications p
+    JOIN articles a ON a.id = p.article_id
+    LEFT JOIN sources s ON s.id = p.source_id
     WHERE p.article_id IN ${sql(ids)}`;
   for (const r of rows) {
+    let unavailableReason: string | undefined;
+    if (!r.available) {
+      if (r.visibility === "withdrawn") {
+        unavailableReason = "该内容已按来源方要求下架或调整展示方式。";
+      } else if (r.visible_after && r.visible_after > now) {
+        unavailableReason = "内容尚未到达公开发布时间。";
+      } else {
+        unavailableReason = "该条目未通过正式情报准入标准。";
+      }
+    }
     out.set(r.id, {
       available: r.available,
+      unavailableReason,
       summary: r.summary,
       firstParty: r.first_party,
       sourceId: r.source_id,
       sourceName: r.source_name,
       sourceIcon: r.icon_url,
+      sourceUrl: r.source_url,
       publishedAt: r.at,
     });
   }
@@ -60,7 +93,8 @@ async function unavailableIds(ids: string[]): Promise<Set<string>> {
   if (!unique.length) return new Set();
   const rows = await sql<{ id: string }[]>`
     SELECT p.article_id AS id FROM publications p
-    WHERE p.article_id = ANY(${unique}::text[]) AND NOT (${listedCondition(new Date())})`;
+    LEFT JOIN sources s ON s.id = p.source_id
+    WHERE p.article_id = ANY(${unique}::text[]) AND NOT (${reportReadableCondition(new Date())})`;
   return new Set(rows.map((r) => r.id));
 }
 
@@ -201,10 +235,15 @@ const stillPublic = (raw: Record<string, any>, avail: Map<string, Availability>)
 
 /** Frozen citation fields, with current source metadata and a public summary only if none was saved. */
 function citationMetadata(raw: Record<string, any>, a: Availability | undefined) {
+  const rawSum = typeof raw.summary === "string" && raw.summary.trim() ? raw.summary.trim() : null;
+  const availSum = typeof a?.summary === "string" && a.summary.trim() ? a.summary.trim() : null;
+  const rawUrl = typeof raw.sourceUrl === "string" && raw.sourceUrl.trim() ? raw.sourceUrl.trim() : null;
+  const linkUrl = typeof raw.links?.original === "string" && raw.links.original.trim() ? raw.links.original.trim() : null;
+  const availUrl = typeof a?.sourceUrl === "string" && a.sourceUrl.trim() ? a.sourceUrl.trim() : null;
   return {
-    summary: raw.summary ?? a?.summary ?? null,
+    summary: rawSum ?? availSum ?? null,
     sourceName: String(a?.sourceName ?? raw.sourceName ?? raw.source?.name ?? ""),
-    sourceUrl: String(raw.sourceUrl ?? raw.links?.original ?? ""),
+    sourceUrl: rawUrl ?? availUrl ?? linkUrl ?? "",
     publishedAt: a?.publishedAt?.toISOString() ?? (raw.publishedAt ? new Date(raw.publishedAt).toISOString() : null),
   };
 }
@@ -221,8 +260,16 @@ function citationFrom(raw: Record<string, any>, avail: Map<string, Availability>
   if (!stillPublic(raw, avail)) {
     // Withdrawn since: the reader sees a marked title; the summary and links are not sent at all.
     return {
-      itemId: id, title: String(raw.title ?? ""), summary: null, sourceName: "", sourceUrl: "", sourceIconUrl: null,
-      firstParty: false, publishedAt: null, available: false,
+      itemId: id,
+      title: String(raw.title ?? ""),
+      summary: null,
+      sourceName: "",
+      sourceUrl: "",
+      sourceIconUrl: null,
+      firstParty: false,
+      publishedAt: null,
+      available: false,
+      unavailableReason: a?.unavailableReason ?? "该条目当前不可阅读。",
     };
   }
   const iconSrcSet = a?.sourceIcon ? proxiedImageSet(a.sourceIcon, "avatar") : null;
@@ -296,12 +343,13 @@ async function leadCover(itemId: string): Promise<{ url: string; srcSet?: string
   const [row] = await sql<{ m: { url: string; width?: number; height?: number } }[]>`
     SELECT img.m
     FROM publications p JOIN articles a ON a.id = p.article_id
+    LEFT JOIN sources s ON s.id = p.source_id
     CROSS JOIN LATERAL (
       SELECT m FROM jsonb_array_elements(coalesce(a.media, '[]'::jsonb)) m
       WHERE m->>'kind' = 'image' AND coalesce((m->>'width')::numeric, 800) >= 480 LIMIT 1
     ) img
     WHERE (p.article_id = ${itemId} OR p.story_id = (SELECT story_id FROM publications WHERE article_id = ${itemId}))
-      AND ${listedCondition(new Date())} AND p.body_mode <> 'summary'
+      AND ${reportReadableCondition(new Date())} AND p.body_mode <> 'summary'
     ORDER BY (p.article_id = ${itemId}) DESC, p.first_party DESC, coalesce(p.score, 0) DESC, p.article_id
     LIMIT 1`;
   if (!row) return null;

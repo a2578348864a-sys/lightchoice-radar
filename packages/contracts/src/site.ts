@@ -406,6 +406,8 @@ export interface ReportCitation {
   publishedAt: string | null;
   /** False once the item was withdrawn; the citation then shows as removed. */
   available: boolean;
+  /** When unavailable, explains why (e.g. withdrawn by source, unreleased, ineligible). */
+  unavailableReason?: string;
   /** A daily entry: other sources that reported the event by the issue's cutoff. */
   otherSources?: number;
   /** A daily entry's other developments of the event, or reports of the launch merged into it (titles only). */

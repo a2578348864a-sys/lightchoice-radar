@@ -121,7 +121,7 @@ function Related({ items, className = "" }: { items: ReportCitation[]; className
                 {r.title}
               </IntentLink>
             ) : (
-              <span title={WITHDRAWN_NOTE} className="text-ink-4 line-through">{r.title}</span>
+              <span title={unavailableNote(r)} className="text-ink-4 line-through">{r.title}</span>
             )}
             {r.available && <span className="ml-2 text-[12px] text-ink-4">{r.sourceName}</span>}
           </span>
@@ -169,7 +169,7 @@ function Story({ c, dated, className = "" }: { c: ReportCitation; dated: boolean
         </>
       ) : (
         <p className="mt-3 text-[14px] leading-relaxed text-ink-4">
-          <span className="line-through">{c.title}</span> · {WITHDRAWN_NOTE}
+          <span className="line-through">{c.title}</span> · {unavailableNote(c)}
         </p>
       )}
     </article>
@@ -211,6 +211,10 @@ function leadStoryOf(report: ReportDetail): ReportCitation | null {
 }
 
 const WITHDRAWN_NOTE = "该内容已按来源方要求下架或调整展示方式。";
+
+function unavailableNote(c: ReportCitation): string {
+  return c.unavailableReason || WITHDRAWN_NOTE;
+}
 
 /**
  * Sections as pages. A story cited twice appears once, and
@@ -329,7 +333,7 @@ function FrontPage({ report, pages, leadStory, count }: { report: ReportDetail; 
                       <span className="num w-6 shrink-0 text-[26px] font-black leading-[0.95] tracking-[-0.03em] text-ink-4">{i + 1}</span>
                       <span className="min-w-0 text-[13.5px] leading-[1.55] text-ink-4">
                         <span className="line-through">{h.title}</span>
-                        <span className="mt-1 block text-[12px]">{WITHDRAWN_NOTE}</span>
+                        <span className="mt-1 block text-[12px]">{unavailableNote(h)}</span>
                       </span>
                     </li>
                   );
@@ -507,7 +511,7 @@ export function ReportPaper({ report, index }: { report: ReportDetail; index: Re
                   {!f.available ? (
                     <span className="text-ink-4">
                       <span className="line-through">{f.title}</span>
-                      <span className="ml-2 text-[12px]">{WITHDRAWN_NOTE}</span>
+                      <span className="ml-2 text-[12px]">{unavailableNote(f)}</span>
                     </span>
                   ) : f.itemId ? (
                     <Link viewTransition to={`/items/${f.itemId}`} className="text-ink transition-colors hover:text-accent">
