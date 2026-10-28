@@ -66,7 +66,7 @@ async function availability(ids: string[]): Promise<Map<string, Availability>> {
     if (!r.available) {
       if (r.visibility === "withdrawn") {
         unavailableReason = "该内容已按来源方要求下架或调整展示方式。";
-      } else if (r.visible_after && r.visible_after > now) {
+      } else if ((r.visible_after && r.visible_after > now) || (r.at && r.at > now)) {
         unavailableReason = "内容尚未到达公开发布时间。";
       } else {
         unavailableReason = "该条目未通过正式情报准入标准。";

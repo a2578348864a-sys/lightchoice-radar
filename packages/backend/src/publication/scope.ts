@@ -38,11 +38,19 @@ export function storyReportCondition(now: Date) {
 
 /**
  * Eligible to be read in a formal report (daily, weekly, monthly).
- * Combines pool-eligible items, explicitly selected items, and admitted editorial items,
- * excluding withdrawn publications and items whose release time has not arrived.
+ * Combines pool-eligible items, explicitly selected items, and admitted editorial items.
+ * Strictly enforces:
+ * 1) p.visibility = 'public' (not withdrawn or draft)
+ * 2) Selected items satisfy releasedCondition(now)
+ * 3) If visible_after is specified, visible_after <= now (protects unselected editorial items)
+ * 4) timeline_at does not postdate now (prevents future facts leaking into reports)
  */
 export function reportReadableCondition(now: Date) {
-  return sql`p.visibility = 'public' AND (p.eligible OR p.selected OR (s.participation_mode = 'editorial' AND s.id NOT LIKE 'rss-%-community')) AND ${releasedCondition(now)}`;
+  return sql`p.visibility = 'public'
+    AND (p.eligible OR p.selected OR (s.participation_mode = 'editorial' AND s.id NOT LIKE 'rss-%-community'))
+    AND ${releasedCondition(now)}
+    AND (p.visible_after IS NULL OR p.visible_after <= ${now})
+    AND (p.timeline_at IS NULL OR p.timeline_at <= ${now})`;
 }
 
 /** Selected set as the website shows it (home timeline, reading groups, topics): every selected report. */
